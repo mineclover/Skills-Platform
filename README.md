@@ -11,6 +11,7 @@ apps/
   skills-manager/    Pinned delivery adapter: provider discovery, links, copies, and verification
 packages/
   skill-contracts/   Shared versioned contracts between the catalog and adapters
+  skills-manager-adapter/ Reference preview/apply implementation of the delivery contract
 docs/
   architecture.md    System boundaries and delivery protocol
 ```

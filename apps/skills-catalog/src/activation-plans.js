@@ -12,6 +12,9 @@ async function createPlanFromRegistry({
   target,
   deliveryRoot,
   distribution,
+  desiredState = "enabled",
+  desiredStateBySkillId = {},
+  mode = "apply",
   now,
 }) {
   if (!deliveryRoot) throw new Error("deliveryRoot is required for a delivery plan preview");
@@ -19,6 +22,7 @@ async function createPlanFromRegistry({
   return createActivationPlan({
     target,
     distribution,
+    mode,
     now,
     operations: skills.map((skill) => ({
       registry_skill_id: skill.id,
@@ -26,7 +30,7 @@ async function createPlanFromRegistry({
       content_digest: skill.content_digest,
       canonical_path: skill.canonical_path,
       delivery_path: path.join(path.resolve(deliveryRoot), deliveryDirectoryName(skill.skill_name)),
-      desired_state: "enabled",
+      desired_state: desiredStateBySkillId[skill.id] ?? desiredState,
     })),
   });
 }

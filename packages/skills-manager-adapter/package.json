@@ -1,0 +1,13 @@
+{
+  "name": "@skills-platform/skills-manager-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reference delivery adapter for Skills Manager activation plans.",
+  "bin": {
+    "skills-manager-adapter": "src/cli.js"
+  },
+  "scripts": {
+    "check": "node --check src/index.js",
+    "test": "node --test"
+  }
+}

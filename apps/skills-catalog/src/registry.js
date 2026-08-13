@@ -1,9 +1,9 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { digestDirectory, listFiles } = require("../../../packages/skill-contracts/src");
 
 const REGISTRY_SCHEMA_VERSION = 1;
-const IGNORED_DIRECTORIES = new Set([".git", "node_modules", "dist", "target"]);
 
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -24,33 +24,6 @@ async function pathExists(candidate) {
   } catch {
     return false;
   }
-}
-
-async function listFiles(root, relative = "") {
-  const directory = path.join(root, relative);
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.isDirectory()) {
-      if (!IGNORED_DIRECTORIES.has(entry.name)) {
-        files.push(...await listFiles(root, path.join(relative, entry.name)));
-      }
-    } else if (entry.isFile()) {
-      files.push(path.join(relative, entry.name));
-    }
-  }
-  return files;
-}
-
-async function digestDirectory(root) {
-  const hash = crypto.createHash("sha256");
-  for (const relativePath of await listFiles(root)) {
-    hash.update(relativePath.replaceAll("\\", "/"));
-    hash.update("\0");
-    hash.update(await fs.readFile(path.join(root, relativePath)));
-    hash.update("\0");
-  }
-  return hash.digest("hex");
 }
 
 function parseSkillMarkdown(content, skillPath) {
@@ -172,6 +145,7 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
       source_revision_id: revisionId,
       skill_name: skill.name,
       source_relative_path: skill.relative_path,
+      artifact_key: `${id}:${skill.relative_path}`,
       description: skill.description,
       content_digest: artifactDigest,
       canonical_path: artifactPath,
@@ -191,6 +165,16 @@ async function listRegistrySkills(registryRoot) {
   return registry.skills.slice().sort((left, right) => left.skill_name.localeCompare(right.skill_name));
 }
 
+function latestSkillsByArtifact(skills) {
+  const latest = new Map();
+  for (const skill of skills) {
+    const key = skill.artifact_key ?? `${skill.source_id}:${skill.source_relative_path}`;
+    const current = latest.get(key);
+    if (!current || current.imported_at.localeCompare(skill.imported_at) <= 0) latest.set(key, skill);
+  }
+  return [...latest.values()].sort((left, right) => left.skill_name.localeCompare(right.skill_name));
+}
+
 async function getRegistrySkills(registryRoot, skillIds) {
   const registry = await loadRegistry(registryRoot);
   const records = skillIds.map((id) => registry.skills.find((skill) => skill.id === id)).filter(Boolean);
@@ -204,6 +188,7 @@ module.exports = {
   discoverSkills,
   getRegistrySkills,
   importLocalSource,
+  latestSkillsByArtifact,
   listRegistrySkills,
   parseSkillMarkdown,
 };

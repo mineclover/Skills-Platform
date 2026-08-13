@@ -1,9 +1,12 @@
 const { randomUUID } = require("node:crypto");
+const path = require("node:path");
+const { digestDirectory, listFiles } = require("./digest");
 
 const ACTIVATION_PLAN_SCHEMA_VERSION = 1;
 const DELIVERY_METHODS = new Set(["symlink", "copy"]);
 const DELIVERY_SCOPES = new Set(["project", "global"]);
 const DESIRED_STATES = new Set(["enabled", "disabled"]);
+const PLAN_MODES = new Set(["apply", "pristine"]);
 
 function requiredString(value, field, issues) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -22,6 +25,9 @@ function validateActivationPlan(plan) {
     issues.push({ field: "schema_version", message: `must equal ${ACTIVATION_PLAN_SCHEMA_VERSION}` });
   }
   requiredString(plan.created_at, "created_at", issues);
+  if (!PLAN_MODES.has(plan.mode)) {
+    issues.push({ field: "mode", message: "must be apply or pristine" });
+  }
 
   const target = plan.target;
   if (!target || typeof target !== "object") {
@@ -45,9 +51,12 @@ function validateActivationPlan(plan) {
     issues.push({ field: "distribution.method", message: "must be symlink or copy" });
   }
 
-  if (!Array.isArray(plan.operations) || plan.operations.length === 0) {
-    issues.push({ field: "operations", message: "must contain at least one operation" });
+  if (!Array.isArray(plan.operations)) {
+    issues.push({ field: "operations", message: "must be an array" });
+  } else if (plan.mode === "apply" && plan.operations.length === 0) {
+    issues.push({ field: "operations", message: "must contain at least one operation for apply mode" });
   } else {
+    const deliveryPaths = new Set();
     plan.operations.forEach((operation, index) => {
       const prefix = `operations[${index}]`;
       requiredString(operation.registry_skill_id, `${prefix}.registry_skill_id`, issues);
@@ -58,17 +67,28 @@ function validateActivationPlan(plan) {
       if (!DESIRED_STATES.has(operation.desired_state)) {
         issues.push({ field: `${prefix}.desired_state`, message: "must be enabled or disabled" });
       }
+      if (typeof operation.delivery_path === "string" && operation.delivery_path.trim() !== "") {
+        const normalizedPath = path.normalize(operation.delivery_path).toLowerCase();
+        if (deliveryPaths.has(normalizedPath)) {
+          issues.push({ field: `${prefix}.delivery_path`, message: "must not duplicate another delivery path" });
+        }
+        deliveryPaths.add(normalizedPath);
+      }
+      if (plan.mode === "pristine" && operation.desired_state !== "disabled") {
+        issues.push({ field: `${prefix}.desired_state`, message: "must be disabled for a pristine plan" });
+      }
     });
   }
 
   return { valid: issues.length === 0, issues };
 }
 
-function createActivationPlan({ target, distribution = {}, operations, now = new Date() }) {
+function createActivationPlan({ target, distribution = {}, operations, mode = "apply", now = new Date() }) {
   const plan = {
     plan_id: randomUUID(),
     schema_version: ACTIVATION_PLAN_SCHEMA_VERSION,
     created_at: now.toISOString(),
+    mode,
     target,
     distribution: {
       method: distribution.method ?? "symlink",
@@ -89,5 +109,7 @@ function createActivationPlan({ target, distribution = {}, operations, now = new
 module.exports = {
   ACTIVATION_PLAN_SCHEMA_VERSION,
   createActivationPlan,
+  digestDirectory,
+  listFiles,
   validateActivationPlan,
 };
