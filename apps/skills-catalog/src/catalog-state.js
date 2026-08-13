@@ -2,7 +2,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { getRegistrySkills } = require("./registry");
 
-const CATALOG_SCHEMA_VERSION = 1;
+const CATALOG_SCHEMA_VERSION = 2;
 const PRISTINE_PRESET_ID = "builtin-pristine";
 
 function now() {
@@ -14,7 +14,19 @@ function catalogFile(catalogRoot) {
 }
 
 function blankCatalog() {
-  return { schema_version: CATALOG_SCHEMA_VERSION, projects: [], presets: [] };
+  return { schema_version: CATALOG_SCHEMA_VERSION, projects: [], presets: [], skill_profiles: [], skill_notes: [] };
+}
+
+function normalizeCatalog(catalog) {
+  if (catalog.schema_version !== 1 && catalog.schema_version !== CATALOG_SCHEMA_VERSION) {
+    throw new Error(`Unsupported catalog schema: ${catalog.schema_version}`);
+  }
+  catalog.projects ??= [];
+  catalog.presets ??= [];
+  catalog.skill_profiles ??= [];
+  catalog.skill_notes ??= [];
+  catalog.schema_version = CATALOG_SCHEMA_VERSION;
+  return catalog;
 }
 
 function pristinePreset() {
@@ -29,11 +41,7 @@ function pristinePreset() {
 
 async function loadCatalog(catalogRoot) {
   try {
-    const catalog = JSON.parse(await fs.readFile(catalogFile(catalogRoot), "utf8"));
-    if (catalog.schema_version !== CATALOG_SCHEMA_VERSION) {
-      throw new Error(`Unsupported catalog schema: ${catalog.schema_version}`);
-    }
-    return catalog;
+    return normalizeCatalog(JSON.parse(await fs.readFile(catalogFile(catalogRoot), "utf8")));
   } catch (error) {
     if (error.code === "ENOENT") return blankCatalog();
     throw error;
@@ -157,4 +165,5 @@ module.exports = {
   listPresets,
   listProjects,
   loadCatalog,
+  saveCatalog,
 };

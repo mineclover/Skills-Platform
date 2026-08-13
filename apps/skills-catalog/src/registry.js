@@ -3,7 +3,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { digestDirectory, listFiles } = require("../../../packages/skill-contracts/src");
 
-const REGISTRY_SCHEMA_VERSION = 1;
+const REGISTRY_SCHEMA_VERSION = 2;
 
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -67,18 +67,42 @@ function blankRegistry() {
     schema_version: REGISTRY_SCHEMA_VERSION,
     sources: [],
     revisions: [],
+    lineages: [],
     skills: [],
   };
+}
+
+function lineageId(artifactKey) {
+  return `lineage_${sha256(artifactKey).slice(0, 20)}`;
+}
+
+function normalizeRegistry(registry) {
+  if (registry.schema_version !== 1 && registry.schema_version !== REGISTRY_SCHEMA_VERSION) {
+    throw new Error(`Unsupported registry schema: ${registry.schema_version}`);
+  }
+  registry.lineages ??= [];
+  for (const skill of registry.skills ?? []) {
+    skill.artifact_key ??= `${skill.source_id}:${skill.source_relative_path}`;
+    skill.lineage_id ??= lineageId(skill.artifact_key);
+    if (!registry.lineages.some((lineage) => lineage.id === skill.lineage_id)) {
+      registry.lineages.push({
+        id: skill.lineage_id,
+        source_id: skill.source_id,
+        artifact_key: skill.artifact_key,
+        source_relative_path: skill.source_relative_path,
+        skill_name: skill.skill_name,
+        created_at: skill.imported_at,
+      });
+    }
+  }
+  registry.schema_version = REGISTRY_SCHEMA_VERSION;
+  return registry;
 }
 
 async function loadRegistry(registryRoot) {
   const file = registryFile(registryRoot);
   if (!await pathExists(file)) return blankRegistry();
-  const registry = JSON.parse(await fs.readFile(file, "utf8"));
-  if (registry.schema_version !== REGISTRY_SCHEMA_VERSION) {
-    throw new Error(`Unsupported registry schema: ${registry.schema_version}`);
-  }
-  return registry;
+  return normalizeRegistry(JSON.parse(await fs.readFile(file, "utf8")));
 }
 
 async function saveRegistry(registryRoot, registry) {
@@ -146,12 +170,23 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
       skill_name: skill.name,
       source_relative_path: skill.relative_path,
       artifact_key: `${id}:${skill.relative_path}`,
+      lineage_id: lineageId(`${id}:${skill.relative_path}`),
       description: skill.description,
       content_digest: artifactDigest,
       canonical_path: artifactPath,
       imported_at: importedAt,
       review_state: "imported",
     };
+    if (!registry.lineages.some((lineage) => lineage.id === record.lineage_id)) {
+      registry.lineages.push({
+        id: record.lineage_id,
+        source_id: id,
+        artifact_key: record.artifact_key,
+        source_relative_path: skill.relative_path,
+        skill_name: skill.name,
+        created_at: importedAt,
+      });
+    }
     if (!existing) registry.skills.push(record);
     imported.push(record);
   }
@@ -183,12 +218,34 @@ async function getRegistrySkills(registryRoot, skillIds) {
   return records;
 }
 
+async function listSkillLineages(registryRoot) {
+  const registry = await loadRegistry(registryRoot);
+  return registry.lineages.slice().sort((left, right) => left.skill_name.localeCompare(right.skill_name));
+}
+
+async function getSkillLineage(registryRoot, lineageIdValue) {
+  const registry = await loadRegistry(registryRoot);
+  const lineage = registry.lineages.find((item) => item.id === lineageIdValue);
+  if (!lineage) throw new Error(`Skill lineage not found: ${lineageIdValue}`);
+  return lineage;
+}
+
+async function getSourceRevision(registryRoot, revisionId) {
+  const registry = await loadRegistry(registryRoot);
+  const revision = registry.revisions.find((item) => item.id === revisionId);
+  if (!revision) throw new Error(`Source revision not found: ${revisionId}`);
+  return revision;
+}
+
 module.exports = {
   defaultRegistryRoot,
   discoverSkills,
   getRegistrySkills,
+  getSourceRevision,
   importLocalSource,
+  getSkillLineage,
   latestSkillsByArtifact,
   listRegistrySkills,
+  listSkillLineages,
   parseSkillMarkdown,
 };

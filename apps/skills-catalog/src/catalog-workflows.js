@@ -3,6 +3,7 @@ const path = require("node:path");
 const { createPlanFromRegistry } = require("./activation-plans");
 const { getPreset, getProject, PRISTINE_PRESET_ID } = require("./catalog-state");
 const { getRegistrySkills, latestSkillsByArtifact, listRegistrySkills } = require("./registry");
+const { listSkillNotes } = require("./skill-management");
 
 async function createProjectPlan({ catalogRoot, registryRoot, projectId, presetId, distribution }) {
   const project = await getProject(catalogRoot, projectId);
@@ -50,7 +51,7 @@ async function exportActivationPlan({ outputPath, plan }) {
   return resolvedOutputPath;
 }
 
-async function buildSystemPrompt({ catalogRoot, registryRoot, presetId }) {
+async function buildSystemPrompt({ catalogRoot, registryRoot, presetId, includeInjectedNotes = false, projectId = null }) {
   const preset = await getPreset(catalogRoot, presetId);
   if (preset.id === PRISTINE_PRESET_ID) {
     return { preset_id: preset.id, included_skill_ids: [], skipped_skill_ids: [], content: "" };
@@ -64,10 +65,24 @@ async function buildSystemPrompt({ catalogRoot, registryRoot, presetId }) {
       const skillMarkdown = await fs.readFile(path.join(skill.canonical_path, "SKILL.md"), "utf8");
       if (skillMarkdown.trim() === "") throw new Error("Empty SKILL.md");
       includedSkillIds.push(skill.id);
-      sections.push([
+      const section = [
         `<!-- registry_skill_id:${skill.id} revision:${skill.source_revision_id} digest:${skill.content_digest} -->`,
         skillMarkdown.trim(),
-      ].join("\n"));
+      ];
+      if (includeInjectedNotes) {
+        const notes = await listSkillNotes({ catalogRoot, lineageId: skill.lineage_id });
+        for (const note of notes.filter((item) => {
+          if (!item.inject_into_prompt) return false;
+          if (item.scope === "global") return true;
+          if (item.scope === "revision") return item.source_revision_id === skill.source_revision_id;
+          if (item.scope === "preset") return item.preset_id === preset.id;
+          if (item.scope === "project") return item.project_id === projectId;
+          return false;
+        })) {
+          section.push(`<!-- registry_note:${note.id} scope:${note.scope} kind:${note.kind} -->`, note.body);
+        }
+      }
+      sections.push(section.join("\n"));
     } catch {
       skippedSkillIds.push(skill.id);
     }
