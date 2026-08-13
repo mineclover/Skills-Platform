@@ -150,7 +150,8 @@ editing `SKILL.md`.
 > Status: Core CLI implemented — templates now have purpose, work-scope tags,
 > owner/lifecycle metadata, immutable versions, version-specific notes, diff,
 > clone/update commands, project version pinning, and effective-set selection /
-> exclusion reasons. Project overlays and persisted activation history remain.
+> exclusion reasons. Work-scope overlay assignments with deterministic priority
+> are also available; persisted activation history remains.
 
 **Goal:** manage reusable skill configurations rather than individual toggles.
 

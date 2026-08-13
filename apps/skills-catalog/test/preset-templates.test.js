@@ -61,8 +61,8 @@ test("template revisions preserve an assigned project's pinned membership", asyn
   const upgradedPlan = await createProjectPlan({ catalogRoot, registryRoot, projectId: "app" });
   assert.equal(upgradedPlan.operations.filter((operation) => operation.desired_state === "enabled").length, 2);
   const effectiveSet = await resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId: "app" });
-  assert.equal(effectiveSet.preset.selected_version, 2);
-  assert.ok(effectiveSet.skills.every((skill) => skill.reason === "selected_by_template"));
+  assert.equal(effectiveSet.assignments[0].template_version, 2);
+  assert.ok(effectiveSet.skills.every((skill) => skill.reason === "selected_by_default_template"));
 });
 
 test("template notes create a new version without modifying a frozen version", async (context) => {
@@ -75,4 +75,32 @@ test("template notes create a new version without modifying a frozen version", a
   assert.equal(template.template_notes[0].author, "mina");
   assert.equal(template.selected_version, 2);
   assert.equal((await getPreset(catalogRoot, "build", 1)).template_notes.length, 0);
+});
+
+test("work-scope overlays add skills only when the requested scope matches", async (context) => {
+  const { catalogRoot, registryRoot, skills } = await fixture(context);
+  await createPreset({ catalogRoot, registryRoot, id: "base", name: "Base", registrySkillIds: [skills.planning.id] });
+  await createPreset({ catalogRoot, registryRoot, id: "verification", name: "Verification", registrySkillIds: [skills.testing.id] });
+  await assignPreset({ catalogRoot, projectId: "app", presetId: "base" });
+  await assignPreset({
+    catalogRoot,
+    projectId: "app",
+    presetId: "verification",
+    role: "work_scope_overlay",
+    priority: 10,
+    workScopeTags: ["implementation"],
+  });
+
+  const regular = await resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId: "app" });
+  const scoped = await resolveProjectEffectiveSet({
+    catalogRoot, registryRoot, projectId: "app", workScopeTags: ["implementation"],
+  });
+  const scopedPlan = await createProjectPlan({
+    catalogRoot, registryRoot, projectId: "app", workScopeTags: ["implementation"],
+  });
+
+  assert.equal(regular.skills.filter((skill) => skill.desired_state === "enabled").length, 1);
+  assert.equal(scoped.skills.filter((skill) => skill.desired_state === "enabled").length, 2);
+  assert.equal(scoped.skills.find((skill) => skill.registry_skill_id === skills.testing.id).reason, "selected_by_work_scope_overlay");
+  assert.equal(scopedPlan.operations.filter((operation) => operation.desired_state === "enabled").length, 2);
 });

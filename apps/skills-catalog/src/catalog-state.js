@@ -4,9 +4,10 @@ const { getRegistrySkills } = require("./registry");
 
 const crypto = require("node:crypto");
 
-const CATALOG_SCHEMA_VERSION = 3;
+const CATALOG_SCHEMA_VERSION = 4;
 const PRISTINE_PRESET_ID = "builtin-pristine";
 const TEMPLATE_LIFECYCLES = new Set(["draft", "reviewed", "deprecated"]);
+const PROJECT_PRESET_ROLES = new Set(["default", "recommended", "work_scope_overlay"]);
 
 function now() {
   return new Date().toISOString();
@@ -60,6 +61,37 @@ function normalizePreset(preset) {
   return preset;
 }
 
+function normalizeAssignment(assignment) {
+  assignment.role ??= "work_scope_overlay";
+  if (!PROJECT_PRESET_ROLES.has(assignment.role)) assignment.role = "work_scope_overlay";
+  assignment.template_version ??= 1;
+  assignment.priority = Number.isFinite(assignment.priority) ? assignment.priority : 0;
+  assignment.work_scope_tags = uniqueStrings(assignment.work_scope_tags);
+  assignment.enabled = assignment.enabled !== false;
+  return assignment;
+}
+
+function normalizeProject(project) {
+  project.default_preset_id ??= PRISTINE_PRESET_ID;
+  project.default_preset_version ??= 1;
+  project.preset_assignments = (project.preset_assignments ?? []).map(normalizeAssignment);
+  if (!project.preset_assignments.some((assignment) => assignment.role === "default")) {
+    project.preset_assignments.unshift({
+      preset_id: project.default_preset_id,
+      template_version: project.default_preset_version,
+      role: "default",
+      priority: 0,
+      work_scope_tags: [],
+      enabled: true,
+      created_at: project.created_at ?? now(),
+    });
+  }
+  const defaultAssignment = project.preset_assignments.find((assignment) => assignment.role === "default");
+  project.default_preset_id = defaultAssignment.preset_id;
+  project.default_preset_version = defaultAssignment.template_version;
+  return project;
+}
+
 function presentPreset(preset, version = preset.active_version) {
   const snapshot = preset.versions.find((item) => item.version === Number(version));
   if (!snapshot) throw new Error(`Preset version not found: ${preset.id}@${version}`);
@@ -72,10 +104,10 @@ function presentPreset(preset, version = preset.active_version) {
 }
 
 function normalizeCatalog(catalog) {
-  if (![1, 2, CATALOG_SCHEMA_VERSION].includes(catalog.schema_version)) {
+  if (![1, 2, 3, CATALOG_SCHEMA_VERSION].includes(catalog.schema_version)) {
     throw new Error(`Unsupported catalog schema: ${catalog.schema_version}`);
   }
-  catalog.projects ??= [];
+  catalog.projects = (catalog.projects ?? []).map(normalizeProject);
   catalog.presets = (catalog.presets ?? []).map(normalizePreset);
   catalog.skill_profiles ??= [];
   catalog.skill_notes ??= [];
@@ -142,6 +174,15 @@ async function createProject({ catalogRoot, id, name, projectPath, providerId, d
     scope,
     default_preset_id: PRISTINE_PRESET_ID,
     default_preset_version: 1,
+    preset_assignments: [{
+      preset_id: PRISTINE_PRESET_ID,
+      template_version: 1,
+      role: "default",
+      priority: 0,
+      work_scope_tags: [],
+      enabled: true,
+      created_at: now(),
+    }],
     created_at: now(),
   };
   catalog.projects.push(project);
@@ -215,13 +256,35 @@ async function getPreset(catalogRoot, presetId, version) {
   return presentPreset(preset, version ?? preset.active_version);
 }
 
-async function assignPreset({ catalogRoot, projectId, presetId, version }) {
+async function assignPreset({ catalogRoot, projectId, presetId, version, role = "default", priority = 0, workScopeTags = [], enabled = true }) {
+  if (!PROJECT_PRESET_ROLES.has(role)) throw new Error("Project preset role is not valid");
   const preset = await getPreset(catalogRoot, presetId, version);
   const catalog = await loadCatalog(catalogRoot);
   const project = catalog.projects.find((item) => item.id === projectId);
   if (!project) throw new Error(`Project not found: ${projectId}`);
-  project.default_preset_id = presetId;
-  project.default_preset_version = preset.selected_version;
+  const assignment = {
+    preset_id: presetId,
+    template_version: preset.selected_version,
+    role,
+    priority: Number(priority),
+    work_scope_tags: uniqueStrings(workScopeTags),
+    enabled: enabled !== false,
+    updated_at: now(),
+  };
+  if (!Number.isFinite(assignment.priority)) throw new Error("Project preset priority must be a number");
+  const existingIndex = role === "default"
+    ? project.preset_assignments.findIndex((item) => item.role === "default")
+    : project.preset_assignments.findIndex((item) => item.role === role && item.preset_id === presetId && item.template_version === preset.selected_version);
+  if (existingIndex >= 0) {
+    project.preset_assignments[existingIndex] = { ...project.preset_assignments[existingIndex], ...assignment };
+  } else {
+    assignment.created_at = now();
+    project.preset_assignments.push(assignment);
+  }
+  if (role === "default") {
+    project.default_preset_id = presetId;
+    project.default_preset_version = preset.selected_version;
+  }
   project.updated_at = now();
   await saveCatalog(catalogRoot, catalog);
   return project;
@@ -335,6 +398,15 @@ async function getProject(catalogRoot, projectId) {
   return project;
 }
 
+async function listProjectPresetAssignments(catalogRoot, projectId) {
+  const project = await getProject(catalogRoot, projectId);
+  return project.preset_assignments.slice().sort((left, right) => {
+    if (left.role === "default") return -1;
+    if (right.role === "default") return 1;
+    return right.priority - left.priority || left.preset_id.localeCompare(right.preset_id);
+  });
+}
+
 function createPlanFileName(plan) {
   return `activation-plan-${plan.plan_id}.json`;
 }
@@ -342,6 +414,7 @@ function createPlanFileName(plan) {
 module.exports = {
   CATALOG_SCHEMA_VERSION,
   PRISTINE_PRESET_ID,
+  PROJECT_PRESET_ROLES,
   assignPreset,
   addPresetTemplateNote,
   clonePresetTemplate,
@@ -352,6 +425,7 @@ module.exports = {
   getPreset,
   getProject,
   listPresets,
+  listProjectPresetAssignments,
   listProjects,
   loadCatalog,
   saveCatalog,

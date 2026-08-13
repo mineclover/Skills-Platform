@@ -5,14 +5,68 @@ const { getPreset, getProject, PRISTINE_PRESET_ID } = require("./catalog-state")
 const { getRegistrySkills, latestSkillsByArtifact, listRegistrySkills } = require("./registry");
 const { listSkillNotes } = require("./skill-management");
 
-async function createProjectPlan({ catalogRoot, registryRoot, projectId, presetId, distribution }) {
+function hasAllTags(candidateTags, requestedTags) {
+  return candidateTags.every((tag) => requestedTags.has(tag));
+}
+
+async function resolveProjectSelection({ catalogRoot, projectId, presetId, workScopeTags = [] }) {
   const project = await getProject(catalogRoot, projectId);
-  const preset = await getPreset(catalogRoot, presetId ?? project.default_preset_id, presetId ? undefined : project.default_preset_version);
-  const isPristine = preset.id === PRISTINE_PRESET_ID;
+  if (presetId) {
+    const preset = await getPreset(catalogRoot, presetId);
+    return {
+      project,
+      requested_work_scope_tags: workScopeTags,
+      mode: preset.id === PRISTINE_PRESET_ID ? "pristine" : "apply",
+      assignments: [{ preset_id: preset.id, template_version: preset.selected_version, role: "explicit", priority: 0, work_scope_tags: [] }],
+      selected: preset.registry_skill_ids.map((registrySkillId) => ({
+        registry_skill_id: registrySkillId,
+        reason: "selected_by_explicit_template",
+        preset_id: preset.id,
+        template_version: preset.selected_version,
+      })),
+    };
+  }
+  const requestedTags = new Set(workScopeTags);
+  const assignments = project.preset_assignments.filter((assignment) => assignment.enabled !== false);
+  const defaultAssignment = assignments.find((assignment) => assignment.role === "default");
+  if (!defaultAssignment) throw new Error(`Project has no default preset assignment: ${project.id}`);
+  const resolvedAssignments = [{ ...defaultAssignment, preset: await getPreset(catalogRoot, defaultAssignment.preset_id, defaultAssignment.template_version) }];
+  const overlays = assignments
+    .filter((assignment) => assignment.role === "work_scope_overlay" && hasAllTags(assignment.work_scope_tags, requestedTags))
+    .sort((left, right) => left.priority - right.priority || left.preset_id.localeCompare(right.preset_id));
+  for (const assignment of overlays) {
+    resolvedAssignments.push({ ...assignment, preset: await getPreset(catalogRoot, assignment.preset_id, assignment.template_version) });
+  }
+  const selectedByLineage = new Map();
+  for (const assignment of resolvedAssignments) {
+    if (assignment.preset.id === PRISTINE_PRESET_ID) continue;
+    for (const entry of assignment.preset.entries) {
+      selectedByLineage.set(entry.lineage_id, {
+        registry_skill_id: entry.registry_skill_id,
+        reason: assignment.role === "default" ? "selected_by_default_template" : "selected_by_work_scope_overlay",
+        preset_id: assignment.preset.id,
+        template_version: assignment.preset.selected_version,
+        priority: assignment.priority,
+      });
+    }
+  }
+  return {
+    project,
+    requested_work_scope_tags: workScopeTags,
+    mode: selectedByLineage.size === 0 ? "pristine" : "apply",
+    assignments: resolvedAssignments.map(({ preset, ...assignment }) => ({ ...assignment, name: preset.name, purpose: preset.purpose })),
+    selected: [...selectedByLineage.values()],
+  };
+}
+
+async function createProjectPlan({ catalogRoot, registryRoot, projectId, presetId, workScopeTags, distribution }) {
+  const selection = await resolveProjectSelection({ catalogRoot, projectId, presetId, workScopeTags });
+  const { project } = selection;
+  const isPristine = selection.mode === "pristine";
   const registeredSkills = await listRegistrySkills(registryRoot);
   const selectedSkills = isPristine
     ? []
-    : await getRegistrySkills(registryRoot, preset.registry_skill_ids);
+    : await getRegistrySkills(registryRoot, selection.selected.map((item) => item.registry_skill_id));
   const selectedByArtifact = new Map(selectedSkills.map((skill) => [
     skill.artifact_key ?? `${skill.source_id}:${skill.source_relative_path}`,
     skill,
@@ -44,21 +98,14 @@ async function createProjectPlan({ catalogRoot, registryRoot, projectId, presetI
   });
 }
 
-async function resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId }) {
-  const project = await getProject(catalogRoot, projectId);
-  const preset = await getPreset(catalogRoot, presetId ?? project.default_preset_id, presetId ? undefined : project.default_preset_version);
-  const plan = await createProjectPlan({ catalogRoot, registryRoot, projectId, presetId });
-  const selected = new Set(preset.registry_skill_ids);
+async function resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId, workScopeTags }) {
+  const selection = await resolveProjectSelection({ catalogRoot, projectId, presetId, workScopeTags });
+  const plan = await createProjectPlan({ catalogRoot, registryRoot, projectId, presetId, workScopeTags });
+  const selected = new Map(selection.selected.map((item) => [item.registry_skill_id, item]));
   return {
-    project,
-    preset: {
-      id: preset.id,
-      name: preset.name,
-      purpose: preset.purpose,
-      lifecycle: preset.lifecycle,
-      selected_version: preset.selected_version,
-      work_scope_tags: preset.work_scope_tags,
-    },
+    project: selection.project,
+    requested_work_scope_tags: selection.requested_work_scope_tags,
+    assignments: selection.assignments,
     mode: plan.mode,
     skills: plan.operations.map((operation) => ({
       registry_skill_id: operation.registry_skill_id,
@@ -67,8 +114,9 @@ async function resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId
       reason: plan.mode === "pristine"
         ? "pristine_baseline"
         : selected.has(operation.registry_skill_id)
-          ? "selected_by_template"
+          ? selected.get(operation.registry_skill_id).reason
           : "not_selected_by_template",
+      selected_by: selected.get(operation.registry_skill_id) ?? null,
     })),
   };
 }
@@ -124,4 +172,4 @@ async function buildSystemPrompt({ catalogRoot, registryRoot, presetId, includeI
   };
 }
 
-module.exports = { buildSystemPrompt, createProjectPlan, exportActivationPlan, resolveProjectEffectiveSet };
+module.exports = { buildSystemPrompt, createProjectPlan, exportActivationPlan, resolveProjectEffectiveSet, resolveProjectSelection };

@@ -100,4 +100,10 @@ node src/cli.js preset assign demo frontend-build --catalog ./.skills-platform/c
 # Inspect the exact pinned version and why each managed skill is selected or disabled.
 node src/cli.js project resolve demo --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry
+
+# Add verification skills only for implementation work. The base assignment remains pinned.
+node src/cli.js preset assign demo verification --catalog ./.skills-platform/catalog \
+  --version 1 --role work_scope_overlay --priority 10 --work-scope implementation
+node src/cli.js project resolve demo --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry --work-scope implementation
 ```

@@ -65,12 +65,13 @@ function usage() {
     "  skills-catalog import-local <source-path> [--registry <path>] [--skill <name>]...",
     "  skills-catalog list [--registry <path>]",
     "  skills-catalog project add <id> --name <name> --path <path> --provider <id> --delivery-root <path>",
-    "  skills-catalog project list | project resolve <id> [--preset <id>]",
+    "  skills-catalog project list | project resolve <id> [--preset <id>] [--work-scope <tag>]...",
     "  skills-catalog preset create <id> --name <name> --skill <registry-skill-id>...",
     "  skills-catalog preset show <id> [--version <n>] | preset update <id> [--skill <id>]...",
     "  skills-catalog preset clone <source-id> <new-id> --name <name> | preset compare <id> <left> <right>",
     "  skills-catalog preset note add <id> --body <text> | preset assign <project-id> <preset-id> [--version <n>]",
-    "  skills-catalog project-plan <project-id> [--preset <id>] [--copy] [--out <file>]",
+    "      [--role default|recommended|work_scope_overlay] [--priority <n>] [--work-scope <tag>]...",
+    "  skills-catalog project-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--copy] [--out <file>]",
     "  skills-catalog system-prompt --preset <id>",
     "  skills-catalog skill list | skill search [query] [--tag <tag>] [--provider <id>]",
     "  skills-catalog skill profile show <lineage-id>",
@@ -200,7 +201,7 @@ async function run(argv) {
     }
     if (action === "list") return listProjects(catalogRoot);
     if (action === "resolve") {
-      return resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId: flags.preset });
+      return resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [] });
     }
   }
 
@@ -257,7 +258,15 @@ async function run(argv) {
       return addPresetTemplateNote({ catalogRoot, presetId: targetPresetId, body: flags.body, author: flags.author });
     }
     if (action === "assign") {
-      return assignPreset({ catalogRoot, projectId: presetId, presetId: assignmentPresetId, version: flags.version });
+      return assignPreset({
+        catalogRoot,
+        projectId: presetId,
+        presetId: assignmentPresetId,
+        version: flags.version,
+        role: flags.role,
+        priority: flags.priority,
+        workScopeTags: flags["work-scope"] ?? [],
+      });
     }
   }
 
@@ -268,6 +277,7 @@ async function run(argv) {
       registryRoot,
       projectId,
       presetId: flags.preset,
+      workScopeTags: flags["work-scope"] ?? [],
       distribution: { method: flags.copy === true ? "copy" : "symlink" },
     });
     if (flags.out) await exportActivationPlan({ outputPath: flags.out, plan });
