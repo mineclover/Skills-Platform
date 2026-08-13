@@ -6,6 +6,7 @@ const {
   addPresetTemplateNote,
   addSkillNote,
   deleteSkillNote,
+  diffSkillRevisions,
   editSkillNote,
   getPreset,
   getSkillProfile,
@@ -19,9 +20,11 @@ const {
   assignPreset,
   exportActivationPlan,
   importLocalSource,
+  inspectLocalSource,
   listPresets,
   listProjects,
   listRegistrySkills,
+  listSkillRevisions,
   listSkillNotes,
   listActivationHistory,
   recordActivationPlan,
@@ -68,6 +71,7 @@ function usage() {
   return [
     "Usage:",
     "  skills-catalog import-local <source-path> [--registry <path>] [--skill <name>]...",
+    "  skills-catalog source inspect <source-path>",
     "  skills-catalog list [--registry <path>]",
     "  skills-catalog project add <id> --name <name> --path <path> --provider <id> --delivery-root <path>",
     "  skills-catalog project list | project resolve <id> [--preset <id>] [--work-scope <tag>]...",
@@ -81,6 +85,7 @@ function usage() {
     "  skills-catalog history record-report <plan-id> --file <adapter-report.json> | history list [--project-id <id>]",
     "  skills-catalog system-prompt --preset <id>",
     "  skills-catalog skill list | skill search [query] [--tag <tag>] [--provider <id>]",
+    "  skills-catalog skill revisions <lineage-id> | skill diff <lineage-id> <left-revision> <right-revision>",
     "  skills-catalog skill profile show <lineage-id>",
     "  skills-catalog skill profile set <lineage-id> [--purpose <text>] [--use-when <text>] [--tag <tag>]...",
     "  skills-catalog skill note add <lineage-id> --body <text> [--scope <scope>] [--kind <kind>]",
@@ -106,6 +111,11 @@ async function run(argv) {
     });
   }
 
+  if (command === "source") {
+    const [action, inspectedPath] = positional.slice(1);
+    if (action === "inspect") return inspectLocalSource({ sourcePath: inspectedPath });
+  }
+
   if (command === "list") return listRegistrySkills(registryRoot);
 
   if (command === "skill") {
@@ -122,6 +132,13 @@ async function run(argv) {
         reviewState: flags["review-state"],
       });
     }
+    if (area === "revisions") return listSkillRevisions({ registryRoot, lineageId: action });
+    if (area === "diff") return diffSkillRevisions({
+      registryRoot,
+      lineageId: action,
+      leftRevisionId: subject,
+      rightRevisionId: positional[4],
+    });
     if (area === "profile") {
       if (action === "show") return getSkillProfile({ catalogRoot, registryRoot, lineageId: subject });
       if (action === "set") {

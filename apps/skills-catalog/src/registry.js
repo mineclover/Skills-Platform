@@ -58,6 +58,40 @@ async function discoverSkills(sourcePath) {
   return found.sort((left, right) => left.relative_path.localeCompare(right.relative_path));
 }
 
+async function inspectLocalSource({ sourcePath }) {
+  const resolvedSourcePath = path.resolve(sourcePath);
+  const sourceStats = await fs.stat(resolvedSourcePath);
+  if (!sourceStats.isDirectory()) throw new Error(`Source must be a directory: ${resolvedSourcePath}`);
+  const skillFiles = (await listFiles(resolvedSourcePath))
+    .filter((relativePath) => path.basename(relativePath).toLowerCase() === "skill.md")
+    .sort((left, right) => left.localeCompare(right));
+  const skills = [];
+  const issues = [];
+  for (const relativePath of skillFiles) {
+    const absolutePath = path.join(resolvedSourcePath, relativePath);
+    try {
+      const metadata = parseSkillMarkdown(await fs.readFile(absolutePath, "utf8"), absolutePath);
+      skills.push({
+        ...metadata,
+        relative_path: path.dirname(relativePath).replaceAll("\\", "/") || ".",
+        root_path: path.dirname(absolutePath),
+      });
+    } catch (error) {
+      issues.push({ path: relativePath.replaceAll("\\", "/"), message: error.message });
+    }
+  }
+  if (skillFiles.length === 0) issues.push({ path: ".", message: "No SKILL.md artifacts were found in source" });
+  return {
+    kind: "local",
+    locator: resolvedSourcePath,
+    source_digest: await digestDirectory(resolvedSourcePath),
+    skill_count: skills.length,
+    skills,
+    issues,
+    importable: issues.length === 0 && skills.length > 0,
+  };
+}
+
 function registryFile(registryRoot) {
   return path.join(registryRoot, "registry.json");
 }
@@ -117,11 +151,12 @@ function defaultRegistryRoot(workspacePath = process.cwd()) {
 }
 
 async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames = [] }) {
-  const resolvedSourcePath = path.resolve(sourcePath);
-  const sourceStats = await fs.stat(resolvedSourcePath);
-  if (!sourceStats.isDirectory()) throw new Error(`Source must be a directory: ${resolvedSourcePath}`);
-
-  const discovered = await discoverSkills(resolvedSourcePath);
+  const inspection = await inspectLocalSource({ sourcePath });
+  if (!inspection.importable) {
+    throw new Error(`Source inspection failed: ${inspection.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ")}`);
+  }
+  const resolvedSourcePath = inspection.locator;
+  const discovered = inspection.skills;
   const selected = selectedSkillNames.length === 0
     ? discovered
     : discovered.filter((skill) => selectedSkillNames.includes(skill.name));
@@ -132,7 +167,7 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
   const registry = await loadRegistry(registryRoot);
   const locator = resolvedSourcePath;
   const id = sourceId(locator);
-  const revisionDigest = await digestDirectory(resolvedSourcePath);
+  const revisionDigest = inspection.source_digest;
   const revisionId = `revision_${sha256(`${id}:${revisionDigest}`).slice(0, 24)}`;
   const importedAt = new Date().toISOString();
 
@@ -237,15 +272,79 @@ async function getSourceRevision(registryRoot, revisionId) {
   return revision;
 }
 
+async function listSkillRevisions({ registryRoot, lineageId: lineageIdValue }) {
+  await getSkillLineage(registryRoot, lineageIdValue);
+  const registry = await loadRegistry(registryRoot);
+  const fetchedAtByRevisionId = new Map(registry.revisions.map((revision) => [revision.id, revision.fetched_at]));
+  return registry.skills
+    .filter((skill) => skill.lineage_id === lineageIdValue)
+    .slice()
+    .sort((left, right) => (fetchedAtByRevisionId.get(left.source_revision_id) ?? left.imported_at)
+      .localeCompare(fetchedAtByRevisionId.get(right.source_revision_id) ?? right.imported_at));
+}
+
+function changedLines(leftContent, rightContent) {
+  const left = leftContent.split(/\r?\n/);
+  const right = rightContent.split(/\r?\n/);
+  const matrix = Array.from({ length: left.length + 1 }, () => Array(right.length + 1).fill(0));
+  for (let leftIndex = left.length - 1; leftIndex >= 0; leftIndex -= 1) {
+    for (let rightIndex = right.length - 1; rightIndex >= 0; rightIndex -= 1) {
+      matrix[leftIndex][rightIndex] = left[leftIndex] === right[rightIndex]
+        ? matrix[leftIndex + 1][rightIndex + 1] + 1
+        : Math.max(matrix[leftIndex + 1][rightIndex], matrix[leftIndex][rightIndex + 1]);
+    }
+  }
+  const removed = [];
+  const added = [];
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length || rightIndex < right.length) {
+    if (leftIndex < left.length && rightIndex < right.length && left[leftIndex] === right[rightIndex]) {
+      leftIndex += 1;
+      rightIndex += 1;
+    } else if (rightIndex < right.length && (leftIndex === left.length || matrix[leftIndex][rightIndex + 1] >= matrix[leftIndex + 1][rightIndex])) {
+      added.push({ line: rightIndex + 1, content: right[rightIndex] });
+      rightIndex += 1;
+    } else {
+      removed.push({ line: leftIndex + 1, content: left[leftIndex] });
+      leftIndex += 1;
+    }
+  }
+  return { added, removed };
+}
+
+async function diffSkillRevisions({ registryRoot, lineageId: lineageIdValue, leftRevisionId, rightRevisionId }) {
+  const revisions = await listSkillRevisions({ registryRoot, lineageId: lineageIdValue });
+  const left = revisions.find((skill) => skill.source_revision_id === leftRevisionId);
+  const right = revisions.find((skill) => skill.source_revision_id === rightRevisionId);
+  if (!left) throw new Error(`Skill revision not found for lineage: ${lineageIdValue}@${leftRevisionId}`);
+  if (!right) throw new Error(`Skill revision not found for lineage: ${lineageIdValue}@${rightRevisionId}`);
+  const [leftContent, rightContent] = await Promise.all([
+    fs.readFile(path.join(left.canonical_path, "SKILL.md"), "utf8"),
+    fs.readFile(path.join(right.canonical_path, "SKILL.md"), "utf8"),
+  ]);
+  const diff = changedLines(leftContent, rightContent);
+  return {
+    lineage_id: lineageIdValue,
+    left: { registry_skill_id: left.id, source_revision_id: left.source_revision_id, content_digest: left.content_digest },
+    right: { registry_skill_id: right.id, source_revision_id: right.source_revision_id, content_digest: right.content_digest },
+    changed: left.content_digest !== right.content_digest,
+    skill_markdown: diff,
+  };
+}
+
 module.exports = {
   defaultRegistryRoot,
   discoverSkills,
+  diffSkillRevisions,
   getRegistrySkills,
   getSourceRevision,
   importLocalSource,
+  inspectLocalSource,
   getSkillLineage,
   latestSkillsByArtifact,
   listRegistrySkills,
+  listSkillRevisions,
   listSkillLineages,
   parseSkillMarkdown,
 };

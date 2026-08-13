@@ -128,7 +128,8 @@ adapter not yet embedded in the existing Skills Manager application.
 
 > Status: Core CLI implemented — stable lineages, profile metadata, scoped
 > notes, note history/recovery, metadata/note search, and opt-in prompt note
-> inclusion are available. Source inspection and revision diff UI remain.
+> inclusion, local source inspection, and canonical revision diffs are
+> available. A visual source/revision detail view remains.
 
 **Goal:** make each skill understandable, searchable, and curated before a
 template can recommend it.

@@ -13,7 +13,10 @@ The initial CLI works with local sources and produces immutable delivery plans;
 it does not perform agent-path mutations.
 
 ```bash
-# Inspect/import local SKILL.md directories into the local registry
+# Inspect local SKILL.md directories without executing third-party installers or mutating the registry.
+node src/cli.js source inspect ../some-skills
+
+# Import inspected local SKILL.md directories into the local registry.
 node src/cli.js import-local ../some-skills --registry ./.skills-platform/registry
 
 # List registered artifacts and copy the emitted registry IDs
@@ -74,6 +77,11 @@ node src/cli.js skill note add lineage_example --catalog ./.skills-platform/cata
 # Search combines skill metadata and active notes.
 node src/cli.js skill search keyboard --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --tag design --provider codex
+
+# Review a lineage's immutable revisions and its canonical SKILL.md delta.
+node src/cli.js skill revisions lineage_example --registry ./.skills-platform/registry
+node src/cli.js skill diff lineage_example revision_old revision_new \
+  --registry ./.skills-platform/registry
 ```
 
 ## Versioned preset templates

@@ -3,7 +3,14 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
-const { createPlanFromRegistry, importLocalSource, listRegistrySkills } = require("../src");
+const {
+  createPlanFromRegistry,
+  diffSkillRevisions,
+  importLocalSource,
+  inspectLocalSource,
+  listRegistrySkills,
+  listSkillRevisions,
+} = require("../src");
 
 async function writeSkill(root, directory, name, description) {
   const skillRoot = path.join(root, directory);
@@ -71,6 +78,40 @@ test("a changed source creates a new immutable revision and skill identity", asy
   assert.notEqual(first.source_revision_id, second.source_revision_id);
   assert.notEqual(first.skills[0].id, second.skills[0].id);
   assert.ok(await fs.stat(path.join(first.skills[0].canonical_path, "SKILL.md")));
+});
+
+test("inspects local sources before import and reports invalid artifacts without mutation", async (context) => {
+  const { root, sourcePath } = await fixture();
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(sourcePath, "broken"), { recursive: true });
+  await fs.writeFile(path.join(sourcePath, "broken", "SKILL.md"), "# Missing frontmatter\n", "utf8");
+
+  const inspection = await inspectLocalSource({ sourcePath });
+
+  assert.equal(inspection.importable, false);
+  assert.equal(inspection.skill_count, 2);
+  assert.equal(inspection.issues.length, 1);
+  assert.match(inspection.issues[0].message, /Missing YAML frontmatter/);
+});
+
+test("lists immutable lineage revisions and diffs SKILL.md changes", async (context) => {
+  const { root, sourcePath, registryRoot } = await fixture();
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const first = await importLocalSource({ registryRoot, sourcePath, selectedSkillNames: ["frontend-design"] });
+  await fs.appendFile(path.join(sourcePath, "frontend", "SKILL.md"), "\nNew reviewed instruction.\n", "utf8");
+  const second = await importLocalSource({ registryRoot, sourcePath, selectedSkillNames: ["frontend-design"] });
+
+  const revisions = await listSkillRevisions({ registryRoot, lineageId: first.skills[0].lineage_id });
+  const diff = await diffSkillRevisions({
+    registryRoot,
+    lineageId: first.skills[0].lineage_id,
+    leftRevisionId: first.source_revision_id,
+    rightRevisionId: second.source_revision_id,
+  });
+
+  assert.equal(revisions.length, 2);
+  assert.equal(diff.changed, true);
+  assert.ok(diff.skill_markdown.added.some((line) => line.content === "New reviewed instruction."));
 });
 
 test("creates a link-first activation plan from pinned registry skills", async (context) => {
