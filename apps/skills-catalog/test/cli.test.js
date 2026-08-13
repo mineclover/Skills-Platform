@@ -66,3 +66,31 @@ test("CLI manages a skill profile, scoped note, and metadata search", async (con
   assert.equal(note.project_id, "demo");
   assert.equal(found[0].lineage.id, lineageId);
 });
+
+test("CLI versions and annotates preset templates", async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-catalog-cli-template-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const sourcePath = path.join(root, "source", "demo");
+  const registryRoot = path.join(root, "registry");
+  const catalogRoot = path.join(root, "catalog");
+  await fs.mkdir(sourcePath, { recursive: true });
+  await fs.writeFile(path.join(sourcePath, "SKILL.md"), "---\nname: demo-skill\ndescription: Demo workflow.\n---\n\n# Demo skill\n");
+  const imported = await run(["import-local", path.join(root, "source"), "--registry", registryRoot]);
+  const skillId = imported.skills[0].id;
+  await run([
+    "preset", "create", "demo", "--catalog", catalogRoot, "--registry", registryRoot,
+    "--name", "Demo", "--purpose", "Initial purpose", "--skill", skillId,
+  ]);
+  const updated = await run([
+    "preset", "update", "demo", "--catalog", catalogRoot, "--registry", registryRoot,
+    "--purpose", "Updated purpose",
+  ]);
+  const initial = await run(["preset", "show", "demo", "--catalog", catalogRoot, "--version", "1"]);
+  const note = await run(["preset", "note", "add", "demo", "--catalog", catalogRoot, "--body", "Use after discovery."]);
+  const compared = await run(["preset", "compare", "demo", "1", "2", "--catalog", catalogRoot]);
+
+  assert.equal(updated.selected_version, 2);
+  assert.equal(initial.purpose, "Initial purpose");
+  assert.equal(note.template_version, 3);
+  assert.deepEqual(compared.added_registry_skill_ids, []);
+});

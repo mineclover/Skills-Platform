@@ -2,13 +2,17 @@
 const path = require("node:path");
 const {
   createPlanFromRegistry,
+  addPresetTemplateNote,
   addSkillNote,
   deleteSkillNote,
   editSkillNote,
+  getPreset,
   getSkillProfile,
   createPreset,
   createProject,
   createProjectPlan,
+  clonePresetTemplate,
+  comparePresetVersions,
   defaultRegistryRoot,
   buildSystemPrompt,
   assignPreset,
@@ -20,7 +24,9 @@ const {
   listSkillNotes,
   searchSkills,
   restoreSkillNote,
+  resolveProjectEffectiveSet,
   updateSkillProfile,
+  updatePresetTemplate,
 } = require(".");
 
 const MULTI_VALUE_FLAGS = new Set([
@@ -59,9 +65,11 @@ function usage() {
     "  skills-catalog import-local <source-path> [--registry <path>] [--skill <name>]...",
     "  skills-catalog list [--registry <path>]",
     "  skills-catalog project add <id> --name <name> --path <path> --provider <id> --delivery-root <path>",
-    "  skills-catalog project list",
+    "  skills-catalog project list | project resolve <id> [--preset <id>]",
     "  skills-catalog preset create <id> --name <name> --skill <registry-skill-id>...",
-    "  skills-catalog preset list | preset assign <project-id> <preset-id>",
+    "  skills-catalog preset show <id> [--version <n>] | preset update <id> [--skill <id>]...",
+    "  skills-catalog preset clone <source-id> <new-id> --name <name> | preset compare <id> <left> <right>",
+    "  skills-catalog preset note add <id> --body <text> | preset assign <project-id> <preset-id> [--version <n>]",
     "  skills-catalog project-plan <project-id> [--preset <id>] [--copy] [--out <file>]",
     "  skills-catalog system-prompt --preset <id>",
     "  skills-catalog skill list | skill search [query] [--tag <tag>] [--provider <id>]",
@@ -191,6 +199,9 @@ async function run(argv) {
       });
     }
     if (action === "list") return listProjects(catalogRoot);
+    if (action === "resolve") {
+      return resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId: flags.preset });
+    }
   }
 
   if (command === "preset") {
@@ -202,12 +213,51 @@ async function run(argv) {
         id: presetId,
         name: flags.name,
         description: flags.description ?? null,
+        purpose: flags.purpose ?? null,
+        workScopeTags: flags["work-scope"] ?? [],
+        owner: flags.owner ?? null,
+        lifecycle: flags.lifecycle ?? "draft",
         registrySkillIds: flags.skill ?? [],
       });
     }
     if (action === "list") return listPresets(catalogRoot);
+    if (action === "show") return getPreset(catalogRoot, presetId, flags.version);
+    if (action === "update") {
+      return updatePresetTemplate({
+        catalogRoot,
+        registryRoot,
+        presetId,
+        patch: {
+          name: flags.name,
+          description: flags.description,
+          purpose: flags.purpose,
+          workScopeTags: flags["work-scope"],
+          owner: flags.owner,
+          lifecycle: flags.lifecycle,
+          registrySkillIds: flags.skill,
+        },
+      });
+    }
+    if (action === "clone") {
+      return clonePresetTemplate({
+        catalogRoot,
+        registryRoot,
+        sourcePresetId: presetId,
+        id: assignmentPresetId,
+        name: flags.name,
+        owner: flags.owner,
+      });
+    }
+    if (action === "compare") {
+      const [, leftVersion, rightVersion] = positional.slice(2);
+      return comparePresetVersions({ catalogRoot, presetId, leftVersion, rightVersion });
+    }
+    if (action === "note" && presetId === "add") {
+      const targetPresetId = assignmentPresetId;
+      return addPresetTemplateNote({ catalogRoot, presetId: targetPresetId, body: flags.body, author: flags.author });
+    }
     if (action === "assign") {
-      return assignPreset({ catalogRoot, projectId: presetId, presetId: assignmentPresetId });
+      return assignPreset({ catalogRoot, projectId: presetId, presetId: assignmentPresetId, version: flags.version });
     }
   }
 

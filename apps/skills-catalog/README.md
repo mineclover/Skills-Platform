@@ -75,3 +75,29 @@ node src/cli.js skill note add lineage_example --catalog ./.skills-platform/cata
 node src/cli.js skill search keyboard --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --tag design --provider codex
 ```
+
+## Versioned preset templates
+
+Template edits create a new version. A project assignment pins the version it
+was given, so an updated template is never adopted implicitly.
+
+```bash
+# Create a reviewed work template, inspect its immutable version, and annotate why it exists.
+node src/cli.js preset create frontend-build --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry --name "Frontend build" \
+  --purpose "Implement and verify interface changes" --work-scope ui \
+  --owner frontend --lifecycle reviewed --skill skill_design --skill skill_test
+node src/cli.js preset note add frontend-build --catalog ./.skills-platform/catalog \
+  --body "Use only after discovery and planning are complete."
+node src/cli.js preset show frontend-build --catalog ./.skills-platform/catalog --version 1
+
+# Updating creates v2; compare, then explicitly pin a project to that version.
+node src/cli.js preset update frontend-build --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry --purpose "Implement, review, and verify UI changes"
+node src/cli.js preset compare frontend-build 1 2 --catalog ./.skills-platform/catalog
+node src/cli.js preset assign demo frontend-build --catalog ./.skills-platform/catalog --version 2
+
+# Inspect the exact pinned version and why each managed skill is selected or disabled.
+node src/cli.js project resolve demo --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry
+```

@@ -7,7 +7,7 @@ const { listSkillNotes } = require("./skill-management");
 
 async function createProjectPlan({ catalogRoot, registryRoot, projectId, presetId, distribution }) {
   const project = await getProject(catalogRoot, projectId);
-  const preset = await getPreset(catalogRoot, presetId ?? project.default_preset_id);
+  const preset = await getPreset(catalogRoot, presetId ?? project.default_preset_id, presetId ? undefined : project.default_preset_version);
   const isPristine = preset.id === PRISTINE_PRESET_ID;
   const registeredSkills = await listRegistrySkills(registryRoot);
   const selectedSkills = isPristine
@@ -42,6 +42,35 @@ async function createProjectPlan({ catalogRoot, registryRoot, projectId, presetI
     desiredStateBySkillId,
     mode: isPristine ? "pristine" : "apply",
   });
+}
+
+async function resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId }) {
+  const project = await getProject(catalogRoot, projectId);
+  const preset = await getPreset(catalogRoot, presetId ?? project.default_preset_id, presetId ? undefined : project.default_preset_version);
+  const plan = await createProjectPlan({ catalogRoot, registryRoot, projectId, presetId });
+  const selected = new Set(preset.registry_skill_ids);
+  return {
+    project,
+    preset: {
+      id: preset.id,
+      name: preset.name,
+      purpose: preset.purpose,
+      lifecycle: preset.lifecycle,
+      selected_version: preset.selected_version,
+      work_scope_tags: preset.work_scope_tags,
+    },
+    mode: plan.mode,
+    skills: plan.operations.map((operation) => ({
+      registry_skill_id: operation.registry_skill_id,
+      source_revision_id: operation.source_revision_id,
+      desired_state: operation.desired_state,
+      reason: plan.mode === "pristine"
+        ? "pristine_baseline"
+        : selected.has(operation.registry_skill_id)
+          ? "selected_by_template"
+          : "not_selected_by_template",
+    })),
+  };
 }
 
 async function exportActivationPlan({ outputPath, plan }) {
@@ -95,4 +124,4 @@ async function buildSystemPrompt({ catalogRoot, registryRoot, presetId, includeI
   };
 }
 
-module.exports = { buildSystemPrompt, createProjectPlan, exportActivationPlan };
+module.exports = { buildSystemPrompt, createProjectPlan, exportActivationPlan, resolveProjectEffectiveSet };

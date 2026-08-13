@@ -2,8 +2,11 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { getRegistrySkills } = require("./registry");
 
-const CATALOG_SCHEMA_VERSION = 2;
+const crypto = require("node:crypto");
+
+const CATALOG_SCHEMA_VERSION = 3;
 const PRISTINE_PRESET_ID = "builtin-pristine";
+const TEMPLATE_LIFECYCLES = new Set(["draft", "reviewed", "deprecated"]);
 
 function now() {
   return new Date().toISOString();
@@ -17,12 +20,63 @@ function blankCatalog() {
   return { schema_version: CATALOG_SCHEMA_VERSION, projects: [], presets: [], skill_profiles: [], skill_notes: [] };
 }
 
+function uniqueStrings(values) {
+  return [...new Set((values ?? []).filter((value) => typeof value === "string" && value.trim() !== "").map((value) => value.trim()))]
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function templateSnapshot(preset, version = preset.active_version ?? 1) {
+  return {
+    version,
+    registry_skill_ids: [...new Set(preset.registry_skill_ids ?? [])],
+    entries: (preset.entries ?? []).map((entry) => ({ ...entry })),
+    description: preset.description ?? null,
+    purpose: preset.purpose ?? null,
+    work_scope_tags: uniqueStrings(preset.work_scope_tags),
+    template_notes: (preset.template_notes ?? []).map((note) => ({ ...note })),
+    created_at: preset.updated_at ?? preset.created_at ?? now(),
+  };
+}
+
+function normalizePreset(preset) {
+  preset.kind ??= "custom";
+  preset.lifecycle ??= "draft";
+  preset.owner ??= null;
+  preset.work_scope_tags = uniqueStrings(preset.work_scope_tags);
+  preset.purpose ??= null;
+  preset.template_notes ??= [];
+  preset.active_version ??= 1;
+  preset.versions ??= [templateSnapshot(preset, preset.active_version)];
+  for (const version of preset.versions) {
+    version.registry_skill_ids ??= preset.registry_skill_ids ?? [];
+    version.entries ??= [];
+    version.work_scope_tags = uniqueStrings(version.work_scope_tags);
+    version.template_notes ??= [];
+  }
+  const current = preset.versions.find((version) => version.version === preset.active_version) ?? preset.versions.at(-1);
+  preset.active_version = current.version;
+  preset.registry_skill_ids = current.registry_skill_ids;
+  preset.entries = current.entries;
+  return preset;
+}
+
+function presentPreset(preset, version = preset.active_version) {
+  const snapshot = preset.versions.find((item) => item.version === Number(version));
+  if (!snapshot) throw new Error(`Preset version not found: ${preset.id}@${version}`);
+  return {
+    ...preset,
+    ...snapshot,
+    active_version: preset.active_version,
+    selected_version: snapshot.version,
+  };
+}
+
 function normalizeCatalog(catalog) {
-  if (catalog.schema_version !== 1 && catalog.schema_version !== CATALOG_SCHEMA_VERSION) {
+  if (![1, 2, CATALOG_SCHEMA_VERSION].includes(catalog.schema_version)) {
     throw new Error(`Unsupported catalog schema: ${catalog.schema_version}`);
   }
   catalog.projects ??= [];
-  catalog.presets ??= [];
+  catalog.presets = (catalog.presets ?? []).map(normalizePreset);
   catalog.skill_profiles ??= [];
   catalog.skill_notes ??= [];
   catalog.schema_version = CATALOG_SCHEMA_VERSION;
@@ -35,7 +89,16 @@ function pristinePreset() {
     name: "Pristine · No managed skills",
     description: "A clean managed baseline that disables every catalog skill for the selected target.",
     kind: "builtin",
+    lifecycle: "reviewed",
+    owner: "Skills Platform",
+    purpose: "Return a target to its clean managed baseline.",
+    work_scope_tags: [],
     registry_skill_ids: [],
+    entries: [],
+    active_version: 1,
+    selected_version: 1,
+    template_notes: [],
+    versions: [{ version: 1, registry_skill_ids: [], entries: [], description: "Clean managed baseline.", purpose: "Return a target to its clean managed baseline.", work_scope_tags: [], template_notes: [], created_at: null }],
   };
 }
 
@@ -78,6 +141,7 @@ async function createProject({ catalogRoot, id, name, projectPath, providerId, d
     delivery_root: path.resolve(deliveryRoot),
     scope,
     default_preset_id: PRISTINE_PRESET_ID,
+    default_preset_version: 1,
     created_at: now(),
   };
   catalog.projects.push(project);
@@ -89,7 +153,18 @@ async function listProjects(catalogRoot) {
   return (await loadCatalog(catalogRoot)).projects.slice().sort((left, right) => left.name.localeCompare(right.name));
 }
 
-async function createPreset({ catalogRoot, registryRoot, id, name, description = null, registrySkillIds }) {
+function templateEntries(skills) {
+  return skills.map((skill) => ({
+    lineage_id: skill.lineage_id,
+    source_revision_id: skill.source_revision_id,
+    registry_skill_id: skill.id,
+    revision_policy: "pinned",
+    required: true,
+    enabled_by_default: true,
+  }));
+}
+
+async function createPreset({ catalogRoot, registryRoot, id, name, description = null, purpose = null, workScopeTags = [], owner = null, lifecycle = "draft", registrySkillIds }) {
   id = requireIdentifier(id, "Preset id");
   name = requireIdentifier(name, "Preset name");
   if (id === PRISTINE_PRESET_ID) throw new Error(`${PRISTINE_PRESET_ID} is reserved`);
@@ -101,6 +176,7 @@ async function createPreset({ catalogRoot, registryRoot, id, name, description =
   if (new Set(artifactKeys).size !== artifactKeys.length) {
     throw new Error("A preset cannot contain multiple revisions of the same artifact");
   }
+  if (!TEMPLATE_LIFECYCLES.has(lifecycle)) throw new Error("Preset lifecycle is not valid");
 
   const catalog = await loadCatalog(catalogRoot);
   if (catalog.presets.some((preset) => preset.id === id)) throw new Error(`Preset already exists: ${id}`);
@@ -110,9 +186,17 @@ async function createPreset({ catalogRoot, registryRoot, id, name, description =
     description,
     kind: "custom",
     registry_skill_ids: [...new Set(registrySkillIds)],
+    entries: templateEntries(selectedSkills),
+    purpose,
+    work_scope_tags: uniqueStrings(workScopeTags),
+    owner,
+    lifecycle,
+    active_version: 1,
+    template_notes: [],
     created_at: now(),
     updated_at: now(),
   };
+  preset.versions = [templateSnapshot(preset, 1)];
   catalog.presets.push(preset);
   await saveCatalog(catalogRoot, catalog);
   return preset;
@@ -120,26 +204,128 @@ async function createPreset({ catalogRoot, registryRoot, id, name, description =
 
 async function listPresets(catalogRoot) {
   const catalog = await loadCatalog(catalogRoot);
-  return [pristinePreset(), ...catalog.presets.slice().sort((left, right) => left.name.localeCompare(right.name))];
+  return [pristinePreset(), ...catalog.presets.slice().sort((left, right) => left.name.localeCompare(right.name)).map((preset) => presentPreset(preset))];
 }
 
-async function getPreset(catalogRoot, presetId) {
+async function getPreset(catalogRoot, presetId, version) {
   if (presetId === PRISTINE_PRESET_ID) return pristinePreset();
   const catalog = await loadCatalog(catalogRoot);
   const preset = catalog.presets.find((item) => item.id === presetId);
   if (!preset) throw new Error(`Preset not found: ${presetId}`);
-  return preset;
+  return presentPreset(preset, version ?? preset.active_version);
 }
 
-async function assignPreset({ catalogRoot, projectId, presetId }) {
-  await getPreset(catalogRoot, presetId);
+async function assignPreset({ catalogRoot, projectId, presetId, version }) {
+  const preset = await getPreset(catalogRoot, presetId, version);
   const catalog = await loadCatalog(catalogRoot);
   const project = catalog.projects.find((item) => item.id === projectId);
   if (!project) throw new Error(`Project not found: ${projectId}`);
   project.default_preset_id = presetId;
+  project.default_preset_version = preset.selected_version;
   project.updated_at = now();
   await saveCatalog(catalogRoot, catalog);
   return project;
+}
+
+async function updatePresetTemplate({ catalogRoot, registryRoot, presetId, patch }) {
+  if (presetId === PRISTINE_PRESET_ID) throw new Error("Pristine template cannot be changed");
+  const catalog = await loadCatalog(catalogRoot);
+  const preset = catalog.presets.find((item) => item.id === presetId);
+  if (!preset) throw new Error(`Preset not found: ${presetId}`);
+  if (patch.lifecycle !== undefined && !TEMPLATE_LIFECYCLES.has(patch.lifecycle)) throw new Error("Preset lifecycle is not valid");
+  const current = presentPreset(preset);
+  let selectedSkills = null;
+  if (patch.registrySkillIds !== undefined) {
+    if (!Array.isArray(patch.registrySkillIds) || patch.registrySkillIds.length === 0) throw new Error("A template must contain at least one registry skill");
+    selectedSkills = await getRegistrySkills(registryRoot, patch.registrySkillIds);
+    const keys = selectedSkills.map((skill) => skill.lineage_id);
+    if (new Set(keys).size !== keys.length) throw new Error("A template cannot contain multiple revisions of the same skill lineage");
+  }
+  const nextVersion = Math.max(...preset.versions.map((item) => item.version)) + 1;
+  const snapshot = {
+    version: nextVersion,
+    registry_skill_ids: selectedSkills ? selectedSkills.map((skill) => skill.id) : current.registry_skill_ids,
+    entries: selectedSkills ? templateEntries(selectedSkills) : current.entries,
+    description: patch.description ?? current.description,
+    purpose: patch.purpose ?? current.purpose,
+    work_scope_tags: patch.workScopeTags === undefined ? current.work_scope_tags : uniqueStrings(patch.workScopeTags),
+    template_notes: current.template_notes.map((note) => ({ ...note })),
+    created_at: now(),
+  };
+  preset.name = patch.name ?? preset.name;
+  preset.owner = patch.owner ?? preset.owner;
+  preset.lifecycle = patch.lifecycle ?? preset.lifecycle;
+  preset.versions.push(snapshot);
+  preset.active_version = nextVersion;
+  preset.registry_skill_ids = snapshot.registry_skill_ids;
+  preset.entries = snapshot.entries;
+  preset.description = snapshot.description;
+  preset.purpose = snapshot.purpose;
+  preset.work_scope_tags = snapshot.work_scope_tags;
+  preset.updated_at = now();
+  await saveCatalog(catalogRoot, catalog);
+  return presentPreset(preset);
+}
+
+async function clonePresetTemplate({ catalogRoot, registryRoot, sourcePresetId, id, name, owner = null }) {
+  const source = await getPreset(catalogRoot, sourcePresetId);
+  if (source.id === PRISTINE_PRESET_ID) throw new Error("Pristine template cannot be cloned; create a template from selected registry skills");
+  return createPreset({
+    catalogRoot,
+    registryRoot,
+    id,
+    name,
+    description: source.description,
+    purpose: source.purpose,
+    workScopeTags: source.work_scope_tags,
+    owner: owner ?? source.owner,
+    lifecycle: "draft",
+    registrySkillIds: source.registry_skill_ids,
+  });
+}
+
+async function comparePresetVersions({ catalogRoot, presetId, leftVersion, rightVersion }) {
+  const left = await getPreset(catalogRoot, presetId, leftVersion);
+  const right = await getPreset(catalogRoot, presetId, rightVersion);
+  const leftIds = new Set(left.registry_skill_ids);
+  const rightIds = new Set(right.registry_skill_ids);
+  return {
+    preset_id: presetId,
+    left_version: left.selected_version,
+    right_version: right.selected_version,
+    added_registry_skill_ids: [...rightIds].filter((id) => !leftIds.has(id)),
+    removed_registry_skill_ids: [...leftIds].filter((id) => !rightIds.has(id)),
+    retained_registry_skill_ids: [...rightIds].filter((id) => leftIds.has(id)),
+  };
+}
+
+async function addPresetTemplateNote({ catalogRoot, presetId, body, author = "local" }) {
+  if (typeof body !== "string" || body.trim() === "") throw new Error("Template note body is required");
+  if (presetId === PRISTINE_PRESET_ID) throw new Error("Pristine template cannot be changed");
+  const catalog = await loadCatalog(catalogRoot);
+  const preset = catalog.presets.find((item) => item.id === presetId);
+  if (!preset) throw new Error(`Preset not found: ${presetId}`);
+  const note = { id: `template_note_${crypto.randomUUID()}`, body: body.trim(), author, created_at: now() };
+  const current = presentPreset(preset);
+  const nextVersion = Math.max(...preset.versions.map((item) => item.version)) + 1;
+  const snapshot = {
+    version: nextVersion,
+    registry_skill_ids: [...current.registry_skill_ids],
+    entries: current.entries.map((entry) => ({ ...entry })),
+    description: current.description,
+    purpose: current.purpose,
+    work_scope_tags: [...current.work_scope_tags],
+    template_notes: [...current.template_notes.map((item) => ({ ...item })), note],
+    created_at: now(),
+  };
+  preset.versions.push(snapshot);
+  preset.active_version = nextVersion;
+  preset.registry_skill_ids = snapshot.registry_skill_ids;
+  preset.entries = snapshot.entries;
+  preset.template_notes = snapshot.template_notes;
+  preset.updated_at = now();
+  await saveCatalog(catalogRoot, catalog);
+  return { ...note, template_version: nextVersion };
 }
 
 async function getProject(catalogRoot, projectId) {
@@ -157,6 +343,9 @@ module.exports = {
   CATALOG_SCHEMA_VERSION,
   PRISTINE_PRESET_ID,
   assignPreset,
+  addPresetTemplateNote,
+  clonePresetTemplate,
+  comparePresetVersions,
   createPlanFileName,
   createPreset,
   createProject,
@@ -166,4 +355,6 @@ module.exports = {
   listProjects,
   loadCatalog,
   saveCatalog,
+  TEMPLATE_LIFECYCLES,
+  updatePresetTemplate,
 };
