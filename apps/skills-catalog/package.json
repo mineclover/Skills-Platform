@@ -1,0 +1,10 @@
+{
+  "name": "@skills-platform/catalog",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Skills registry, activation catalog, and policy control plane.",
+  "scripts": {
+    "check": "node --check src/index.js",
+    "test": "node --test"
+  }
+}

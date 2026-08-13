@@ -1,0 +1,10 @@
+{
+  "name": "@skills-platform/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Versioned contracts for Skills Catalog and delivery adapters.",
+  "scripts": {
+    "check": "node --check src/index.js",
+    "test": "node --test"
+  }
+}

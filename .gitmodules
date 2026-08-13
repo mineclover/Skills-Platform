@@ -1,0 +1,4 @@
+[submodule "apps/skills-manager"]
+	path = apps/skills-manager
+	url = https://github.com/mineclover/Skills-Manager.git
+	branch = preserve/skills-manager-control-plane
