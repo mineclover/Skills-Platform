@@ -106,4 +106,10 @@ node src/cli.js preset assign demo verification --catalog ./.skills-platform/cat
   --version 1 --role work_scope_overlay --priority 10 --work-scope implementation
 node src/cli.js project resolve demo --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --work-scope implementation
+
+# Preserve an immutable plan record, then attach a report returned by the delivery adapter.
+node src/cli.js history record-plan demo --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry --work-scope implementation
+node src/cli.js history record-report <plan-id> --catalog ./.skills-platform/catalog \
+  --file ./activation-report.json
 ```

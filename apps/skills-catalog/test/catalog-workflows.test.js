@@ -11,6 +11,9 @@ const {
   createProject,
   createProjectPlan,
   importLocalSource,
+  listActivationHistory,
+  recordActivationPlan,
+  recordActivationReport,
 } = require("../src");
 
 async function setup(context) {
@@ -83,4 +86,39 @@ test("system prompt export uses the pinned canonical SKILL.md content", async (c
   assert.deepEqual(prompt.included_skill_ids, [writingSkill.id]);
   assert.match(prompt.content, /registry_skill_id:/);
   assert.match(prompt.content, /Use short sentences/);
+});
+
+test("records immutable plan context and adapter reports for project history", async (context) => {
+  const { catalogRoot, imported, project, registryRoot } = await setup(context);
+  const preset = await createPreset({
+    catalogRoot,
+    registryRoot,
+    id: "docs-writing",
+    name: "Docs writing",
+    registrySkillIds: [imported.skills[0].id],
+  });
+  await assignPreset({ catalogRoot, projectId: project.id, presetId: preset.id });
+  const plan = await createProjectPlan({ catalogRoot, registryRoot, projectId: project.id });
+  const recorded = await recordActivationPlan({
+    catalogRoot,
+    plan,
+    projectId: project.id,
+    assignments: [{ preset_id: preset.id, template_version: 1, role: "default" }],
+  });
+  await recordActivationReport({
+    catalogRoot,
+    planId: plan.plan_id,
+    report: {
+      plan_id: plan.plan_id,
+      completed_at: "2026-08-14T00:00:00.000Z",
+      operations: [],
+      summary: { applied: 1, skipped: 1 },
+    },
+  });
+  const history = await listActivationHistory({ catalogRoot, projectId: project.id });
+
+  assert.equal(recorded.digest.length, 64);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].assignments[0].preset_id, preset.id);
+  assert.equal(history[0].reports[0].status, "completed");
 });

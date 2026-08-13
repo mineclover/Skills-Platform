@@ -1,10 +1,11 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { getRegistrySkills } = require("./registry");
+const { validateActivationPlan } = require("../../../packages/skill-contracts/src");
 
 const crypto = require("node:crypto");
 
-const CATALOG_SCHEMA_VERSION = 4;
+const CATALOG_SCHEMA_VERSION = 5;
 const PRISTINE_PRESET_ID = "builtin-pristine";
 const TEMPLATE_LIFECYCLES = new Set(["draft", "reviewed", "deprecated"]);
 const PROJECT_PRESET_ROLES = new Set(["default", "recommended", "work_scope_overlay"]);
@@ -18,7 +19,15 @@ function catalogFile(catalogRoot) {
 }
 
 function blankCatalog() {
-  return { schema_version: CATALOG_SCHEMA_VERSION, projects: [], presets: [], skill_profiles: [], skill_notes: [] };
+  return {
+    schema_version: CATALOG_SCHEMA_VERSION,
+    projects: [],
+    presets: [],
+    skill_profiles: [],
+    skill_notes: [],
+    activation_plans: [],
+    activation_reports: [],
+  };
 }
 
 function uniqueStrings(values) {
@@ -104,13 +113,15 @@ function presentPreset(preset, version = preset.active_version) {
 }
 
 function normalizeCatalog(catalog) {
-  if (![1, 2, 3, CATALOG_SCHEMA_VERSION].includes(catalog.schema_version)) {
+  if (![1, 2, 3, 4, CATALOG_SCHEMA_VERSION].includes(catalog.schema_version)) {
     throw new Error(`Unsupported catalog schema: ${catalog.schema_version}`);
   }
   catalog.projects = (catalog.projects ?? []).map(normalizeProject);
   catalog.presets = (catalog.presets ?? []).map(normalizePreset);
   catalog.skill_profiles ??= [];
   catalog.skill_notes ??= [];
+  catalog.activation_plans ??= [];
+  catalog.activation_reports ??= [];
   catalog.schema_version = CATALOG_SCHEMA_VERSION;
   return catalog;
 }
@@ -407,6 +418,79 @@ async function listProjectPresetAssignments(catalogRoot, projectId) {
   });
 }
 
+function activationPlanDigest(plan) {
+  return crypto.createHash("sha256").update(JSON.stringify(plan)).digest("hex");
+}
+
+async function recordActivationPlan({ catalogRoot, plan, projectId, assignments = [] }) {
+  if (!plan?.plan_id) throw new Error("Activation plan id is required");
+  const validation = validateActivationPlan(plan);
+  if (!validation.valid) {
+    const error = new Error("Activation plan cannot be recorded because it is invalid");
+    error.issues = validation.issues;
+    throw error;
+  }
+  const catalog = await loadCatalog(catalogRoot);
+  const effectiveProjectId = projectId ?? plan.target?.project_id;
+  if (!effectiveProjectId || !catalog.projects.some((project) => project.id === effectiveProjectId)) {
+    throw new Error("Activation plan must reference a registered project");
+  }
+  if (catalog.activation_plans.some((item) => item.plan_id === plan.plan_id)) {
+    throw new Error(`Activation plan already recorded: ${plan.plan_id}`);
+  }
+  const record = {
+    plan_id: plan.plan_id,
+    project_id: effectiveProjectId,
+    mode: plan.mode,
+    created_at: plan.created_at,
+    recorded_at: now(),
+    digest: activationPlanDigest(plan),
+    assignments: assignments.map((assignment) => ({ ...assignment })),
+    plan,
+  };
+  catalog.activation_plans.push(record);
+  await saveCatalog(catalogRoot, catalog);
+  return record;
+}
+
+async function recordActivationReport({ catalogRoot, planId, report }) {
+  if (!report || typeof report !== "object") throw new Error("Activation report is required");
+  if (report.plan_id && report.plan_id !== planId) throw new Error("Activation report plan id does not match");
+  if (!Array.isArray(report.operations)) throw new Error("Activation report operations must be an array");
+  if (!report.summary || typeof report.summary !== "object" || Array.isArray(report.summary)) {
+    throw new Error("Activation report summary must be an object");
+  }
+  const catalog = await loadCatalog(catalogRoot);
+  if (!catalog.activation_plans.some((item) => item.plan_id === planId)) throw new Error(`Activation plan not found: ${planId}`);
+  const record = {
+    report_id: `activation_report_${crypto.randomUUID()}`,
+    plan_id: planId,
+    recorded_at: now(),
+    status: report.completed_at ? "completed" : "reported",
+    report: { ...report, plan_id: planId },
+  };
+  catalog.activation_reports.push(record);
+  await saveCatalog(catalogRoot, catalog);
+  return record;
+}
+
+async function listActivationHistory({ catalogRoot, projectId, planId }) {
+  const catalog = await loadCatalog(catalogRoot);
+  const reportsByPlanId = new Map();
+  for (const report of catalog.activation_reports) {
+    const items = reportsByPlanId.get(report.plan_id) ?? [];
+    items.push(report);
+    reportsByPlanId.set(report.plan_id, items);
+  }
+  return catalog.activation_plans
+    .filter((plan) => (!projectId || plan.project_id === projectId) && (!planId || plan.plan_id === planId))
+    .sort((left, right) => right.recorded_at.localeCompare(left.recorded_at))
+    .map((plan) => ({
+      ...plan,
+      reports: (reportsByPlanId.get(plan.plan_id) ?? []).slice().sort((left, right) => left.recorded_at.localeCompare(right.recorded_at)),
+    }));
+}
+
 function createPlanFileName(plan) {
   return `activation-plan-${plan.plan_id}.json`;
 }
@@ -426,9 +510,12 @@ module.exports = {
   getProject,
   listPresets,
   listProjectPresetAssignments,
+  listActivationHistory,
   listProjects,
   loadCatalog,
   saveCatalog,
+  recordActivationPlan,
+  recordActivationReport,
   TEMPLATE_LIFECYCLES,
   updatePresetTemplate,
 };

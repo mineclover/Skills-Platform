@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const fs = require("node:fs/promises");
 const path = require("node:path");
 const {
   createPlanFromRegistry,
@@ -22,6 +23,10 @@ const {
   listProjects,
   listRegistrySkills,
   listSkillNotes,
+  listActivationHistory,
+  recordActivationPlan,
+  recordActivationReport,
+  resolveProjectSelection,
   searchSkills,
   restoreSkillNote,
   resolveProjectEffectiveSet,
@@ -72,6 +77,8 @@ function usage() {
     "  skills-catalog preset note add <id> --body <text> | preset assign <project-id> <preset-id> [--version <n>]",
     "      [--role default|recommended|work_scope_overlay] [--priority <n>] [--work-scope <tag>]...",
     "  skills-catalog project-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--copy] [--out <file>]",
+    "  skills-catalog history record-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--copy]",
+    "  skills-catalog history record-report <plan-id> --file <adapter-report.json> | history list [--project-id <id>]",
     "  skills-catalog system-prompt --preset <id>",
     "  skills-catalog skill list | skill search [query] [--tag <tag>] [--provider <id>]",
     "  skills-catalog skill profile show <lineage-id>",
@@ -282,6 +289,30 @@ async function run(argv) {
     });
     if (flags.out) await exportActivationPlan({ outputPath: flags.out, plan });
     return plan;
+  }
+
+  if (command === "history") {
+    const [action, subject] = positional.slice(1);
+    if (action === "list") return listActivationHistory({ catalogRoot, projectId: flags["project-id"], planId: flags["plan-id"] });
+    if (action === "record-plan") {
+      const selection = await resolveProjectSelection({
+        catalogRoot, projectId: subject, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [],
+      });
+      const plan = await createProjectPlan({
+        catalogRoot,
+        registryRoot,
+        projectId: subject,
+        presetId: flags.preset,
+        workScopeTags: flags["work-scope"] ?? [],
+        distribution: { method: flags.copy === true ? "copy" : "symlink" },
+      });
+      return recordActivationPlan({ catalogRoot, plan, projectId: subject, assignments: selection.assignments });
+    }
+    if (action === "record-report") {
+      if (!flags.file) throw new Error("history record-report requires --file <adapter-report.json>");
+      const report = JSON.parse(await fs.readFile(path.resolve(flags.file), "utf8"));
+      return recordActivationReport({ catalogRoot, planId: subject, report });
+    }
   }
 
   if (command === "system-prompt") {

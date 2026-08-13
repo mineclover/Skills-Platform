@@ -151,7 +151,8 @@ editing `SKILL.md`.
 > owner/lifecycle metadata, immutable versions, version-specific notes, diff,
 > clone/update commands, project version pinning, and effective-set selection /
 > exclusion reasons. Work-scope overlay assignments with deterministic priority
-> are also available; persisted activation history remains.
+> and immutable plan/report history are also available. Portable plan exchange
+> and observed-state drift comparison remain.
 
 **Goal:** manage reusable skill configurations rather than individual toggles.
 
