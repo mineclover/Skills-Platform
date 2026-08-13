@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Skills registry, activation catalog, and policy control plane.",
+  "bin": {
+    "skills-catalog": "src/cli.js"
+  },
   "scripts": {
     "check": "node --check src/index.js",
     "test": "node --test"

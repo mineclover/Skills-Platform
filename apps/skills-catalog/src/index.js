@@ -1,6 +1,4 @@
-/**
- * Skills Catalog entry point.
- * Provider filesystem access intentionally lives in the Skills Manager adapter.
- */
-
-export {};
+module.exports = {
+  ...require("./activation-plans"),
+  ...require("./registry"),
+};

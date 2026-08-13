@@ -1,0 +1,209 @@
+const crypto = require("node:crypto");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+
+const REGISTRY_SCHEMA_VERSION = 1;
+const IGNORED_DIRECTORIES = new Set([".git", "node_modules", "dist", "target"]);
+
+function sha256(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function slug(value) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "skill";
+}
+
+function sourceId(locator) {
+  return `source_local_${sha256(locator).slice(0, 16)}`;
+}
+
+async function pathExists(candidate) {
+  try {
+    await fs.access(candidate);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function listFiles(root, relative = "") {
+  const directory = path.join(root, relative);
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.isDirectory()) {
+      if (!IGNORED_DIRECTORIES.has(entry.name)) {
+        files.push(...await listFiles(root, path.join(relative, entry.name)));
+      }
+    } else if (entry.isFile()) {
+      files.push(path.join(relative, entry.name));
+    }
+  }
+  return files;
+}
+
+async function digestDirectory(root) {
+  const hash = crypto.createHash("sha256");
+  for (const relativePath of await listFiles(root)) {
+    hash.update(relativePath.replaceAll("\\", "/"));
+    hash.update("\0");
+    hash.update(await fs.readFile(path.join(root, relativePath)));
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+}
+
+function parseSkillMarkdown(content, skillPath) {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!match) {
+    throw new Error(`Missing YAML frontmatter: ${skillPath}`);
+  }
+  const metadata = {};
+  for (const line of match[1].split(/\r?\n/)) {
+    const field = line.match(/^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/);
+    if (!field) continue;
+    metadata[field[1]] = field[2].trim().replace(/^['"]|['"]$/g, "");
+  }
+  if (!metadata.name) {
+    throw new Error(`Missing skill name in frontmatter: ${skillPath}`);
+  }
+  return { name: metadata.name, description: metadata.description ?? null };
+}
+
+async function discoverSkills(sourcePath) {
+  const found = [];
+  for (const relativePath of await listFiles(sourcePath)) {
+    if (path.basename(relativePath).toLowerCase() !== "skill.md") continue;
+    const absolutePath = path.join(sourcePath, relativePath);
+    const metadata = parseSkillMarkdown(await fs.readFile(absolutePath, "utf8"), absolutePath);
+    found.push({
+      ...metadata,
+      relative_path: path.dirname(relativePath).replaceAll("\\", "/") || ".",
+      root_path: path.dirname(absolutePath),
+    });
+  }
+  return found.sort((left, right) => left.relative_path.localeCompare(right.relative_path));
+}
+
+function registryFile(registryRoot) {
+  return path.join(registryRoot, "registry.json");
+}
+
+function blankRegistry() {
+  return {
+    schema_version: REGISTRY_SCHEMA_VERSION,
+    sources: [],
+    revisions: [],
+    skills: [],
+  };
+}
+
+async function loadRegistry(registryRoot) {
+  const file = registryFile(registryRoot);
+  if (!await pathExists(file)) return blankRegistry();
+  const registry = JSON.parse(await fs.readFile(file, "utf8"));
+  if (registry.schema_version !== REGISTRY_SCHEMA_VERSION) {
+    throw new Error(`Unsupported registry schema: ${registry.schema_version}`);
+  }
+  return registry;
+}
+
+async function saveRegistry(registryRoot, registry) {
+  await fs.mkdir(registryRoot, { recursive: true });
+  const temporaryFile = `${registryFile(registryRoot)}.tmp`;
+  await fs.writeFile(temporaryFile, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+  await fs.rename(temporaryFile, registryFile(registryRoot));
+}
+
+function defaultRegistryRoot(workspacePath = process.cwd()) {
+  return path.join(workspacePath, ".skills-platform", "registry");
+}
+
+async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames = [] }) {
+  const resolvedSourcePath = path.resolve(sourcePath);
+  const sourceStats = await fs.stat(resolvedSourcePath);
+  if (!sourceStats.isDirectory()) throw new Error(`Source must be a directory: ${resolvedSourcePath}`);
+
+  const discovered = await discoverSkills(resolvedSourcePath);
+  const selected = selectedSkillNames.length === 0
+    ? discovered
+    : discovered.filter((skill) => selectedSkillNames.includes(skill.name));
+  const missingNames = selectedSkillNames.filter((name) => !selected.some((skill) => skill.name === name));
+  if (missingNames.length > 0) throw new Error(`Selected skills were not found: ${missingNames.join(", ")}`);
+  if (selected.length === 0) throw new Error("No SKILL.md artifacts were found in source");
+
+  const registry = await loadRegistry(registryRoot);
+  const locator = resolvedSourcePath;
+  const id = sourceId(locator);
+  const revisionDigest = await digestDirectory(resolvedSourcePath);
+  const revisionId = `revision_${sha256(`${id}:${revisionDigest}`).slice(0, 24)}`;
+  const importedAt = new Date().toISOString();
+
+  if (!registry.sources.some((source) => source.id === id)) {
+    registry.sources.push({ id, kind: "local", locator, created_at: importedAt });
+  }
+  if (!registry.revisions.some((revision) => revision.id === revisionId)) {
+    registry.revisions.push({
+      id: revisionId,
+      source_id: id,
+      resolved_revision: revisionDigest,
+      content_digest: revisionDigest,
+      fetched_at: importedAt,
+      review_state: "imported",
+    });
+  }
+
+  const artifactsRoot = path.join(registryRoot, "revisions", revisionId, "artifacts");
+  const imported = [];
+  for (const skill of selected) {
+    const artifactDigest = await digestDirectory(skill.root_path);
+    // The ID includes the source revision so every delivery plan can pin the
+    // exact immutable instructions it was reviewed against.
+    const artifactId = `skill_${sha256(`${id}:${revisionId}:${skill.relative_path}`).slice(0, 20)}`;
+    const artifactPath = path.join(artifactsRoot, `${slug(skill.name)}-${artifactDigest.slice(0, 10)}`);
+    if (!await pathExists(artifactPath)) {
+      await fs.mkdir(path.dirname(artifactPath), { recursive: true });
+      await fs.cp(skill.root_path, artifactPath, { recursive: true, force: false, errorOnExist: true });
+    }
+    const existing = registry.skills.find((record) => record.id === artifactId && record.source_revision_id === revisionId);
+    const record = existing ?? {
+      id: artifactId,
+      source_id: id,
+      source_revision_id: revisionId,
+      skill_name: skill.name,
+      source_relative_path: skill.relative_path,
+      description: skill.description,
+      content_digest: artifactDigest,
+      canonical_path: artifactPath,
+      imported_at: importedAt,
+      review_state: "imported",
+    };
+    if (!existing) registry.skills.push(record);
+    imported.push(record);
+  }
+
+  await saveRegistry(registryRoot, registry);
+  return { source_id: id, source_revision_id: revisionId, skills: imported };
+}
+
+async function listRegistrySkills(registryRoot) {
+  const registry = await loadRegistry(registryRoot);
+  return registry.skills.slice().sort((left, right) => left.skill_name.localeCompare(right.skill_name));
+}
+
+async function getRegistrySkills(registryRoot, skillIds) {
+  const registry = await loadRegistry(registryRoot);
+  const records = skillIds.map((id) => registry.skills.find((skill) => skill.id === id)).filter(Boolean);
+  const missing = skillIds.filter((id) => !records.some((record) => record.id === id));
+  if (missing.length > 0) throw new Error(`Registry skills not found: ${missing.join(", ")}`);
+  return records;
+}
+
+module.exports = {
+  defaultRegistryRoot,
+  discoverSkills,
+  getRegistrySkills,
+  importLocalSource,
+  listRegistrySkills,
+  parseSkillMarkdown,
+};
