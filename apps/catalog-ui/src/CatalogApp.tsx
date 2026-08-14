@@ -23,6 +23,8 @@ type RemoteSet = {
   assignments: Assignment[];
   skills: Array<{ skill_name: string; desired_state: "enabled" | "disabled"; reason: string; selected_by: { preset_id?: string } | null }>;
 };
+type RemoteProject = { id: string; name: string };
+type RemoteHistory = { plan_id: string; mode: string; recorded_at: string; reports: Array<{ status: string; report: { summary?: Record<string, number> } }> };
 
 const catalogApi = import.meta.env.VITE_CATALOG_API?.replace(/\/$/, "") ?? "";
 
@@ -132,15 +134,17 @@ function TemplateInspector({ scope, pristine, defaultTemplate, overlayTemplate, 
   );
 }
 
-function PlanHistory({ scope, pristine, previewing, skills, defaultTemplate, remote }: { scope: Scope; pristine: boolean; previewing: boolean; skills: DisplaySkill[]; defaultTemplate: string; remote: boolean }) {
+function PlanHistory({ scope, pristine, previewing, skills, defaultTemplate, remote, history }: { scope: Scope; pristine: boolean; previewing: boolean; skills: DisplaySkill[]; defaultTemplate: string; remote: boolean; history: RemoteHistory | null }) {
   const enabledCount = skills.filter((skill) => skill.enabled).length;
-  const progress = previewing ? "2 / 3 resolving" : "3 / 3 resolved";
+  const report = history?.reports.at(-1);
+  const applied = report?.report.summary?.applied ?? enabledCount;
+  const progress = previewing ? "2 / 3 resolving" : report ? `${applied} applied` : "3 / 3 resolved";
   return (
     <section className="history-strip" aria-labelledby="history-title">
       <div className="history-title"><h2 id="history-title">Recent activation plans</h2><span>{remote ? "Catalog bridge connected" : "Demo data"}</span></div>
       <div className="history-row">
-        <CircleCheck size={30} className="mint" /><div className="history-name"><strong>{pristine ? "Pristine baseline" : `${scope} · ${defaultTemplate}`}</strong><small>Plan is ready for Skills Manager delivery</small></div>
-        <div className="history-progress"><strong>{progress}</strong><small>{enabledCount} enabled · {3 - enabledCount} disabled</small></div>
+        <CircleCheck size={30} className="mint" /><div className="history-name"><strong>{history ? `${history.mode} · ${history.plan_id.slice(0, 8)}` : pristine ? "Pristine baseline" : `${scope} · ${defaultTemplate}`}</strong><small>{report ? `Adapter report: ${report.status}` : "Plan is ready for Skills Manager delivery"}</small></div>
+        <div className="history-progress"><strong>{progress}</strong><small>{enabledCount} enabled · {skills.length - enabledCount} disabled</small></div>
         <div className="progress-track" aria-label={progress}><div className="progress-fill" style={{ width: previewing ? "54%" : "100%" }} /></div>
         <button className="details-button" type="button">View details</button><ChevronDown size={20} className="row-chevron" aria-hidden="true" />
       </div>
@@ -156,14 +160,17 @@ export function CatalogApp() {
   const [remoteSet, setRemoteSet] = useState<RemoteSet | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<RemoteProject[]>([]);
+  const [history, setHistory] = useState<RemoteHistory | null>(null);
 
   useEffect(() => {
     if (!catalogApi) return;
     let active = true;
     fetch(`${catalogApi}/api/projects`)
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Catalog bridge is unavailable")))
-      .then((body: { projects: Array<{ id: string }> }) => {
+      .then((body: { projects: RemoteProject[] }) => {
         if (!active) return;
+        setProjects(body.projects);
         setSelectedProjectId(body.projects[0]?.id ?? null);
         setRemoteError(body.projects.length === 0 ? "No catalog projects are registered." : null);
       })
@@ -182,6 +189,16 @@ export function CatalogApp() {
       .catch((error: Error) => active && setRemoteError(error.message));
     return () => { active = false; };
   }, [scope, pristine, selectedProjectId]);
+
+  useEffect(() => {
+    if (!catalogApi || !selectedProjectId) return;
+    let active = true;
+    fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/history`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load project history")))
+      .then((body: { history: RemoteHistory[] }) => active && setHistory(body.history[0] ?? null))
+      .catch(() => active && setHistory(null));
+    return () => { active = false; };
+  }, [selectedProjectId, notice]);
 
   const skills = useMemo<DisplaySkill[]>(() => remoteSet
     ? remoteSet.skills.map((skill) => {
@@ -222,12 +239,12 @@ export function CatalogApp() {
     <main className="app-shell">
       <SideNavigation />
       <div className="workspace">
-        <header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button><h1>{remoteSet?.project.name ?? "Acme Web"}</h1><label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
+        <header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
           <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
           <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} overlayTemplate={overlayTemplate} onPristine={togglePristine} onPreview={previewPlan} previewing={previewing} />
         </div>
-        <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} />
+        <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} />
       </div>
     </main>
   );
