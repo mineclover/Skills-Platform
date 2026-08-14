@@ -25,6 +25,7 @@ type RemoteSet = {
 };
 type RemoteProject = { id: string; name: string };
 type RemoteHistory = { plan_id: string; mode: string; recorded_at: string; reports: Array<{ status: string; report: { summary?: Record<string, number> } }> };
+type RemoteComparison = { in_sync: boolean; summary: Record<string, number>; captured_at: string; provider_id: string };
 type ReviewReason = { code: string; severity: "critical" | "high" | "medium" | "low"; detail: string };
 type ReviewItem = { lineage: { id: string; skill_name: string }; severity: "critical" | "high" | "medium" | "low"; reasons: ReviewReason[]; latest_source_revision_id: string | null };
 
@@ -141,18 +142,19 @@ function TemplateInspector({ scope, pristine, defaultTemplate, overlayTemplate, 
   );
 }
 
-function PlanHistory({ scope, pristine, previewing, skills, defaultTemplate, remote, history }: { scope: Scope; pristine: boolean; previewing: boolean; skills: DisplaySkill[]; defaultTemplate: string; remote: boolean; history: RemoteHistory | null }) {
+function PlanHistory({ scope, pristine, previewing, skills, defaultTemplate, remote, history, comparison }: { scope: Scope; pristine: boolean; previewing: boolean; skills: DisplaySkill[]; defaultTemplate: string; remote: boolean; history: RemoteHistory | null; comparison: RemoteComparison | null }) {
   const enabledCount = skills.filter((skill) => skill.enabled).length;
   const report = history?.reports.at(-1);
   const applied = report?.report.summary?.applied ?? enabledCount;
-  const progress = previewing ? "2 / 3 resolving" : report ? `${applied} applied` : "3 / 3 resolved";
+  const progress = previewing ? "2 / 3 resolving" : comparison ? (comparison.in_sync ? "Observed in sync" : "Observed drift") : report ? `${applied} applied` : "3 / 3 resolved";
+  const observationDetail = comparison ? (comparison.in_sync ? `Provider ${comparison.provider_id} matches the pinned plan` : Object.entries(comparison.summary).filter(([status]) => status !== "matched").map(([status, count]) => `${count} ${status}`).join(" · ")) : null;
   return (
     <section className="history-strip" aria-labelledby="history-title">
       <div className="history-title"><h2 id="history-title">Recent activation plans</h2><span>{remote ? "Catalog bridge connected" : "Demo data"}</span></div>
       <div className="history-row">
-        <CircleCheck size={30} className="mint" /><div className="history-name"><strong>{history ? `${history.mode} · ${history.plan_id.slice(0, 8)}` : pristine ? "Pristine baseline" : `${scope} · ${defaultTemplate}`}</strong><small>{report ? `Adapter report: ${report.status}` : "Plan is ready for Skills Manager delivery"}</small></div>
-        <div className="history-progress"><strong>{progress}</strong><small>{enabledCount} enabled · {skills.length - enabledCount} disabled</small></div>
-        <div className="progress-track" aria-label={progress}><div className="progress-fill" style={{ width: previewing ? "54%" : "100%" }} /></div>
+        <CircleCheck size={30} className="mint" /><div className="history-name"><strong>{history ? `${history.mode} · ${history.plan_id.slice(0, 8)}` : pristine ? "Pristine baseline" : `${scope} · ${defaultTemplate}`}</strong><small>{observationDetail ?? (report ? `Adapter report: ${report.status}` : "Plan is ready for Skills Manager delivery")}</small></div>
+        <div className="history-progress"><strong className={comparison && !comparison.in_sync ? "drift" : ""}>{progress}</strong><small>{enabledCount} enabled · {skills.length - enabledCount} disabled</small></div>
+        <div className="progress-track" aria-label={progress}><div className={comparison && !comparison.in_sync ? "progress-fill drift" : "progress-fill"} style={{ width: previewing ? "54%" : comparison && !comparison.in_sync ? "68%" : "100%" }} /></div>
         <button className="details-button" type="button">View details</button><ChevronDown size={20} className="row-chevron" aria-hidden="true" />
       </div>
     </section>
@@ -179,6 +181,7 @@ export function CatalogApp() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<RemoteProject[]>([]);
   const [history, setHistory] = useState<RemoteHistory | null>(null);
+  const [comparison, setComparison] = useState<RemoteComparison | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
   useEffect(() => {
@@ -228,6 +231,16 @@ export function CatalogApp() {
     return () => { active = false; };
   }, [selectedProjectId, notice]);
 
+  useEffect(() => {
+    if (!catalogApi || !history?.plan_id) { setComparison(null); return; }
+    let active = true;
+    fetch(`${catalogApi}/api/activation-plans/${encodeURIComponent(history.plan_id)}/observed-state-comparison`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("No observed state is available")))
+      .then((body: RemoteComparison) => active && setComparison(body))
+      .catch(() => active && setComparison(null));
+    return () => { active = false; };
+  }, [history?.plan_id]);
+
   const skills = useMemo<DisplaySkill[]>(() => remoteSet
     ? remoteSet.skills.map((skill) => {
       const assignment = remoteSet.assignments.find((item) => item.preset_id === skill.selected_by?.preset_id);
@@ -272,7 +285,7 @@ export function CatalogApp() {
           <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
           <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} overlayTemplate={overlayTemplate} onPristine={togglePristine} onPreview={previewPlan} previewing={previewing} />
         </div>
-        <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} />
+        <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} comparison={comparison} />
         <ReviewQueue items={reviewItems} remote={catalogApi !== ""} />
       </div>
     </main>
