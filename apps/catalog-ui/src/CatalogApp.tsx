@@ -28,6 +28,16 @@ type RemoteHistory = { plan_id: string; mode: string; recorded_at: string; repor
 type RemoteComparison = { in_sync: boolean; summary: Record<string, number>; captured_at: string; provider_id: string };
 type ReviewReason = { code: string; severity: "critical" | "high" | "medium" | "low"; detail: string };
 type ReviewItem = { lineage: { id: string; skill_name: string }; severity: "critical" | "high" | "medium" | "low"; reasons: ReviewReason[]; latest_source_revision_id: string | null };
+type SourceReview = { id: string; decision: "approved" | "rejected"; summary: string; reviewer: string; reviewed_at: string };
+type SourceAdoptionCandidate = {
+  lineage_id: string;
+  skill_name: string;
+  registry_skill_id: string;
+  source_revision_id: string;
+  imported_at: string;
+  review: SourceReview | null;
+  compatible_presets: Array<{ id: string; name: string; selected_version: number; current_registry_skill_id: string; current_source_revision_id: string }>;
+};
 
 const catalogApi = import.meta.env.VITE_CATALOG_API?.replace(/\/$/, "") ?? "";
 
@@ -171,6 +181,31 @@ function ReviewQueue({ items, remote }: { items: ReviewItem[]; remote: boolean }
   );
 }
 
+function SourceChangeQueue({ candidates, summaries, actionId, onSummaryChange, onReview, onAdopt }: {
+  candidates: SourceAdoptionCandidate[];
+  summaries: Record<string, string>;
+  actionId: string | null;
+  onSummaryChange: (sourceRevisionId: string, summary: string) => void;
+  onReview: (candidate: SourceAdoptionCandidate, decision: "approved" | "rejected") => void;
+  onAdopt: (candidate: SourceAdoptionCandidate, presetId: string) => void;
+}) {
+  return (
+    <section className="source-changes" aria-labelledby="source-changes-title">
+      <div className="review-title"><div><h2 id="source-changes-title">Source change decisions</h2><p>Imported revisions stay isolated until reviewed, then create a new template version only when adopted.</p></div><span>{candidates.length} candidate{candidates.length === 1 ? "" : "s"}</span></div>
+      {candidates.length === 0 ? <div className="review-empty"><CircleCheck size={22} className="mint" /><span>No imported revision is waiting to replace a pinned template skill.</span></div> : <div className="source-change-list">{candidates.map((candidate) => {
+        const busy = actionId === candidate.source_revision_id || actionId?.startsWith(`${candidate.registry_skill_id}:`) === true;
+        const approved = candidate.review?.decision === "approved";
+        return <article className="source-change" key={candidate.registry_skill_id}>
+          <div className="source-change-heading"><Database size={21} className="mint" /><div><strong>{candidate.skill_name}</strong><small>Candidate {candidate.source_revision_id.slice(0, 12)} · imported {new Date(candidate.imported_at).toLocaleDateString()}</small></div><span className={candidate.review ? `review-decision ${candidate.review.decision}` : "review-decision pending"}>{candidate.review?.decision ?? "needs review"}</span></div>
+          {candidate.review ? <p className="review-summary">{candidate.review.summary}</p> : <label className="review-summary-input"><span>Decision note</span><input value={summaries[candidate.source_revision_id] ?? ""} onChange={(event) => onSummaryChange(candidate.source_revision_id, event.target.value)} placeholder="What changed and why this decision is safe" /></label>}
+          {!candidate.review ? <div className="source-actions"><button className="source-button approve" type="button" disabled={busy} onClick={() => onReview(candidate, "approved")}>{busy ? "Saving…" : "Approve revision"}</button><button className="source-button reject" type="button" disabled={busy} onClick={() => onReview(candidate, "rejected")}>Reject</button></div> : null}
+          <div className="compatible-presets"><span>Can replace</span>{candidate.compatible_presets.map((preset) => <div key={preset.id} className="compatible-preset"><div><strong>{preset.name}</strong><small>Current template v{preset.selected_version} · pinned revision {preset.current_source_revision_id.slice(0, 10)}</small></div>{approved ? <button className="adopt-button" type="button" disabled={busy} onClick={() => onAdopt(candidate, preset.id)}>{busy ? "Adopting…" : "Adopt as new version"}</button> : <small className="adopt-hint">Approve before adoption</small>}</div>)}</div>
+        </article>;
+      })}</div>}
+    </section>
+  );
+}
+
 export function CatalogApp() {
   const [scope, setScope] = useState<Scope>("implementation");
   const [pristine, setPristine] = useState(false);
@@ -183,6 +218,16 @@ export function CatalogApp() {
   const [history, setHistory] = useState<RemoteHistory | null>(null);
   const [comparison, setComparison] = useState<RemoteComparison | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [sourceCandidates, setSourceCandidates] = useState<SourceAdoptionCandidate[]>([]);
+  const [sourceReviewSummaries, setSourceReviewSummaries] = useState<Record<string, string>>({});
+  const [sourceActionId, setSourceActionId] = useState<string | null>(null);
+
+  const refreshSourceCandidates = useCallback(() => {
+    if (!catalogApi) return Promise.resolve();
+    return fetch(`${catalogApi}/api/source-adoption-candidates`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load imported source changes")))
+      .then((body: { candidates: SourceAdoptionCandidate[] }) => setSourceCandidates(body.candidates));
+  }, []);
 
   useEffect(() => {
     if (!catalogApi) return;
@@ -198,6 +243,10 @@ export function CatalogApp() {
       .catch((error: Error) => active && setRemoteError(error.message));
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    refreshSourceCandidates().catch(() => setSourceCandidates([]));
+  }, [refreshSourceCandidates]);
 
   useEffect(() => {
     if (!catalogApi) return;
@@ -275,6 +324,36 @@ export function CatalogApp() {
       setNotice(`${enabledCount} enabled and ${3 - enabledCount} disabled operations are ready for preview.`);
     }, 620);
   }, [enabledCount, pristine, scope, selectedProjectId]);
+  const updateSourceSummary = useCallback((sourceRevisionId: string, summary: string) => {
+    setSourceReviewSummaries((current) => ({ ...current, [sourceRevisionId]: summary }));
+  }, []);
+  const reviewSourceCandidate = useCallback((candidate: SourceAdoptionCandidate, decision: "approved" | "rejected") => {
+    const summary = sourceReviewSummaries[candidate.source_revision_id]?.trim();
+    if (!summary) {
+      setNotice("Add a decision note before approving or rejecting an imported revision.");
+      return;
+    }
+    setSourceActionId(candidate.source_revision_id);
+    fetch(`${catalogApi}/api/source-revisions/${encodeURIComponent(candidate.source_revision_id)}/review`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ decision, summary }),
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Source review was rejected")))
+      .then(() => refreshSourceCandidates())
+      .then(() => setNotice(`Revision ${decision}. It remains isolated until a template adoption is chosen.`))
+      .catch((error: Error) => setNotice(error.message))
+      .finally(() => setSourceActionId(null));
+  }, [refreshSourceCandidates, sourceReviewSummaries]);
+  const adoptSourceCandidate = useCallback((candidate: SourceAdoptionCandidate, presetId: string) => {
+    setSourceActionId(`${candidate.registry_skill_id}:${presetId}`);
+    fetch(`${catalogApi}/api/presets/${encodeURIComponent(presetId)}/adopt`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ registry_skill_id: candidate.registry_skill_id }),
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Template adoption was rejected")))
+      .then((body: { adoption: { selected_version: number } }) => refreshSourceCandidates().then(() => body.adoption))
+      .then((adoption) => setNotice(`Created template version ${adoption.selected_version}. Existing project pins were not changed.`))
+      .catch((error: Error) => setNotice(error.message))
+      .finally(() => setSourceActionId(null));
+  }, [refreshSourceCandidates]);
 
   return (
     <main className="app-shell">
@@ -287,6 +366,7 @@ export function CatalogApp() {
         </div>
         <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} comparison={comparison} />
         <ReviewQueue items={reviewItems} remote={catalogApi !== ""} />
+        {catalogApi ? <SourceChangeQueue candidates={sourceCandidates} summaries={sourceReviewSummaries} actionId={sourceActionId} onSummaryChange={updateSourceSummary} onReview={reviewSourceCandidate} onAdopt={adoptSourceCandidate} /> : null}
       </div>
     </main>
   );

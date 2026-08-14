@@ -5,7 +5,7 @@ const { createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection }
 const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
 const { compareRecordedPlanWithObservedState, listObservedStates, recordObservedState } = require("./observed-state");
-const { adoptApprovedRevisionIntoPreset, latestSourceReview, recordSourceReview } = require("./source-review");
+const { adoptApprovedRevisionIntoPreset, latestSourceReview, listSourceAdoptionCandidates, recordSourceReview } = require("./source-review");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -55,6 +55,9 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
     try {
       if (request.method === "GET" && url.pathname === "/api/projects") {
         return json(response, 200, { projects: await listProjects(catalogRoot) });
+      }
+      if (request.method === "GET" && url.pathname === "/api/source-adoption-candidates") {
+        return json(response, 200, { candidates: await listSourceAdoptionCandidates({ catalogRoot, registryRoot }) });
       }
       const sourceReview = url.pathname.match(/^\/api\/source-revisions\/([^/]+)\/review$/);
       if (sourceReview && request.method === "GET") {

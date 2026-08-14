@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
-const { getRegistrySkills, getSourceRevision } = require("./registry");
-const { PRISTINE_PRESET_ID, loadCatalog, saveCatalog } = require("./catalog-state");
+const { getRegistrySkills, getSourceRevision, listRegistrySkills } = require("./registry");
+const { PRISTINE_PRESET_ID, listPresets, loadCatalog, saveCatalog } = require("./catalog-state");
 
 const REVIEW_DECISIONS = new Set(["approved", "rejected"]);
 
@@ -18,6 +18,53 @@ async function recordSourceReview({ catalogRoot, registryRoot, sourceRevisionId,
 async function latestSourceReview({ catalogRoot, sourceRevisionId }) {
   const catalog = await loadCatalog(catalogRoot);
   return catalog.source_reviews.filter((item) => item.source_revision_id === sourceRevisionId).sort((a, b) => b.reviewed_at.localeCompare(a.reviewed_at))[0] ?? null;
+}
+
+function latestSkillByLineage(skills) {
+  const latest = new Map();
+  for (const skill of skills) {
+    const current = latest.get(skill.lineage_id);
+    if (!current || current.imported_at.localeCompare(skill.imported_at) < 0) latest.set(skill.lineage_id, skill);
+  }
+  return latest;
+}
+
+async function listSourceAdoptionCandidates({ catalogRoot, registryRoot }) {
+  const [presets, skills] = await Promise.all([
+    listPresets(catalogRoot),
+    listRegistrySkills(registryRoot),
+  ]);
+  const latestByLineage = latestSkillByLineage(skills);
+  const candidates = new Map();
+  for (const preset of presets) {
+    if (preset.id === PRISTINE_PRESET_ID) continue;
+    for (const entry of preset.entries) {
+      const candidate = latestByLineage.get(entry.lineage_id);
+      if (!candidate || candidate.id === entry.registry_skill_id) continue;
+      const key = candidate.id;
+      if (!candidates.has(key)) {
+        candidates.set(key, {
+          lineage_id: candidate.lineage_id,
+          skill_name: candidate.skill_name,
+          registry_skill_id: candidate.id,
+          source_revision_id: candidate.source_revision_id,
+          imported_at: candidate.imported_at,
+          compatible_presets: [],
+        });
+      }
+      candidates.get(key).compatible_presets.push({
+        id: preset.id,
+        name: preset.name,
+        selected_version: preset.selected_version,
+        current_registry_skill_id: entry.registry_skill_id,
+        current_source_revision_id: entry.source_revision_id,
+      });
+    }
+  }
+  return Promise.all([...candidates.values()].map(async (candidate) => ({
+    ...candidate,
+    review: await latestSourceReview({ catalogRoot, sourceRevisionId: candidate.source_revision_id }),
+  }))).then((items) => items.sort((left, right) => right.imported_at.localeCompare(left.imported_at)));
 }
 
 function entryFor(skill) {
@@ -67,4 +114,10 @@ async function adoptApprovedRevisionIntoPreset({ catalogRoot, registryRoot, pres
   return { preset_id: preset.id, selected_version: nextVersion, adopted: snapshot.adoption };
 }
 
-module.exports = { REVIEW_DECISIONS, adoptApprovedRevisionIntoPreset, latestSourceReview, recordSourceReview };
+module.exports = {
+  REVIEW_DECISIONS,
+  adoptApprovedRevisionIntoPreset,
+  latestSourceReview,
+  listSourceAdoptionCandidates,
+  recordSourceReview,
+};

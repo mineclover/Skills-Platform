@@ -36,11 +36,11 @@ async function setup(context) {
     registrySkillIds: [imported.skills[0].id],
   });
   await assignPreset({ catalogRoot, projectId: project.id, presetId: preset.id });
-  return { catalogRoot, registryRoot, imported };
+  return { catalogRoot, registryRoot, imported, sourcePath };
 }
 
 test("catalog bridge exposes projects, effective set, history, and read-only plan preview", async (context) => {
-  const { catalogRoot, registryRoot, imported } = await setup(context);
+  const { catalogRoot, registryRoot, imported, sourcePath } = await setup(context);
   const server = createCatalogServer({ catalogRoot, registryRoot });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   context.after(() => server.close());
@@ -61,6 +61,24 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(preview.plan.operations[0].registry_skill_id, imported.skills[0].id);
   assert.equal(preview.plan.operations[0].skill_name, "planning");
   assert.deepEqual(history.history, []);
+
+  await fs.appendFile(path.join(sourcePath, "SKILL.md"), "\nUpdated planning instruction.\n", "utf8");
+  const importedCandidate = await importLocalSource({ registryRoot, sourcePath: path.dirname(sourcePath) });
+  const sourceCandidates = await (await fetch(`${base}/source-adoption-candidates`)).json();
+  assert.equal(sourceCandidates.candidates.length, 1);
+  assert.equal(sourceCandidates.candidates[0].registry_skill_id, importedCandidate.skills[0].id);
+
+  const candidateReview = await (await fetch(`${base}/source-revisions/${importedCandidate.source_revision_id}/review`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ decision: "approved", summary: "Candidate diff reviewed." }),
+  })).json();
+  const adopted = await (await fetch(`${base}/presets/planning/adopt`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ registry_skill_id: importedCandidate.skills[0].id }),
+  })).json();
+  assert.equal(candidateReview.review.decision, "approved");
+  assert.equal(adopted.adoption.selected_version, 2);
+  assert.deepEqual((await (await fetch(`${base}/source-adoption-candidates`)).json()).candidates, []);
 
   const createdFeedback = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/feedback`, {
     method: "POST",

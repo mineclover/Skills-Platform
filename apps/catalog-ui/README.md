@@ -17,7 +17,9 @@ Without configuration, the project screen is an interactive visual prototype.
 
 Start the local Catalog bridge in another terminal. The UI reads project
 policy, effective skill sets, history, plan previews, and the evidence-derived
-review queue; it does not apply a plan or mutate a delivery path.
+review queue. It can also record an explicit source review and create a new
+template version from an approved revision; it does not apply a plan or mutate
+a provider delivery path.
 
 ```bash
 cd ../skills-catalog
@@ -36,4 +38,7 @@ The UI displays the first registered project, its pinned template and matching
 overlays, every selected/disabled skill reason, and the adapter-ready preview.
 It also shows why any skill needs review—unreviewed metadata, declared risk,
 feedback signals, missing current-revision evaluations, or failed/blocked
-evaluation results.
+evaluation results. Imported source revisions that could replace a pinned
+template skill appear in a separate decision queue. A reviewer must add a
+decision note before approving or rejecting; approval only unlocks an explicit
+new-version adoption and never repins an existing project.
