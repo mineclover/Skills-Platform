@@ -20,8 +20,9 @@ docs/
 
 `apps/skills-manager` is a Git submodule pinned to the preserved Skills Manager
 control-plane branch. It stays independently buildable and continues to track
-its own upstream. The catalog never writes an agent's `skills/` directory
-directly; it sends a reviewed activation plan to the delivery adapter.
+its own upstream. The Catalog integrates with it only through its CLI, never
+writes an agent's `skills/` directory directly, and keeps policy separate from
+provider delivery.
 
 See [the architecture](./docs/architecture.md) for responsibilities, [the MVP
 definition](./docs/mvp.md) for the implemented core flow, and [the product

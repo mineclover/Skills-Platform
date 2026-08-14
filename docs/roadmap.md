@@ -211,14 +211,18 @@ to `Pristine` safely.
 **Goal:** make existing Skills Manager the real provider adapter without making
 it a registry.
 
-> Status: Reference adapter now emits preview, operation-progress, and complete
-> events in a stable NDJSON form. Catalog can now retain immutable snapshots
-> from the upstream Skills Manager `providers --json` / `bindings --json`
-> inspection interface and compare them against a recorded pinned plan. Direct
-> plan apply through the upstream app remains.
+> Status: Skills Manager CLI is now the accepted integration boundary. Catalog
+> can read live global and mapped-project state from upstream `projects`,
+> `providers --json`, and `bindings --json`, retain immutable snapshots, and
+> compare them against a recorded pinned plan. The reference adapter remains a
+> contract test harness only; direct Catalog filesystem delivery is not a
+> product path. CLI-backed write translation and apply remain.
 
-- Embed plan validation in Skills Manager commands.
-- Add local plan import/preview/apply and stable activation-report event stream.
+- Maintain the CLI runner and registry-revision → upstream instance mapping.
+- Translate a recorded plan into `skill preview` then confirmed
+  `skill enable`/`skill disable` or `batch` commands.
+- Store upstream JSON operation results and re-inspected state as the
+  activation report/event stream.
 - Map provider inventory, shared roots, direct skills, and existing links to
   preview reasons and progress UI.
 - Preserve independent upstream tracking; Catalog storage remains external.
