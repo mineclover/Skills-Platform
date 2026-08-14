@@ -74,6 +74,12 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
     body: JSON.stringify({ purpose: "Plan with a verified scope." }),
   })).json();
   assert.ok(updatedPreset.preset.selected_version > 1);
+  const createdPreset = await (await fetch(`${base}/presets`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "planning-copy", name: "Planning copy", registry_skill_ids: [imported.skills[0].id] }),
+  })).json();
+  assert.equal(createdPreset.preset.active_version, 1);
+  assert.equal(createdPreset.preset.registry_skill_ids[0], imported.skills[0].id);
 
   const pristineAssignment = await (await fetch(`${base}/projects/demo/default-preset`, {
     method: "POST", headers: { "content-type": "application/json" },
@@ -114,7 +120,9 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   })).json();
   assert.equal(candidateReview.review.decision, "approved");
   assert.equal(adopted.adoption.selected_version, updatedPreset.preset.selected_version + 1);
-  assert.deepEqual((await (await fetch(`${base}/source-adoption-candidates`)).json()).candidates, []);
+  const remainingCandidates = (await (await fetch(`${base}/source-adoption-candidates`)).json()).candidates;
+  assert.equal(remainingCandidates.length, 1);
+  assert.equal(remainingCandidates[0].compatible_presets[0].id, "planning-copy");
 
   const createdFeedback = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/feedback`, {
     method: "POST",
