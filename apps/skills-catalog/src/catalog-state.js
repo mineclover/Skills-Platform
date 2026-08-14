@@ -86,6 +86,7 @@ function normalizeAssignment(assignment) {
 }
 
 function normalizeProject(project) {
+  project.upstream_project_id ??= project.id;
   project.default_preset_id ??= PRISTINE_PRESET_ID;
   project.default_preset_version ??= 1;
   project.preset_assignments = (project.preset_assignments ?? []).map(normalizeAssignment);
@@ -176,7 +177,7 @@ function requireIdentifier(value, label) {
   return value.trim();
 }
 
-async function createProject({ catalogRoot, id, name, projectPath, providerId, deliveryRoot, scope = "project" }) {
+async function createProject({ catalogRoot, id, name, projectPath, providerId, deliveryRoot, scope = "project", upstreamProjectId = id }) {
   id = requireIdentifier(id, "Project id");
   name = requireIdentifier(name, "Project name");
   providerId = requireIdentifier(providerId, "Provider id");
@@ -189,6 +190,7 @@ async function createProject({ catalogRoot, id, name, projectPath, providerId, d
   const project = {
     id,
     name,
+    upstream_project_id: requireIdentifier(upstreamProjectId, "Upstream Skills Manager project id"),
     project_path: scope === "project" ? path.resolve(projectPath) : null,
     provider_id: providerId,
     delivery_root: path.resolve(deliveryRoot),

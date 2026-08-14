@@ -198,6 +198,17 @@ Comparison is observational: it reports `matched`, `missing`, `disabled`,
 `still_enabled`, `conflict`, or `provider_unavailable`. It never changes the
 upstream Skills Manager, the registry, or an agent delivery path.
 
+When the Catalog bridge runs beside the `apps/skills-manager` submodule, its
+`/api/upstream-status` and `/api/projects/:id/upstream-status` endpoints invoke
+the same inspector directly. The first endpoint reports global bindings; the
+second uses the Catalog project's `upstream_project_id` (defaulting to the
+Catalog project ID) to report the corresponding project bindings. Set
+`SKILLS_MANAGER_DIR` when the upstream checkout is elsewhere. Both endpoints
+are read-only and power the live status cards in Catalog UI.
+The bridge prefers an already built inspector binary and falls back to
+`npm run inspect`; set `SKILLS_MANAGER_INSPECT_PATH` to select a different
+binary explicitly.
+
 ## Versioned preset templates
 
 Template edits create a new version. A project assignment pins the version it

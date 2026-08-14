@@ -1,12 +1,13 @@
 const http = require("node:http");
 const { URL } = require("node:url");
-const { assignPreset, createPreset, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay, updatePresetTemplate } = require("./catalog-state");
+const { assignPreset, createPreset, getProject, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay, updatePresetTemplate } = require("./catalog-state");
 const { buildProjectSystemPrompt, createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
 const { compareRecordedPlanWithObservedState, listObservedStates, recordObservedState } = require("./observed-state");
 const { adoptApprovedRevisionIntoPreset, latestSourceReview, listSourceAdoptionCandidates, recordSourceReview } = require("./source-review");
 const { latestSkillsByArtifact, listRegistrySkills } = require("./registry");
+const { createSkillsManagerInspector } = require("./upstream-inspector");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -48,7 +49,7 @@ function workScopeTags(url, body = {}) {
   return url.searchParams.getAll("work_scope");
 }
 
-function createCatalogServer({ catalogRoot, registryRoot }) {
+function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = createSkillsManagerInspector() }) {
   if (!catalogRoot || !registryRoot) throw new Error("catalogRoot and registryRoot are required");
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
@@ -56,6 +57,9 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
     try {
       if (request.method === "GET" && url.pathname === "/api/projects") {
         return json(response, 200, { projects: await listProjects(catalogRoot) });
+      }
+      if (request.method === "GET" && url.pathname === "/api/upstream-status") {
+        return json(response, 200, { status: await upstreamInspector.inspect() });
       }
       if (request.method === "GET" && url.pathname === "/api/presets") {
         return json(response, 200, { presets: await listPresets(catalogRoot) });
@@ -258,6 +262,11 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
           presetId: url.searchParams.get("preset") ?? undefined,
           workScopeTags: workScopeTags(url),
         }));
+      }
+      const upstreamStatus = url.pathname.match(/^\/api\/projects\/([^/]+)\/upstream-status$/);
+      if (request.method === "GET" && upstreamStatus) {
+        const project = await getProject(catalogRoot, decodeURIComponent(upstreamStatus[1]));
+        return json(response, 200, { status: await upstreamInspector.inspect({ projectId: project.upstream_project_id }) });
       }
       const systemPrompt = url.pathname.match(/^\/api\/projects\/([^/]+)\/system-prompt$/);
       if (request.method === "GET" && systemPrompt) {

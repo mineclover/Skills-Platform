@@ -36,6 +36,11 @@ npm run dev
 
 The UI displays the first registered project, its pinned template and matching
 overlays, every selected/disabled skill reason, and the adapter-ready preview.
+It also calls the upstream Skills Manager inspector through the bridge and
+shows separate live cards for global activation and the selected project's
+current bindings. Refreshing those cards is read-only; configure
+`SKILLS_MANAGER_DIR` for the bridge when the upstream submodule is not at
+`apps/skills-manager`.
 It also shows why any skill needs review—unreviewed metadata, declared risk,
 feedback signals, missing current-revision evaluations, or failed/blocked
 evaluation results. Imported source revisions that could replace a pinned

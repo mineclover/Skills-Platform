@@ -41,7 +41,25 @@ async function setup(context) {
 
 test("catalog bridge exposes projects, effective set, history, and read-only plan preview", async (context) => {
   const { catalogRoot, registryRoot, imported, sourcePath } = await setup(context);
-  const server = createCatalogServer({ catalogRoot, registryRoot });
+  const inspectedProjectIds = [];
+  const server = createCatalogServer({
+    catalogRoot,
+    registryRoot,
+    upstreamInspector: {
+      inspect: async ({ projectId } = {}) => {
+        inspectedProjectIds.push(projectId ?? null);
+        return {
+          source: "skills-manager-inspect",
+          checked_at: "2026-08-14T00:00:00.000Z",
+          scope: projectId ? "project" : "global",
+          manager_project_id: projectId ?? null,
+          inventory: { providers: [{ provider_id: "codex", detected: true, reachable: true, enabled_count: 1, disabled_count: 1 }] },
+          bindings: [{ skill_instance_id: "planning", provider_id: "codex", state: projectId ? "enabled" : "disabled", scope: projectId ? "project" : "global" }],
+          summary: { total: 1, enabled: projectId ? 1 : 0, disabled: projectId ? 0 : 1, missing: 0, conflict: 0, unavailable: 0 },
+        };
+      },
+    },
+  });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   context.after(() => server.close());
   const { port } = server.address();
@@ -58,6 +76,8 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   })).json();
   const history = await (await fetch(`${base}/projects/demo/history`)).json();
   const systemPrompt = await (await fetch(`${base}/projects/demo/system-prompt?include_notes=true`)).json();
+  const globalUpstreamStatus = await (await fetch(`${base}/upstream-status`)).json();
+  const projectUpstreamStatus = await (await fetch(`${base}/projects/demo/upstream-status`)).json();
 
   assert.equal(projects.projects[0].id, "demo");
   assert.ok(presets.presets.some((preset) => preset.id === "builtin-pristine"));
@@ -68,6 +88,12 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.deepEqual(history.history, []);
   assert.equal(systemPrompt.project_id, "demo");
   assert.match(systemPrompt.content, /# Planning/);
+  assert.equal(globalUpstreamStatus.status.scope, "global");
+  assert.equal(globalUpstreamStatus.status.summary.disabled, 1);
+  assert.equal(projectUpstreamStatus.status.scope, "project");
+  assert.equal(projectUpstreamStatus.status.manager_project_id, "demo");
+  assert.equal(projectUpstreamStatus.status.summary.enabled, 1);
+  assert.deepEqual(inspectedProjectIds, [null, "demo"]);
 
   const updatedPreset = await (await fetch(`${base}/presets/planning/update`, {
     method: "POST", headers: { "content-type": "application/json" },

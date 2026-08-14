@@ -95,7 +95,7 @@ function usage() {
     "  skills-catalog source review approve|reject <source-revision-id> --summary <text>",
     "  skills-catalog serve [--catalog <path>] [--registry <path>] [--host <host>] [--port <n>]",
     "  skills-catalog list [--registry <path>]",
-    "  skills-catalog project add <id> --name <name> --path <path> --provider <id> --delivery-root <path>",
+    "  skills-catalog project add <id> --name <name> --path <path> --provider <id> --delivery-root <path> [--upstream-project-id <id>]",
     "  skills-catalog project list | project resolve <id> [--preset <id>] [--work-scope <tag>]...",
     "  skills-catalog preset create <id> --name <name> --skill <registry-skill-id>...",
     "  skills-catalog preset show <id> [--version <n>] | preset update <id> [--skill <id>]...",
@@ -424,6 +424,7 @@ async function run(argv) {
         providerId: flags.provider?.[0],
         deliveryRoot: flags["delivery-root"],
         scope: flags.global === true ? "global" : "project",
+        upstreamProjectId: flags["upstream-project-id"],
       });
     }
     if (action === "list") return listProjects(catalogRoot);

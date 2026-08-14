@@ -29,6 +29,17 @@ type RemoteAssignment = { preset_id: string; template_version: number; role: str
 type RegistrySkill = { id: string; skill_name: string; description: string | null; source_revision_id: string };
 type RemoteHistory = { plan_id: string; mode: string; recorded_at: string; reports: Array<{ status: string; report: { summary?: Record<string, number> } }> };
 type RemoteComparison = { in_sync: boolean; summary: Record<string, number>; captured_at: string; provider_id: string };
+type UpstreamProvider = { provider_id: string; display_name?: string; detected: boolean; reachable?: boolean | null; enabled_count?: number; disabled_count?: number; warning?: string | null };
+type UpstreamBinding = { artifact_id?: string; skill_instance_id: string; provider_id: string; scope: "global" | "project" | "tool"; state: "enabled" | "disabled" | "missing" | "conflict" | "unavailable"; target_path?: string | null; reason?: string | null };
+type UpstreamStatus = {
+  source: "skills-manager-inspect";
+  checked_at: string;
+  scope: "global" | "project";
+  manager_project_id: string | null;
+  inventory: { providers: UpstreamProvider[] };
+  bindings: UpstreamBinding[];
+  summary: { total: number; enabled: number; disabled: number; missing: number; conflict: number; unavailable: number };
+};
 type ReviewReason = { code: string; severity: "critical" | "high" | "medium" | "low"; detail: string };
 type ReviewItem = { lineage: { id: string; skill_name: string }; severity: "critical" | "high" | "medium" | "low"; reasons: ReviewReason[]; latest_source_revision_id: string | null };
 type SourceReview = { id: string; decision: "approved" | "rejected"; summary: string; reviewer: string; reviewed_at: string };
@@ -231,6 +242,36 @@ function PlanHistory({ scope, pristine, previewing, skills, defaultTemplate, rem
   );
 }
 
+function statusCopy(status: UpstreamStatus | null, loading: boolean, error: string | null) {
+  if (loading) return "Refreshing Skills Manager…";
+  if (error) return "Skills Manager unavailable";
+  if (!status) return "Not inspected yet";
+  return `${status.summary.enabled} enabled · ${status.summary.total} bindings`;
+}
+
+function LiveStatusCard({ label, status, loading, error }: { label: string; status: UpstreamStatus | null; loading: boolean; error: string | null }) {
+  const detectedProviders = status?.inventory.providers.filter((provider) => provider.detected) ?? [];
+  return <article className="live-status-card">
+    <div className="live-status-heading"><div><strong>{label}</strong><small>{statusCopy(status, loading, error)}</small></div><span className={error ? "live-chip problem" : status?.summary.enabled ? "live-chip active" : "live-chip"}>{error ? "Unavailable" : loading ? "Checking" : status?.summary.enabled ? "Active" : "No active skills"}</span></div>
+    {error ? <p className="live-status-error">{error}</p> : status ? <>
+      <div className="live-status-summary"><span><strong>{status.summary.enabled}</strong> enabled</span><span><strong>{status.summary.disabled}</strong> disabled</span><span><strong>{status.summary.missing + status.summary.conflict + status.summary.unavailable}</strong> attention</span></div>
+      <p className="live-provider-line">{detectedProviders.length ? `Providers: ${detectedProviders.map((provider) => `${provider.display_name ?? provider.provider_id} (${provider.enabled_count ?? 0} enabled)`).join(" · ")}` : "No detected provider"}</p>
+      <div className="live-binding-list" aria-label={`${label} bindings`}>
+        {status.bindings.length === 0 ? <span className="live-empty">No managed bindings reported.</span> : status.bindings.map((binding) => <div className="live-binding" key={`${binding.provider_id}:${binding.scope}:${binding.skill_instance_id}:${binding.target_path ?? ""}`}><div><strong>{binding.skill_instance_id}</strong><small>{binding.provider_id} · {binding.scope}</small></div><span className={`binding-state ${binding.state}`}>{binding.state}</span></div>)}
+      </div>
+      <small className="live-checked">Read-only check · {new Date(status.checked_at).toLocaleString()}</small>
+    </> : <p className="live-empty">Connect the Catalog bridge to inspect the current Skills Manager state.</p>}
+  </article>;
+}
+
+function LiveActivationStatus({ globalStatus, projectStatus, loading, error, onRefresh }: { globalStatus: UpstreamStatus | null; projectStatus: UpstreamStatus | null; loading: boolean; error: string | null; onRefresh: () => void }) {
+  const projectLabel = projectStatus?.manager_project_id ? `Selected project · ${projectStatus.manager_project_id}` : "Selected project";
+  return <section className="live-status" aria-labelledby="live-status-title">
+    <div className="live-status-title"><div><h2 id="live-status-title">Live Skills Manager status</h2><p>Read-only provider and binding inspection. Catalog policy is not changed.</p></div><button className="live-refresh" type="button" onClick={onRefresh} disabled={loading}>{loading ? <LoaderCircle size={16} className="spin" /> : <RefreshCcw size={16} />} {loading ? "Checking…" : "Refresh"}</button></div>
+    <div className="live-status-grid"><LiveStatusCard label="Global activation" status={globalStatus} loading={loading} error={error} /><LiveStatusCard label={projectLabel} status={projectStatus} loading={loading} error={error} /></div>
+  </section>;
+}
+
 function ReviewQueue({ items, remote }: { items: ReviewItem[]; remote: boolean }) {
   const queue = remote ? items : demoReviewQueue;
   return (
@@ -291,6 +332,10 @@ export function CatalogApp() {
   const [activePage, setActivePage] = useState("Projects");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [globalStatus, setGlobalStatus] = useState<UpstreamStatus | null>(null);
+  const [projectStatus, setProjectStatus] = useState<UpstreamStatus | null>(null);
+  const [loadingLiveStatus, setLoadingLiveStatus] = useState(false);
+  const [liveStatusError, setLiveStatusError] = useState<string | null>(null);
 
   const refreshSourceCandidates = useCallback(() => {
     if (!catalogApi) return Promise.resolve();
@@ -394,6 +439,30 @@ export function CatalogApp() {
       .catch(() => active && setComparison(null));
     return () => { active = false; };
   }, [history?.plan_id]);
+
+  const refreshLiveStatus = useCallback(() => {
+    if (!catalogApi) {
+      setGlobalStatus(null);
+      setProjectStatus(null);
+      setLiveStatusError(null);
+      return Promise.resolve();
+    }
+    setLoadingLiveStatus(true);
+    setLiveStatusError(null);
+    const global = fetch(`${catalogApi}/api/upstream-status`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not inspect global Skills Manager activation")));
+    const project = selectedProjectId
+      ? fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/upstream-status`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not inspect this project in Skills Manager")))
+      : Promise.resolve(null);
+    return Promise.all([global, project])
+      .then(([globalBody, projectBody]: [{ status: UpstreamStatus }, { status: UpstreamStatus } | null]) => {
+        setGlobalStatus(globalBody.status);
+        setProjectStatus(projectBody?.status ?? null);
+      })
+      .catch((error: Error) => setLiveStatusError(error.message))
+      .finally(() => setLoadingLiveStatus(false));
+  }, [selectedProjectId]);
+
+  useEffect(() => { void refreshLiveStatus(); }, [refreshLiveStatus]);
 
   const skills = useMemo<DisplaySkill[]>(() => remoteSet
     ? remoteSet.skills.map((skill) => {
@@ -545,7 +614,7 @@ export function CatalogApp() {
       <div className="workspace">
         {activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} onCreate={createTemplate} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
-          <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
+           <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} /><LiveActivationStatus globalStatus={globalStatus} projectStatus={projectStatus} loading={loadingLiveStatus} error={liveStatusError} onRefresh={() => void refreshLiveStatus()} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
           <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />
         </div>
         <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} comparison={comparison} />
