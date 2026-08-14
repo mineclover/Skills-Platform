@@ -27,6 +27,10 @@ node src/cli.js import-git https://github.com/example/skills.git --ref main \
 # Discover a newer commit without importing or adopting it automatically.
 node src/cli.js source updates --registry ./.skills-platform/registry
 
+# After explicitly importing a candidate, approve the exact immutable revision.
+node src/cli.js source review approve revision_candidate --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry --summary "Reviewed the prompt diff and source provenance."
+
 # List registered artifacts and copy the emitted registry IDs
 node src/cli.js list --registry ./.skills-platform/registry
 
@@ -74,6 +78,11 @@ node src/cli.js project add demo --catalog ./.skills-platform/catalog \
 node src/cli.js preset create demo-build --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --name "Demo build" --skill skill_example
 node src/cli.js preset assign demo demo-build --catalog ./.skills-platform/catalog
+
+# Adoption changes the preset only by creating a new version; existing project
+# pins remain unchanged until explicitly reassigned.
+node src/cli.js preset adopt demo-build --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry --skill skill_candidate
 
 # Export a pinned plan for the Skills Manager delivery adapter; no provider path is changed.
 node src/cli.js project-plan demo --catalog ./.skills-platform/catalog \

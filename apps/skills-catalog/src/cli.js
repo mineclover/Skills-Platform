@@ -3,10 +3,12 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const {
   createPlanFromRegistry,
+  adoptApprovedRevisionIntoPreset,
   createEvaluationCase,
   addSkillFeedback,
   addPresetTemplateNote,
   addSkillNote,
+  latestSourceReview,
   deleteSkillNote,
   diffSkillRevisions,
   editSkillNote,
@@ -47,6 +49,7 @@ const {
   restoreSkillNote,
   recordEvaluationRun,
   recordObservedState,
+  recordSourceReview,
   resolveProjectEffectiveSet,
   updateSkillProfile,
   updateEvaluationCase,
@@ -89,6 +92,7 @@ function usage() {
     "  skills-catalog import-local <source-path> [--registry <path>] [--skill <name>]...",
     "  skills-catalog import-git <repository> [--ref <commit-or-ref>] [--registry <path>] [--skill <name>]...",
     "  skills-catalog source inspect <source-path> | source updates [--registry <path>]",
+    "  skills-catalog source review approve|reject <source-revision-id> --summary <text>",
     "  skills-catalog serve [--catalog <path>] [--registry <path>] [--host <host>] [--port <n>]",
     "  skills-catalog list [--registry <path>]",
     "  skills-catalog project add <id> --name <name> --path <path> --provider <id> --delivery-root <path>",
@@ -97,6 +101,7 @@ function usage() {
     "  skills-catalog preset show <id> [--version <n>] | preset update <id> [--skill <id>]...",
     "  skills-catalog preset clone <source-id> <new-id> --name <name> | preset compare <id> <left> <right>",
     "  skills-catalog preset note add <id> --body <text> | preset assign <project-id> <preset-id> [--version <n>]",
+    "  skills-catalog preset adopt <preset-id> --skill <approved-registry-skill-id>",
     "      [--role default|recommended|work_scope_overlay] [--priority <n>] [--work-scope <tag>]...",
     "  skills-catalog project-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--copy] [--out <file>]",
     "  skills-catalog history record-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--copy]",
@@ -150,6 +155,11 @@ async function run(argv) {
     const [action, inspectedPath] = positional.slice(1);
     if (action === "inspect") return inspectLocalSource({ sourcePath: inspectedPath });
     if (action === "updates") return listSourceUpdateCandidates(registryRoot);
+    if (action === "review") {
+      const [decision, revisionId] = positional.slice(2);
+      if (decision === "show") return latestSourceReview({ catalogRoot, sourceRevisionId: revisionId });
+      return recordSourceReview({ catalogRoot, registryRoot, sourceRevisionId: revisionId, decision: decision === "approve" ? "approved" : decision === "reject" ? "rejected" : decision, summary: flags.summary, reviewer: flags.reviewer });
+    }
   }
 
   if (command === "list") return listRegistrySkills(registryRoot);
@@ -456,6 +466,7 @@ async function run(argv) {
         },
       });
     }
+    if (action === "adopt") return adoptApprovedRevisionIntoPreset({ catalogRoot, registryRoot, presetId, registrySkillId: flags.skill?.[0] });
     if (action === "clone") {
       return clonePresetTemplate({
         catalogRoot,

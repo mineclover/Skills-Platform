@@ -232,8 +232,9 @@ and Catalog records the report without duplicated policy state.
 
 > Status: Git sources can be resolved to a commit and imported into the
 > immutable local registry without executing installer scripts; update candidates
-> are discovered without auto-adoption. GitHub shorthand, archives, skills.sh
-> packs, trust policy, and review adoption remain.
+> are discovered without auto-adoption. An imported candidate requires an
+> explicit revision review before it can create a new preset version. GitHub
+> shorthand, archives, skills.sh packs, and richer trust policy remain.
 
 - Add Git URLs, GitHub shorthand, direct paths, archives, and skills.sh packs.
 - Lock commits/archive digests; store manifest/license where available.
