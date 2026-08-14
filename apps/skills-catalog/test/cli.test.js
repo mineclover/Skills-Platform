@@ -90,6 +90,35 @@ test("CLI records structured feedback and reads its health summary", async (cont
   assert.equal(summary.reported_metrics.attempted, 1);
 });
 
+test("CLI records a revision-pinned evaluation case result and derives review work", async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-catalog-cli-evaluation-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const sourcePath = path.join(root, "source", "demo");
+  const registryRoot = path.join(root, "registry");
+  const catalogRoot = path.join(root, "catalog");
+  await fs.mkdir(sourcePath, { recursive: true });
+  await fs.writeFile(path.join(sourcePath, "SKILL.md"), "---\nname: demo-skill\ndescription: Demo workflow.\n---\n\n# Demo skill\n");
+  const imported = await run(["import-local", path.join(root, "source"), "--registry", registryRoot]);
+  const skill = imported.skills[0];
+  const evaluationCase = await run([
+    "evaluation", "case", "create", "demo-contract", "--catalog", catalogRoot, "--registry", registryRoot,
+    "--lineage", skill.lineage_id, "--name", "Demo contract", "--objective", "Check demo output.",
+    "--criterion", "Explains intent", "--lifecycle", "active",
+  ]);
+  const runResult = await run([
+    "evaluation", "run", "record", "demo-contract", "--catalog", catalogRoot, "--registry", registryRoot,
+    "--revision", skill.source_revision_id, "--outcome", "passed", "--summary", "Intent was clear.",
+    "--criterion-results", '[{"criterion":"Explains intent","outcome":"passed"}]',
+  ]);
+  const summary = await run(["evaluation", "summary", skill.lineage_id, "--catalog", catalogRoot, "--registry", registryRoot, "--revision", skill.source_revision_id]);
+  const queue = await run(["review", "queue", "--catalog", catalogRoot, "--registry", registryRoot]);
+
+  assert.equal(evaluationCase.selected_version, 1);
+  assert.equal(runResult.outcome, "passed");
+  assert.equal(summary.evaluated_active_case_count, 1);
+  assert.equal(queue[0].reasons[0].code, "unreviewed_profile");
+});
+
 test("CLI versions and annotates preset templates", async (context) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-catalog-cli-template-"));
   context.after(() => fs.rm(root, { recursive: true, force: true }));

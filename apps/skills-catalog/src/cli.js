@@ -3,6 +3,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const {
   createPlanFromRegistry,
+  createEvaluationCase,
   addSkillFeedback,
   addPresetTemplateNote,
   addSkillNote,
@@ -12,6 +13,7 @@ const {
   getPreset,
   getSkillProfile,
   getSkillFeedbackSummary,
+  getSkillEvaluationSummary,
   createPreset,
   createProject,
   createProjectPlan,
@@ -31,6 +33,9 @@ const {
   listSkillRevisions,
   listSkillNotes,
   listSkillFeedback,
+  listEvaluationCases,
+  listEvaluationRuns,
+  listReviewQueue,
   listActivationHistory,
   recordActivationPlan,
   recordActivationReport,
@@ -38,14 +43,16 @@ const {
   searchSkills,
   startCatalogServer,
   restoreSkillNote,
+  recordEvaluationRun,
   resolveProjectEffectiveSet,
   updateSkillProfile,
+  updateEvaluationCase,
   updatePresetTemplate,
 } = require(".");
 
 const MULTI_VALUE_FLAGS = new Set([
   "skill", "use-when", "avoid-when", "tag", "domain", "work-scope",
-  "maintainer", "provider", "runtime",
+  "maintainer", "provider", "runtime", "criterion",
 ]);
 
 function parseArguments(argv) {
@@ -101,6 +108,9 @@ function usage() {
     "  skills-catalog skill note delete|restore <note-id>",
     "  skills-catalog skill feedback add <lineage-id> --summary <text> [--outcome <outcome>] [--evidence <type>]",
     "  skills-catalog skill feedback list [--lineage <id>] | skill feedback summary <lineage-id>",
+    "  skills-catalog evaluation case create <id> --lineage <id> --name <name> --objective <text> --criterion <text>...",
+    "  skills-catalog evaluation case list [--lineage <id>] | evaluation run record <case-id> --revision <id> --outcome <outcome>",
+    "      --summary <text> --criterion-results <json> | evaluation summary <lineage-id> | review queue",
     "  skills-catalog plan --skill <registry-skill-id>... --provider <id> --delivery-root <path>",
     "      [--registry <path>] [--project-id <id> --project-path <path> | --global] [--copy]",
   ].join("\n");
@@ -296,6 +306,75 @@ async function run(argv) {
       }
     }
   }
+
+  if (command === "evaluation") {
+    const [area, action, subject] = positional.slice(1);
+    if (area === "case") {
+      if (action === "create") return createEvaluationCase({
+        catalogRoot,
+        registryRoot,
+        id: subject,
+        lineageId: flags.lineage,
+        name: flags.name,
+        objective: flags.objective,
+        criteria: flags.criterion,
+        owner: flags.owner,
+        lifecycle: flags.lifecycle,
+      });
+      if (action === "list") return listEvaluationCases({
+        catalogRoot,
+        lineageId: flags.lineage,
+        lifecycle: flags.lifecycle,
+        includeRetired: flags["include-retired"] === true,
+      });
+      if (action === "update") return updateEvaluationCase({
+        catalogRoot,
+        caseId: subject,
+        name: flags.name,
+        owner: flags.owner,
+        lifecycle: flags.lifecycle,
+        objective: flags.objective,
+        criteria: flags.criterion,
+      });
+    }
+    if (area === "run") {
+      if (action === "record") {
+        let criterionResults;
+        try {
+          criterionResults = JSON.parse(flags["criterion-results"] ?? "");
+        } catch {
+          throw new Error("Criterion results must be valid JSON");
+        }
+        return recordEvaluationRun({
+          catalogRoot,
+          registryRoot,
+          caseId: subject,
+          version: flags.version,
+          sourceRevisionId: flags.revision,
+          outcome: flags.outcome,
+          summary: flags.summary,
+          details: flags.details,
+          author: flags.author,
+          criterionResults,
+        });
+      }
+      if (action === "list") return listEvaluationRuns({
+        catalogRoot,
+        lineageId: flags.lineage,
+        caseId: flags["case-id"],
+        sourceRevisionId: flags.revision,
+        outcome: flags.outcome,
+      });
+    }
+    if (area === "summary") return getSkillEvaluationSummary({
+      catalogRoot,
+      registryRoot,
+      lineageId: action,
+      sourceRevisionId: flags.revision,
+    });
+  }
+
+  if (command === "review" && sourcePath === "queue") return listReviewQueue({ catalogRoot, registryRoot });
 
   if (command === "project") {
     const [action, projectId] = positional.slice(1);

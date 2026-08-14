@@ -97,6 +97,23 @@ success rate across non-neutral signals, latest evidence, and a conservative
 `healthy` / `needs_review` / `unknown` health state. It never changes preset
 policy automatically.
 
+### 3.4 Evaluation cases and review queue
+
+Evaluation cases are versioned contracts for a skill lineage. A recorded result
+always pins both the source revision and the case version, so a revised
+criterion cannot inherit an earlier pass.
+
+```text
+EvaluationCase -> immutable versioned objective + criteria
+EvaluationRun  -> case version + source revision + per-criterion result
+ReviewQueue    -> inferred evidence only; no automatic activation/policy edit
+```
+
+The queue includes unreviewed profiles, high/critical declared risk, unhealthy
+feedback, a latest revision missing an active-case result, and failed/blocked
+latest evaluations. Human review resolves the underlying profile, source,
+case, or feedback; queue entries are never silently dismissed.
+
 ## 4. Preset templates
 
 A template replaces a loose collection of toggles with reusable and explainable
@@ -249,9 +266,10 @@ every active skill.
 **Goal:** recommend and improve skills from evidence, not installation count.
 
 > Status: Structured feedback records, evidence/redaction conventions, numeric
-> counters, and per-lineage health summaries are available through the Catalog
-> CLI and local bridge. Evaluation-case execution, revision comparisons, and a
-> review queue remain.
+> counters, per-lineage health summaries, versioned evaluation cases,
+> per-revision criterion results, and an inferred review queue are available
+> through the Catalog CLI and local bridge. Automated evaluator execution and
+> richer revision comparison remain.
 
 - Structured feedback with evidence type and redaction.
 - Evaluation cases and per-revision outcomes.

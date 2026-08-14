@@ -53,7 +53,11 @@ Available endpoints are `GET /api/projects`, `GET
 adapter; `POST /api/activation-plans/:id/report` stores the report returned by
 that adapter. `GET|POST /api/skills/:lineage/feedback` records or reads
 structured evidence, and `GET /api/skills/:lineage/feedback-summary` provides
-its aggregate health indicators. Neither endpoint applies a delivery operation.
+its aggregate health indicators. `GET|POST /api/evaluation-cases` and
+`GET|POST /api/evaluation-cases/:id/runs` manage revision-pinned evaluation
+evidence; `GET /api/skills/:lineage/evaluation-summary` and `GET
+/api/review-queue` expose derived evaluation and review state. None of these
+endpoints applies a delivery operation.
 
 ## MVP catalog flow
 
@@ -129,6 +133,33 @@ node src/cli.js skill feedback add lineage_example \
 # conservative healthy / needs_review / unknown state.
 node src/cli.js skill feedback summary lineage_example \
   --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry
+```
+
+## Evaluation cases and review queue
+
+An evaluation case is a versioned contract for one skill lineage. A run must
+name an immutable source revision and give one result for every criterion. If
+the contract changes, its version advances and the prior pass does not cover
+the new version.
+
+```bash
+# Define an active, explicit evaluation contract.
+node src/cli.js evaluation case create review-contract \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
+  --lineage lineage_example --name "Review contract" \
+  --objective "Confirm a review is scoped and evidenced" \
+  --criterion "Explains the expected scope" \
+  --criterion "Records verifiable evidence" --lifecycle active
+
+# Record a human or external evaluator result against a pinned source revision.
+node src/cli.js evaluation run record review-contract \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
+  --revision revision_example --outcome passed --summary "Both checks passed." \
+  --criterion-results '[{"criterion":"Explains the expected scope","outcome":"passed"},{"criterion":"Records verifiable evidence","outcome":"passed"}]'
+
+# List inferred review work; it never changes a template or delivery target.
+node src/cli.js review queue --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry
 ```
 
 ## Versioned preset templates

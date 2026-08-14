@@ -3,6 +3,7 @@ const { URL } = require("node:url");
 const { listActivationHistory, listProjects, recordActivationPlan, recordActivationReport } = require("./catalog-state");
 const { createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
+const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -52,6 +53,64 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
     try {
       if (request.method === "GET" && url.pathname === "/api/projects") {
         return json(response, 200, { projects: await listProjects(catalogRoot) });
+      }
+      if (request.method === "GET" && url.pathname === "/api/review-queue") {
+        return json(response, 200, { items: await listReviewQueue({ catalogRoot, registryRoot }) });
+      }
+      if (request.method === "GET" && url.pathname === "/api/evaluation-cases") {
+        return json(response, 200, { cases: await listEvaluationCases({
+          catalogRoot,
+          lineageId: url.searchParams.get("lineage_id") ?? undefined,
+          lifecycle: url.searchParams.get("lifecycle") ?? undefined,
+          includeRetired: url.searchParams.get("include_retired") === "true",
+        }) });
+      }
+      if (request.method === "POST" && url.pathname === "/api/evaluation-cases") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { evaluation_case: await createEvaluationCase({
+          catalogRoot,
+          registryRoot,
+          id: body.id,
+          lineageId: body.lineage_id,
+          name: body.name,
+          objective: body.objective,
+          criteria: body.criteria,
+          owner: body.owner,
+          lifecycle: body.lifecycle,
+        }) });
+      }
+      const evaluationRuns = url.pathname.match(/^\/api\/evaluation-cases\/([^/]+)\/runs$/);
+      if (evaluationRuns && request.method === "GET") {
+        return json(response, 200, { runs: await listEvaluationRuns({
+          catalogRoot,
+          caseId: decodeURIComponent(evaluationRuns[1]),
+          sourceRevisionId: url.searchParams.get("source_revision_id") ?? undefined,
+          outcome: url.searchParams.get("outcome") ?? undefined,
+        }) });
+      }
+      if (evaluationRuns && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { run: await recordEvaluationRun({
+          catalogRoot,
+          registryRoot,
+          caseId: decodeURIComponent(evaluationRuns[1]),
+          version: body.case_version,
+          sourceRevisionId: body.source_revision_id,
+          outcome: body.outcome,
+          summary: body.summary,
+          details: body.details,
+          author: body.author,
+          criterionResults: body.criterion_results,
+        }) });
+      }
+      const evaluationSummary = url.pathname.match(/^\/api\/skills\/([^/]+)\/evaluation-summary$/);
+      if (evaluationSummary && request.method === "GET") {
+        return json(response, 200, await getSkillEvaluationSummary({
+          catalogRoot,
+          registryRoot,
+          lineageId: decodeURIComponent(evaluationSummary[1]),
+          sourceRevisionId: url.searchParams.get("source_revision_id") ?? undefined,
+        }));
       }
       const feedback = url.pathname.match(/^\/api\/skills\/([^/]+)\/feedback$/);
       if (feedback && request.method === "GET") {

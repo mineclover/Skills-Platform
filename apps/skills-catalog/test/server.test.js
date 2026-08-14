@@ -78,6 +78,35 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(createdFeedback.feedback.outcome, "success");
   assert.equal(feedbackSummary.reported_metrics.successful, 1);
 
+  const createdCase = await (await fetch(`${base}/evaluation-cases`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      id: "planning-contract",
+      lineage_id: imported.skills[0].lineage_id,
+      name: "Planning contract",
+      objective: "Check planning output.",
+      criteria: ["Captures constraints"],
+      lifecycle: "active",
+    }),
+  })).json();
+  const createdRun = await (await fetch(`${base}/evaluation-cases/planning-contract/runs`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      source_revision_id: imported.skills[0].source_revision_id,
+      outcome: "passed",
+      summary: "Constraint coverage passed.",
+      criterion_results: [{ criterion: "Captures constraints", outcome: "passed" }],
+    }),
+  })).json();
+  const evaluationSummary = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/evaluation-summary?source_revision_id=${imported.skills[0].source_revision_id}`)).json();
+  const reviewQueue = await (await fetch(`${base}/review-queue`)).json();
+  assert.equal(createdCase.evaluation_case.selected_version, 1);
+  assert.equal(createdRun.run.outcome, "passed");
+  assert.equal(evaluationSummary.evaluated_active_case_count, 1);
+  assert.ok(reviewQueue.items.length >= 1);
+
   const recorded = await (await fetch(`${base}/projects/demo/activation-plan`, {
     method: "POST",
     headers: { "content-type": "application/json" },
