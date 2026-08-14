@@ -4,4 +4,5 @@ module.exports = {
   ...require("./catalog-workflows"),
   ...require("./registry"),
   ...require("./skill-management"),
+  ...require("./server"),
 };

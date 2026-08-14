@@ -109,6 +109,7 @@ async function resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId
     mode: plan.mode,
     skills: plan.operations.map((operation) => ({
       registry_skill_id: operation.registry_skill_id,
+      skill_name: operation.skill_name,
       source_revision_id: operation.source_revision_id,
       desired_state: operation.desired_state,
       reason: plan.mode === "pristine"

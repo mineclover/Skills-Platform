@@ -26,6 +26,7 @@ async function createPlanFromRegistry({
     now,
     operations: skills.map((skill) => ({
       registry_skill_id: skill.id,
+      skill_name: skill.skill_name,
       source_revision_id: skill.source_revision_id,
       content_digest: skill.content_digest,
       canonical_path: skill.canonical_path,

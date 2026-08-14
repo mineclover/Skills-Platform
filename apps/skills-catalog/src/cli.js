@@ -31,6 +31,7 @@ const {
   recordActivationReport,
   resolveProjectSelection,
   searchSkills,
+  startCatalogServer,
   restoreSkillNote,
   resolveProjectEffectiveSet,
   updateSkillProfile,
@@ -72,6 +73,7 @@ function usage() {
     "Usage:",
     "  skills-catalog import-local <source-path> [--registry <path>] [--skill <name>]...",
     "  skills-catalog source inspect <source-path>",
+    "  skills-catalog serve [--catalog <path>] [--registry <path>] [--host <host>] [--port <n>]",
     "  skills-catalog list [--registry <path>]",
     "  skills-catalog project add <id> --name <name> --path <path> --provider <id> --delivery-root <path>",
     "  skills-catalog project list | project resolve <id> [--preset <id>] [--work-scope <tag>]...",
@@ -117,6 +119,21 @@ async function run(argv) {
   }
 
   if (command === "list") return listRegistrySkills(registryRoot);
+
+  if (command === "serve") {
+    const server = await startCatalogServer({
+      catalogRoot,
+      registryRoot,
+      host: flags.host ?? "127.0.0.1",
+      port: Number(flags.port ?? 4300),
+    });
+    const address = server.address();
+    return new Promise((resolve) => {
+      process.stdout.write(`${JSON.stringify({ listening: `http://${address.address}:${address.port}` }, null, 2)}\n`);
+      process.once("SIGINT", () => server.close(() => resolve({ stopped: true })));
+      process.once("SIGTERM", () => server.close(() => resolve({ stopped: true })));
+    });
+  }
 
   if (command === "skill") {
     const [area, action, subject] = positional.slice(1);

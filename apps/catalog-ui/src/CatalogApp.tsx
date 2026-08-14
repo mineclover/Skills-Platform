@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, Check, ChevronDown, CircleCheck, ClipboardCheck, Database,
   Eye, FileText, Layers3, LoaderCircle, RefreshCcw, Settings, ShieldCheck,
@@ -15,6 +15,16 @@ type SkillRow = {
   defaultReason: string;
   overlayReason?: string;
 };
+
+type DisplaySkill = { name: string; source: string; enabled: boolean; reason: string };
+type Assignment = { preset_id: string; template_version: number; role: string; name?: string };
+type RemoteSet = {
+  project: { id: string; name: string };
+  assignments: Assignment[];
+  skills: Array<{ skill_name: string; desired_state: "enabled" | "disabled"; reason: string; selected_by: { preset_id?: string } | null }>;
+};
+
+const catalogApi = import.meta.env.VITE_CATALOG_API?.replace(/\/$/, "") ?? "";
 
 const navigation = [
   { label: "Registry", icon: Database },
@@ -37,6 +47,17 @@ function statusFor(row: SkillRow, scope: Scope, pristine: boolean) {
   return { enabled: row.defaultEnabled, reason: row.defaultReason, source: row.source };
 }
 
+function sampleSkills(scope: Scope, pristine: boolean): DisplaySkill[] {
+  return skillRows.map((row) => {
+    const status = statusFor(row, scope, pristine);
+    return { name: row.name, source: status.source, enabled: status.enabled, reason: status.reason };
+  });
+}
+
+function presetName(assignments: Assignment[], role: string, fallback: string) {
+  return assignments.find((assignment) => assignment.role === role)?.name ?? fallback;
+}
+
 function AppIcon({ icon: Icon, active }: { icon: typeof Database; active?: boolean }) {
   return <Icon aria-hidden="true" size={21} strokeWidth={1.7} className={active ? "nav-icon active" : "nav-icon"} />;
 }
@@ -56,18 +77,17 @@ function SideNavigation() {
   );
 }
 
-function SkillTable({ scope, pristine }: { scope: Scope; pristine: boolean }) {
+function SkillTable({ skills }: { skills: DisplaySkill[] }) {
   return (
     <section className="skill-table" aria-labelledby="effective-set-title">
       <div className="table-head"><span>Skill</span><span>Status</span><span>Source</span><span>Reason</span><span aria-hidden="true" /></div>
-      {skillRows.map((row) => {
-        const status = statusFor(row, scope, pristine);
+      {skills.map((skill) => {
         return (
-          <article className="skill-row" key={row.name}>
-            <div className="skill-name"><span className={status.enabled ? "checkbox checked" : "checkbox"}>{status.enabled ? <Check size={16} /> : null}</span><strong>{row.name}</strong></div>
-            <span className={status.enabled ? "status enabled" : "status"}>{status.enabled ? "Selected" : "Disabled"}</span>
-            <div className="source"><strong>{status.source}</strong><small>{status.source === "Verification v1" ? "Work-scope overlay" : "Pinned template"}</small></div>
-            <span className="reason">{status.reason}</span>
+          <article className="skill-row" key={skill.name}>
+            <div className="skill-name"><span className={skill.enabled ? "checkbox checked" : "checkbox"}>{skill.enabled ? <Check size={16} /> : null}</span><strong>{skill.name}</strong></div>
+            <span className={skill.enabled ? "status enabled" : "status"}>{skill.enabled ? "Selected" : "Disabled"}</span>
+            <div className="source"><strong>{skill.source}</strong><small>{skill.source === "Pristine" ? "Managed baseline" : "Pinned template"}</small></div>
+            <span className="reason">{skill.reason}</span>
             <ChevronDown size={20} className="row-chevron" aria-hidden="true" />
           </article>
         );
@@ -76,9 +96,11 @@ function SkillTable({ scope, pristine }: { scope: Scope; pristine: boolean }) {
   );
 }
 
-function TemplateInspector({ scope, pristine, onPristine, onPreview, previewing }: {
+function TemplateInspector({ scope, pristine, defaultTemplate, overlayTemplate, onPristine, onPreview, previewing }: {
   scope: Scope;
   pristine: boolean;
+  defaultTemplate: string;
+  overlayTemplate: string;
   onPristine: () => void;
   onPreview: () => void;
   previewing: boolean;
@@ -88,16 +110,16 @@ function TemplateInspector({ scope, pristine, onPristine, onPreview, previewing 
     <aside className="inspector" aria-label="Project policy">
       <div className="inspector-section">
         <p className="section-label">Pinned default template</p>
-        <div className="template-tile"><FileText size={30} strokeWidth={1.4} /><div><strong>{pristine ? "Pristine" : "Build v2"}</strong><small>{pristine ? "Clean managed baseline" : "Default template · pinned"}</small></div><Check size={20} className="mint" /></div>
+        <div className="template-tile"><FileText size={30} strokeWidth={1.4} /><div><strong>{pristine ? "Pristine" : defaultTemplate}</strong><small>{pristine ? "Clean managed baseline" : "Default template · pinned"}</small></div><Check size={20} className="mint" /></div>
       </div>
       <div className="inspector-section overlay-section">
         <p className="section-label">Work-scope overlay</p>
-        <div className={overlayShown ? "template-tile overlay-tile" : "template-tile overlay-tile inactive"}><Layers3 size={30} strokeWidth={1.4} /><div><strong>Verification v1</strong><small>{overlayShown ? "Matches implementation scope" : "Available for implementation"}</small></div><Eye size={20} className={overlayShown ? "mint" : "muted"} /></div>
+        <div className={overlayShown && overlayTemplate !== "None" ? "template-tile overlay-tile" : "template-tile overlay-tile inactive"}><Layers3 size={30} strokeWidth={1.4} /><div><strong>{overlayTemplate}</strong><small>{overlayShown && overlayTemplate !== "None" ? "Matches selected work scope" : "No matching overlay"}</small></div><Eye size={20} className={overlayShown && overlayTemplate !== "None" ? "mint" : "muted"} /></div>
       </div>
       <div className="provenance">
         <p className="section-label">Resolution</p>
-        <div><span>Default source</span><strong>{pristine ? "Pristine" : "Build v2"}</strong></div>
-        <div><span>Overlay source</span><strong>{overlayShown ? "Verification v1" : "None"}</strong></div>
+        <div><span>Default source</span><strong>{pristine ? "Pristine" : defaultTemplate}</strong></div>
+        <div><span>Overlay source</span><strong>{overlayShown ? overlayTemplate : "None"}</strong></div>
       </div>
       <div className="inspector-actions">
         <button className="primary-action" type="button" onClick={onPreview} disabled={previewing}>
@@ -110,14 +132,14 @@ function TemplateInspector({ scope, pristine, onPristine, onPreview, previewing 
   );
 }
 
-function PlanHistory({ scope, pristine, previewing }: { scope: Scope; pristine: boolean; previewing: boolean }) {
-  const enabledCount = skillRows.filter((row) => statusFor(row, scope, pristine).enabled).length;
+function PlanHistory({ scope, pristine, previewing, skills, defaultTemplate, remote }: { scope: Scope; pristine: boolean; previewing: boolean; skills: DisplaySkill[]; defaultTemplate: string; remote: boolean }) {
+  const enabledCount = skills.filter((skill) => skill.enabled).length;
   const progress = previewing ? "2 / 3 resolving" : "3 / 3 resolved";
   return (
     <section className="history-strip" aria-labelledby="history-title">
-      <div className="history-title"><h2 id="history-title">Recent activation plans</h2><span>Recorded locally</span></div>
+      <div className="history-title"><h2 id="history-title">Recent activation plans</h2><span>{remote ? "Catalog bridge connected" : "Demo data"}</span></div>
       <div className="history-row">
-        <CircleCheck size={30} className="mint" /><div className="history-name"><strong>{pristine ? "Pristine baseline" : `${scope} · Build v2`}</strong><small>Plan is ready for Skills Manager delivery</small></div>
+        <CircleCheck size={30} className="mint" /><div className="history-name"><strong>{pristine ? "Pristine baseline" : `${scope} · ${defaultTemplate}`}</strong><small>Plan is ready for Skills Manager delivery</small></div>
         <div className="history-progress"><strong>{progress}</strong><small>{enabledCount} enabled · {3 - enabledCount} disabled</small></div>
         <div className="progress-track" aria-label={progress}><div className="progress-fill" style={{ width: previewing ? "54%" : "100%" }} /></div>
         <button className="details-button" type="button">View details</button><ChevronDown size={20} className="row-chevron" aria-hidden="true" />
@@ -131,7 +153,45 @@ export function CatalogApp() {
   const [pristine, setPristine] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const enabledCount = useMemo(() => skillRows.filter((row) => statusFor(row, scope, pristine).enabled).length, [scope, pristine]);
+  const [remoteSet, setRemoteSet] = useState<RemoteSet | null>(null);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!catalogApi) return;
+    let active = true;
+    fetch(`${catalogApi}/api/projects`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Catalog bridge is unavailable")))
+      .then((body: { projects: Array<{ id: string }> }) => {
+        if (!active) return;
+        setSelectedProjectId(body.projects[0]?.id ?? null);
+        setRemoteError(body.projects.length === 0 ? "No catalog projects are registered." : null);
+      })
+      .catch((error: Error) => active && setRemoteError(error.message));
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!catalogApi || !selectedProjectId) return;
+    let active = true;
+    const params = new URLSearchParams({ work_scope: scope });
+    if (pristine) params.set("preset", "builtin-pristine");
+    fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/effective-set?${params}`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not resolve the selected project")))
+      .then((body: RemoteSet) => { if (active) { setRemoteSet(body); setRemoteError(null); } })
+      .catch((error: Error) => active && setRemoteError(error.message));
+    return () => { active = false; };
+  }, [scope, pristine, selectedProjectId]);
+
+  const skills = useMemo<DisplaySkill[]>(() => remoteSet
+    ? remoteSet.skills.map((skill) => {
+      const assignment = remoteSet.assignments.find((item) => item.preset_id === skill.selected_by?.preset_id);
+      return { name: skill.skill_name, source: assignment?.name ?? (pristine ? "Pristine" : "Catalog"), enabled: skill.desired_state === "enabled", reason: skill.reason.replaceAll("_", " ") };
+    })
+    : sampleSkills(scope, pristine), [remoteSet, scope, pristine]);
+  const enabledCount = useMemo(() => skills.filter((skill) => skill.enabled).length, [skills]);
+  const defaultTemplate = remoteSet ? presetName(remoteSet.assignments, "default", "Pristine") : "Build v2";
+  const overlayTemplate = remoteSet ? presetName(remoteSet.assignments, "work_scope_overlay", "None") : "Verification v1";
 
   const togglePristine = useCallback(() => {
     setPristine((current) => !current);
@@ -140,22 +200,34 @@ export function CatalogApp() {
   const previewPlan = useCallback(() => {
     setPreviewing(true);
     setNotice(null);
+    if (catalogApi && selectedProjectId) {
+      fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/activation-plan/preview`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ work_scope_tags: [scope], preset_id: pristine ? "builtin-pristine" : undefined }),
+      })
+        .then((response) => response.ok ? response.json() : Promise.reject(new Error("Preview request was rejected")))
+        .then((body: { plan: { operations: unknown[] } }) => setNotice(`${body.plan.operations.length} operations were validated. Ready for Skills Manager delivery.`))
+        .catch((error: Error) => setNotice(error.message))
+        .finally(() => setPreviewing(false));
+      return;
+    }
     window.setTimeout(() => {
       setPreviewing(false);
       setNotice(`${enabledCount} enabled and ${3 - enabledCount} disabled operations are ready for preview.`);
     }, 620);
-  }, [enabledCount]);
+  }, [enabledCount, pristine, scope, selectedProjectId]);
 
   return (
     <main className="app-shell">
       <SideNavigation />
       <div className="workspace">
-        <header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button><h1>Acme Web</h1><label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
+        <header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button><h1>{remoteSet?.project.name ?? "Acme Web"}</h1><label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
-          <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable scope={scope} pristine={pristine} />{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
-          <TemplateInspector scope={scope} pristine={pristine} onPristine={togglePristine} onPreview={previewPlan} previewing={previewing} />
+          <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
+          <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} overlayTemplate={overlayTemplate} onPristine={togglePristine} onPreview={previewPlan} previewing={previewing} />
         </div>
-        <PlanHistory scope={scope} pristine={pristine} previewing={previewing} />
+        <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} />
       </div>
     </main>
   );

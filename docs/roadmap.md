@@ -202,7 +202,9 @@ the exact revision adopted by each template/project.
 > Status: Project effective-set UI shell implemented — it visualizes the
 > pinned default template, work-scope overlay, selected/disabled reasons,
 > Pristine reset, preview progress, and recorded plan status. It is currently
-> a local interactive prototype; Catalog API bindings follow the adapter API.
+> usable with its local Catalog bridge, which provides real project policy and
+> read-only plan previews. Full project selection and adapter report streaming
+> remain.
 
 - Build Registry, Skill Detail, Notes, Templates, Projects, History, Review Queue.
 - Add import wizard: inspect -> select -> enrich -> template -> preview -> activate.

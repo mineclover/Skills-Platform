@@ -28,6 +28,20 @@ node src/cli.js plan --registry ./.skills-platform/registry \
   --project-path C:/work/demo --delivery-root C:/work/demo/.agents/skills
 ```
 
+## Local Catalog bridge
+
+The bridge gives the separate Catalog UI a local, read-only view of Catalog
+state. It has no endpoint that applies a plan or writes provider paths.
+
+```bash
+node src/cli.js serve --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry --port 4300
+```
+
+Available endpoints are `GET /api/projects`, `GET
+/api/projects/:id/effective-set`, `GET /api/projects/:id/history`, and `POST
+/api/projects/:id/activation-plan/preview`.
+
 ## MVP catalog flow
 
 ```bash
