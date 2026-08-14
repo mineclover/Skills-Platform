@@ -24,6 +24,9 @@ node src/cli.js import-local ../some-skills --registry ./.skills-platform/regist
 node src/cli.js import-git https://github.com/example/skills.git --ref main \
   --registry ./.skills-platform/registry
 
+# Discover a newer commit without importing or adopting it automatically.
+node src/cli.js source updates --registry ./.skills-platform/registry
+
 # List registered artifacts and copy the emitted registry IDs
 node src/cli.js list --registry ./.skills-platform/registry
 

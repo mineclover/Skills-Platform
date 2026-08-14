@@ -25,6 +25,7 @@ const {
   listPresets,
   listProjects,
   listRegistrySkills,
+  listSourceUpdateCandidates,
   listSkillRevisions,
   listSkillNotes,
   listActivationHistory,
@@ -74,7 +75,7 @@ function usage() {
     "Usage:",
     "  skills-catalog import-local <source-path> [--registry <path>] [--skill <name>]...",
     "  skills-catalog import-git <repository> [--ref <commit-or-ref>] [--registry <path>] [--skill <name>]...",
-    "  skills-catalog source inspect <source-path>",
+    "  skills-catalog source inspect <source-path> | source updates [--registry <path>]",
     "  skills-catalog serve [--catalog <path>] [--registry <path>] [--host <host>] [--port <n>]",
     "  skills-catalog list [--registry <path>]",
     "  skills-catalog project add <id> --name <name> --path <path> --provider <id> --delivery-root <path>",
@@ -128,6 +129,7 @@ async function run(argv) {
   if (command === "source") {
     const [action, inspectedPath] = positional.slice(1);
     if (action === "inspect") return inspectLocalSource({ sourcePath: inspectedPath });
+    if (action === "updates") return listSourceUpdateCandidates(registryRoot);
   }
 
   if (command === "list") return listRegistrySkills(registryRoot);

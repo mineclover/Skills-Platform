@@ -286,6 +286,27 @@ async function importGitSource({ registryRoot, repository, ref = "HEAD", selecte
   }
 }
 
+async function listSourceUpdateCandidates(registryRoot) {
+  const registry = await loadRegistry(registryRoot);
+  const candidates = [];
+  for (const source of registry.sources.filter((item) => item.kind === "git" && item.requested_ref)) {
+    const current = registry.revisions
+      .filter((revision) => revision.source_id === source.id)
+      .sort((left, right) => right.fetched_at.localeCompare(left.fetched_at))[0] ?? null;
+    const inspected = await inspectGitSource({ repository: source.locator, ref: source.requested_ref });
+    candidates.push({
+      source_id: source.id,
+      locator: source.locator,
+      requested_ref: source.requested_ref,
+      current_revision_id: current?.id ?? null,
+      current_resolved_revision: current?.resolved_revision ?? null,
+      candidate_resolved_revision: inspected.resolved_revision,
+      update_available: current?.resolved_revision !== inspected.resolved_revision,
+    });
+  }
+  return candidates.sort((left, right) => left.locator.localeCompare(right.locator));
+}
+
 async function listRegistrySkills(registryRoot) {
   const registry = await loadRegistry(registryRoot);
   return registry.skills.slice().sort((left, right) => left.skill_name.localeCompare(right.skill_name));
@@ -402,6 +423,7 @@ module.exports = {
   getSkillLineage,
   latestSkillsByArtifact,
   listRegistrySkills,
+  listSourceUpdateCandidates,
   listSkillRevisions,
   listSkillLineages,
   parseSkillMarkdown,

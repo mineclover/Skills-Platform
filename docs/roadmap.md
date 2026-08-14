@@ -187,8 +187,9 @@ and Catalog records the report without duplicated policy state.
 **Goal:** evolve external skills safely over time.
 
 > Status: Git sources can be resolved to a commit and imported into the
-> immutable local registry without executing installer scripts. GitHub shorthand,
-> archives, skills.sh packs, trust policy, and review adoption remain.
+> immutable local registry without executing installer scripts; update candidates
+> are discovered without auto-adoption. GitHub shorthand, archives, skills.sh
+> packs, trust policy, and review adoption remain.
 
 - Add Git URLs, GitHub shorthand, direct paths, archives, and skills.sh packs.
 - Lock commits/archive digests; store manifest/license where available.

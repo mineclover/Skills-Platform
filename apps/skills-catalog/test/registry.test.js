@@ -10,6 +10,7 @@ const {
   importLocalSource,
   inspectLocalSource,
   listRegistrySkills,
+  listSourceUpdateCandidates,
   listSkillRevisions,
 } = require("../src");
 
@@ -134,6 +135,28 @@ test("imports a Git source from a resolved commit without retaining the checkout
   assert.equal(result.skills.length, 1);
   assert.match(revision.resolved_revision, /^[0-9a-f]{40}$/);
   assert.equal((await require("../src").listRegistrySkills(registryRoot)).length, 1);
+});
+
+test("reports newer Git commits as reviewable candidates without changing imported revisions", async (context) => {
+  const { root, sourcePath, registryRoot } = await fixture();
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const runGit = (argumentsList) => new Promise((resolve, reject) => {
+    require("node:child_process").execFile("git", argumentsList, (error) => error ? reject(error) : resolve());
+  });
+  await runGit(["init", sourcePath]);
+  await runGit(["-C", sourcePath, "add", "."]);
+  await runGit(["-C", sourcePath, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Initial"]);
+  const imported = await importGitSource({ registryRoot, repository: sourcePath });
+  await fs.appendFile(path.join(sourcePath, "frontend", "SKILL.md"), "\nCandidate change.\n", "utf8");
+  await runGit(["-C", sourcePath, "add", "."]);
+  await runGit(["-C", sourcePath, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Candidate"]);
+
+  const candidates = await listSourceUpdateCandidates(registryRoot);
+
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].update_available, true);
+  assert.notEqual(candidates[0].current_resolved_revision, candidates[0].candidate_resolved_revision);
+  assert.equal((await require("../src").getSourceRevision(registryRoot, imported.source_revision_id)).resolved_revision, candidates[0].current_resolved_revision);
 });
 
 test("creates a link-first activation plan from pinned registry skills", async (context) => {
