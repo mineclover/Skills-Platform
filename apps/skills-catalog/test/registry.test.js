@@ -6,6 +6,7 @@ const test = require("node:test");
 const {
   createPlanFromRegistry,
   diffSkillRevisions,
+  importGitSource,
   importLocalSource,
   inspectLocalSource,
   listRegistrySkills,
@@ -112,6 +113,27 @@ test("lists immutable lineage revisions and diffs SKILL.md changes", async (cont
   assert.equal(revisions.length, 2);
   assert.equal(diff.changed, true);
   assert.ok(diff.skill_markdown.added.some((line) => line.content === "New reviewed instruction."));
+});
+
+test("imports a Git source from a resolved commit without retaining the checkout", async (context) => {
+  const { root, sourcePath, registryRoot } = await fixture();
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  await new Promise((resolve, reject) => {
+    require("node:child_process").execFile("git", ["init", sourcePath], (error) => error ? reject(error) : resolve());
+  });
+  await new Promise((resolve, reject) => {
+    require("node:child_process").execFile("git", ["-C", sourcePath, "add", "."], (error) => error ? reject(error) : resolve());
+  });
+  await new Promise((resolve, reject) => {
+    require("node:child_process").execFile("git", ["-C", sourcePath, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Initial"], (error) => error ? reject(error) : resolve());
+  });
+
+  const result = await importGitSource({ registryRoot, repository: sourcePath, ref: "HEAD", selectedSkillNames: ["frontend-design"] });
+  const revision = (await require("../src").getSourceRevision(registryRoot, result.source_revision_id));
+
+  assert.equal(result.skills.length, 1);
+  assert.match(revision.resolved_revision, /^[0-9a-f]{40}$/);
+  assert.equal((await require("../src").listRegistrySkills(registryRoot)).length, 1);
 });
 
 test("creates a link-first activation plan from pinned registry skills", async (context) => {

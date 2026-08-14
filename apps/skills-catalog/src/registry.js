@@ -1,9 +1,13 @@
 const crypto = require("node:crypto");
+const { execFile } = require("node:child_process");
 const fs = require("node:fs/promises");
+const os = require("node:os");
 const path = require("node:path");
+const { promisify } = require("node:util");
 const { digestDirectory, listFiles } = require("../../../packages/skill-contracts/src");
 
 const REGISTRY_SCHEMA_VERSION = 2;
+const execFileAsync = promisify(execFile);
 
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -150,7 +154,7 @@ function defaultRegistryRoot(workspacePath = process.cwd()) {
   return path.join(workspacePath, ".skills-platform", "registry");
 }
 
-async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames = [] }) {
+async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames = [], source = null }) {
   const inspection = await inspectLocalSource({ sourcePath });
   if (!inspection.importable) {
     throw new Error(`Source inspection failed: ${inspection.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ")}`);
@@ -165,20 +169,27 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
   if (selected.length === 0) throw new Error("No SKILL.md artifacts were found in source");
 
   const registry = await loadRegistry(registryRoot);
-  const locator = resolvedSourcePath;
+  const locator = source?.locator ?? resolvedSourcePath;
+  const kind = source?.kind ?? "local";
   const id = sourceId(locator);
   const revisionDigest = inspection.source_digest;
   const revisionId = `revision_${sha256(`${id}:${revisionDigest}`).slice(0, 24)}`;
   const importedAt = new Date().toISOString();
 
   if (!registry.sources.some((source) => source.id === id)) {
-    registry.sources.push({ id, kind: "local", locator, created_at: importedAt });
+    registry.sources.push({
+      id,
+      kind,
+      locator,
+      requested_ref: source?.requested_ref ?? null,
+      created_at: importedAt,
+    });
   }
   if (!registry.revisions.some((revision) => revision.id === revisionId)) {
     registry.revisions.push({
       id: revisionId,
       source_id: id,
-      resolved_revision: revisionDigest,
+      resolved_revision: source?.resolved_revision ?? revisionDigest,
       content_digest: revisionDigest,
       fetched_at: importedAt,
       review_state: "imported",
@@ -228,6 +239,51 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
 
   await saveRegistry(registryRoot, registry);
   return { source_id: id, source_revision_id: revisionId, skills: imported };
+}
+
+function requireGitLocator(value) {
+  if (typeof value !== "string" || value.trim() === "") throw new Error("Git repository locator is required");
+  return value.trim();
+}
+
+async function inspectGitSource({ repository, ref = "HEAD" }) {
+  repository = requireGitLocator(repository);
+  if (typeof ref !== "string" || ref.trim() === "") throw new Error("Git ref is required");
+  let stdout;
+  try {
+    ({ stdout } = await execFileAsync("git", ["ls-remote", repository, ref.trim()], { windowsHide: true, maxBuffer: 1024 * 1024 }));
+  } catch (error) {
+    throw new Error(`Could not inspect Git source: ${error.stderr?.trim() || error.message}`);
+  }
+  const line = stdout.split(/\r?\n/).find(Boolean);
+  const revision = line?.split(/\s+/)[0];
+  if (!revision || !/^[0-9a-f]{40,64}$/i.test(revision)) throw new Error(`Git ref was not found: ${ref}`);
+  return { kind: "git", locator: repository, requested_ref: ref.trim(), resolved_revision: revision.toLowerCase() };
+}
+
+async function importGitSource({ registryRoot, repository, ref = "HEAD", selectedSkillNames = [] }) {
+  const inspection = await inspectGitSource({ repository, ref });
+  const temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "skills-platform-git-"));
+  try {
+    await execFileAsync("git", ["clone", "--no-checkout", "--depth", "1", "--no-tags", inspection.locator, temporaryRoot], {
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+    });
+    await execFileAsync("git", ["-C", temporaryRoot, "checkout", "--detach", inspection.resolved_revision], {
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+    });
+    return await importLocalSource({
+      registryRoot,
+      sourcePath: temporaryRoot,
+      selectedSkillNames,
+      source: inspection,
+    });
+  } catch (error) {
+    throw new Error(`Could not import Git source: ${error.stderr?.trim() || error.message}`);
+  } finally {
+    await fs.rm(temporaryRoot, { recursive: true, force: true });
+  }
 }
 
 async function listRegistrySkills(registryRoot) {
@@ -339,7 +395,9 @@ module.exports = {
   diffSkillRevisions,
   getRegistrySkills,
   getSourceRevision,
+  importGitSource,
   importLocalSource,
+  inspectGitSource,
   inspectLocalSource,
   getSkillLineage,
   latestSkillsByArtifact,

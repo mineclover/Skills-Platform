@@ -20,6 +20,7 @@ const {
   assignPreset,
   exportActivationPlan,
   importLocalSource,
+  importGitSource,
   inspectLocalSource,
   listPresets,
   listProjects,
@@ -72,6 +73,7 @@ function usage() {
   return [
     "Usage:",
     "  skills-catalog import-local <source-path> [--registry <path>] [--skill <name>]...",
+    "  skills-catalog import-git <repository> [--ref <commit-or-ref>] [--registry <path>] [--skill <name>]...",
     "  skills-catalog source inspect <source-path>",
     "  skills-catalog serve [--catalog <path>] [--registry <path>] [--host <host>] [--port <n>]",
     "  skills-catalog list [--registry <path>]",
@@ -109,6 +111,16 @@ async function run(argv) {
     return importLocalSource({
       registryRoot,
       sourcePath,
+      selectedSkillNames: flags.skill ?? [],
+    });
+  }
+
+  if (command === "import-git") {
+    if (!sourcePath) throw new Error("import-git requires a repository locator");
+    return importGitSource({
+      registryRoot,
+      repository: sourcePath,
+      ref: flags.ref ?? "HEAD",
       selectedSkillNames: flags.skill ?? [],
     });
   }

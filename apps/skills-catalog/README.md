@@ -19,6 +19,11 @@ node src/cli.js source inspect ../some-skills
 # Import inspected local SKILL.md directories into the local registry.
 node src/cli.js import-local ../some-skills --registry ./.skills-platform/registry
 
+# Resolve a Git ref to its commit, inspect the checked-out content, and import
+# only the immutable registry copy. No installer or repository script runs.
+node src/cli.js import-git https://github.com/example/skills.git --ref main \
+  --registry ./.skills-platform/registry
+
 # List registered artifacts and copy the emitted registry IDs
 node src/cli.js list --registry ./.skills-platform/registry
 
