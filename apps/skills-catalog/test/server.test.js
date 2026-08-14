@@ -78,6 +78,17 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ preset_id: "planning" }),
   });
+  const overlay = await (await fetch(`${base}/projects/demo/work-scope-overlay`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ preset_id: "planning", work_scope_tags: ["review"] }),
+  })).json();
+  const assignments = await (await fetch(`${base}/projects/demo/preset-assignments`)).json();
+  assert.equal(overlay.assignments[0].work_scope_tags[0], "review");
+  assert.ok(assignments.assignments.some((item) => item.role === "work_scope_overlay"));
+  await fetch(`${base}/projects/demo/work-scope-overlay`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ work_scope_tags: ["review"] }),
+  });
 
   await fs.appendFile(path.join(sourcePath, "SKILL.md"), "\nUpdated planning instruction.\n", "utf8");
   const importedCandidate = await importLocalSource({ registryRoot, sourcePath: path.dirname(sourcePath) });

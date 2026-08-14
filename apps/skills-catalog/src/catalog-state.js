@@ -311,6 +311,38 @@ async function assignPreset({ catalogRoot, projectId, presetId, version, role = 
   return project;
 }
 
+function sameTags(left, right) {
+  if (left.length !== right.length) return false;
+  return left.every((tag, index) => tag === right[index]);
+}
+
+async function replaceWorkScopeOverlay({ catalogRoot, projectId, presetId, version, workScopeTags, priority = 0 }) {
+  const tags = uniqueStrings(workScopeTags);
+  if (tags.length === 0) throw new Error("A work-scope overlay requires at least one work-scope tag");
+  const catalog = await loadCatalog(catalogRoot);
+  const project = catalog.projects.find((item) => item.id === projectId);
+  if (!project) throw new Error(`Project not found: ${projectId}`);
+  project.preset_assignments = project.preset_assignments.filter((assignment) => !(assignment.role === "work_scope_overlay" && sameTags(assignment.work_scope_tags, tags)));
+  if (presetId) {
+    const preset = await getPreset(catalogRoot, presetId, version);
+    const assignment = {
+      preset_id: preset.id,
+      template_version: preset.selected_version,
+      role: "work_scope_overlay",
+      priority: Number(priority),
+      work_scope_tags: tags,
+      enabled: true,
+      created_at: now(),
+      updated_at: now(),
+    };
+    if (!Number.isFinite(assignment.priority)) throw new Error("Project preset priority must be a number");
+    project.preset_assignments.push(assignment);
+  }
+  project.updated_at = now();
+  await saveCatalog(catalogRoot, catalog);
+  return project;
+}
+
 async function updatePresetTemplate({ catalogRoot, registryRoot, presetId, patch }) {
   if (presetId === PRISTINE_PRESET_ID) throw new Error("Pristine template cannot be changed");
   const catalog = await loadCatalog(catalogRoot);
@@ -526,6 +558,7 @@ module.exports = {
   saveCatalog,
   recordActivationPlan,
   recordActivationReport,
+  replaceWorkScopeOverlay,
   TEMPLATE_LIFECYCLES,
   updatePresetTemplate,
 };

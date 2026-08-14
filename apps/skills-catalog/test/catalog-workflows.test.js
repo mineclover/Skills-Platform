@@ -16,6 +16,7 @@ const {
   listActivationHistory,
   recordActivationPlan,
   recordActivationReport,
+  replaceWorkScopeOverlay,
 } = require("../src");
 
 async function setup(context) {
@@ -70,6 +71,19 @@ test("pristine baseline disables all known managed skills for a project", async 
   assert.equal(plan.mode, "pristine");
   assert.equal(plan.operations.length, imported.skills.length);
   assert.ok(plan.operations.every((operation) => operation.desired_state === "disabled"));
+});
+
+test("a work-scope overlay can be replaced or cleared without changing the default template", async (context) => {
+  const { catalogRoot, imported, project, registryRoot } = await setup(context);
+  const writing = imported.skills.find((skill) => skill.skill_name === "writing-guide");
+  const review = imported.skills.find((skill) => skill.skill_name === "review-guide");
+  const defaultPreset = await createPreset({ catalogRoot, registryRoot, id: "default", name: "Default", registrySkillIds: [writing.id] });
+  await createPreset({ catalogRoot, registryRoot, id: "review", name: "Review", registrySkillIds: [review.id] });
+  await assignPreset({ catalogRoot, projectId: project.id, presetId: defaultPreset.id });
+  await replaceWorkScopeOverlay({ catalogRoot, projectId: project.id, presetId: "review", workScopeTags: ["review"] });
+  assert.equal((await createProjectPlan({ catalogRoot, registryRoot, projectId: project.id, workScopeTags: ["review"] })).operations.filter((item) => item.desired_state === "enabled").length, 2);
+  await replaceWorkScopeOverlay({ catalogRoot, projectId: project.id, presetId: null, workScopeTags: ["review"] });
+  assert.equal((await createProjectPlan({ catalogRoot, registryRoot, projectId: project.id, workScopeTags: ["review"] })).operations.filter((item) => item.desired_state === "enabled").length, 1);
 });
 
 test("system prompt export uses the pinned canonical SKILL.md content", async (context) => {

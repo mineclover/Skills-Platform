@@ -1,6 +1,6 @@
 const http = require("node:http");
 const { URL } = require("node:url");
-const { assignPreset, listActivationHistory, listPresets, listProjects, recordActivationPlan, recordActivationReport } = require("./catalog-state");
+const { assignPreset, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay } = require("./catalog-state");
 const { buildProjectSystemPrompt, createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
@@ -73,6 +73,23 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
           project,
           assignment: project.preset_assignments.find((item) => item.role === "default") ?? null,
         });
+      }
+      const projectAssignments = url.pathname.match(/^\/api\/projects\/([^/]+)\/preset-assignments$/);
+      if (projectAssignments && request.method === "GET") {
+        return json(response, 200, { assignments: await listProjectPresetAssignments(catalogRoot, decodeURIComponent(projectAssignments[1])) });
+      }
+      const workScopeOverlay = url.pathname.match(/^\/api\/projects\/([^/]+)\/work-scope-overlay$/);
+      if (workScopeOverlay && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const project = await replaceWorkScopeOverlay({
+          catalogRoot,
+          projectId: decodeURIComponent(workScopeOverlay[1]),
+          presetId: body.preset_id || null,
+          version: body.template_version,
+          workScopeTags: body.work_scope_tags,
+          priority: body.priority,
+        });
+        return json(response, 201, { project, assignments: project.preset_assignments.filter((item) => item.role === "work_scope_overlay") });
       }
       if (request.method === "GET" && url.pathname === "/api/source-adoption-candidates") {
         return json(response, 200, { candidates: await listSourceAdoptionCandidates({ catalogRoot, registryRoot }) });

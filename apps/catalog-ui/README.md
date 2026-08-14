@@ -52,3 +52,7 @@ When connected to the local bridge, the same inspector can pin any registered
 template—including `Pristine`—as that project's default. This changes only the
 Catalog project-policy record; it does not apply a delivery plan or repin any
 other project.
+
+For each active work scope, the inspector can also select or clear one overlay
+template. Replacing an overlay affects only that exact scope tag and preserves
+the project's default template and other scope assignments.

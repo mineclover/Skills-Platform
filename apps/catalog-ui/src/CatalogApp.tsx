@@ -25,6 +25,7 @@ type RemoteSet = {
 };
 type RemoteProject = { id: string; name: string };
 type RemotePreset = { id: string; name: string; selected_version: number };
+type RemoteAssignment = { preset_id: string; template_version: number; role: string; priority: number; work_scope_tags: string[]; enabled: boolean };
 type RemoteHistory = { plan_id: string; mode: string; recorded_at: string; reports: Array<{ status: string; report: { summary?: Record<string, number> } }> };
 type RemoteComparison = { in_sync: boolean; summary: Record<string, number>; captured_at: string; provider_id: string };
 type ReviewReason = { code: string; severity: "critical" | "high" | "medium" | "low"; detail: string };
@@ -134,22 +135,26 @@ function SkillTable({ skills }: { skills: DisplaySkill[] }) {
   );
 }
 
-function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, presets, overlayTemplate, onPristine, onDefaultTemplate, onPreview, onCopyPrompt, previewing, copyingPrompt, updatingDefault }: {
+function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, presets, overlayTemplate, overlayPresetId, overlayActive, onPristine, onDefaultTemplate, onOverlayTemplate, onPreview, onCopyPrompt, previewing, copyingPrompt, updatingDefault, updatingOverlay }: {
   scope: Scope;
   pristine: boolean;
   defaultTemplate: string;
   defaultPresetId: string | null;
   presets: RemotePreset[];
   overlayTemplate: string;
+  overlayPresetId: string | null;
+  overlayActive: boolean;
   onPristine: () => void;
   onDefaultTemplate: (presetId: string) => void;
+  onOverlayTemplate: (presetId: string) => void;
   onPreview: () => void;
   onCopyPrompt: () => void;
   previewing: boolean;
   copyingPrompt: boolean;
   updatingDefault: boolean;
+  updatingOverlay: boolean;
 }) {
-  const overlayShown = scope === "implementation" && !pristine;
+  const overlayShown = overlayActive && !pristine;
   return (
     <aside className="inspector" aria-label="Project policy">
       <div className="inspector-section">
@@ -160,6 +165,7 @@ function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, 
       <div className="inspector-section overlay-section">
         <p className="section-label">Work-scope overlay</p>
         <div className={overlayShown && overlayTemplate !== "None" ? "template-tile overlay-tile" : "template-tile overlay-tile inactive"}><Layers3 size={30} strokeWidth={1.4} /><div><strong>{overlayTemplate}</strong><small>{overlayShown && overlayTemplate !== "None" ? "Matches selected work scope" : "No matching overlay"}</small></div><Eye size={20} className={overlayShown && overlayTemplate !== "None" ? "mint" : "muted"} /></div>
+        {presets.length > 0 ? <label className="template-picker"><span>Set overlay for {scope}</span><select value={overlayPresetId ?? ""} disabled={updatingOverlay} onChange={(event) => onOverlayTemplate(event.target.value)}><option value="">No overlay</option>{presets.filter((preset) => preset.id !== "builtin-pristine").map((preset) => <option key={preset.id} value={preset.id}>{preset.name} · v{preset.selected_version}</option>)}</select></label> : null}
       </div>
       <div className="provenance">
         <p className="section-label">Resolution</p>
@@ -245,6 +251,7 @@ export function CatalogApp() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<RemoteProject[]>([]);
   const [presets, setPresets] = useState<RemotePreset[]>([]);
+  const [projectAssignments, setProjectAssignments] = useState<RemoteAssignment[]>([]);
   const [history, setHistory] = useState<RemoteHistory | null>(null);
   const [comparison, setComparison] = useState<RemoteComparison | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
@@ -252,6 +259,7 @@ export function CatalogApp() {
   const [sourceReviewSummaries, setSourceReviewSummaries] = useState<Record<string, string>>({});
   const [sourceActionId, setSourceActionId] = useState<string | null>(null);
   const [updatingDefault, setUpdatingDefault] = useState(false);
+  const [updatingOverlay, setUpdatingOverlay] = useState(false);
   const [policyVersion, setPolicyVersion] = useState(0);
 
   const refreshSourceCandidates = useCallback(() => {
@@ -285,6 +293,16 @@ export function CatalogApp() {
       .catch(() => active && setPresets([]));
     return () => { active = false; };
   }, [policyVersion]);
+
+  useEffect(() => {
+    if (!catalogApi || !selectedProjectId) return;
+    let active = true;
+    fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/preset-assignments`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load project template assignments")))
+      .then((body: { assignments: RemoteAssignment[] }) => active && setProjectAssignments(body.assignments))
+      .catch(() => active && setProjectAssignments([]));
+    return () => { active = false; };
+  }, [policyVersion, selectedProjectId]);
 
   useEffect(() => {
     refreshSourceCandidates().catch(() => setSourceCandidates([]));
@@ -342,6 +360,9 @@ export function CatalogApp() {
   const defaultTemplate = remoteSet ? presetName(remoteSet.assignments, "default", "Pristine") : "Build v2";
   const defaultPresetId = remoteSet?.assignments.find((assignment) => assignment.role === "default")?.preset_id ?? null;
   const overlayTemplate = remoteSet ? presetName(remoteSet.assignments, "work_scope_overlay", "None") : "Verification v1";
+  const configuredOverlay = projectAssignments.find((assignment) => assignment.role === "work_scope_overlay" && assignment.enabled && assignment.work_scope_tags.length === 1 && assignment.work_scope_tags[0] === scope) ?? null;
+  const overlayPresetId = configuredOverlay?.preset_id ?? null;
+  const overlayActive = remoteSet ? overlayTemplate !== "None" : scope === "implementation";
 
   const togglePristine = useCallback(() => {
     setPristine((current) => !current);
@@ -364,6 +385,24 @@ export function CatalogApp() {
       .catch((error: Error) => setNotice(error.message))
       .finally(() => setUpdatingDefault(false));
   }, [presets, selectedProjectId]);
+  const updateWorkScopeOverlay = useCallback((presetId: string) => {
+    if (!catalogApi || !selectedProjectId) return;
+    setUpdatingOverlay(true);
+    setNotice(null);
+    fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/work-scope-overlay`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ preset_id: presetId || null, work_scope_tags: [scope] }),
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Work-scope overlay was rejected")))
+      .then(() => {
+        setPolicyVersion((current) => current + 1);
+        const preset = presets.find((item) => item.id === presetId);
+        setNotice(preset ? `${preset.name} now applies during ${scope}.` : `No template applies during ${scope}.`);
+      })
+      .catch((error: Error) => setNotice(error.message))
+      .finally(() => setUpdatingOverlay(false));
+  }, [presets, scope, selectedProjectId]);
   const previewPlan = useCallback(() => {
     setPreviewing(true);
     setNotice(null);
@@ -438,7 +477,7 @@ export function CatalogApp() {
         <header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
           <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
-          <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onPreview={previewPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} />
+          <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />
         </div>
         <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} comparison={comparison} />
         <ReviewQueue items={reviewItems} remote={catalogApi !== ""} />
