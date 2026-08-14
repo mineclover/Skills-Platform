@@ -16,6 +16,38 @@ source review -> Catalog registry -> preset / project / work scope
 An agent-visible `skills/` directory is a delivery endpoint, not a registry.
 Do not edit it as a way to change Catalog policy.
 
+## Control surfaces
+
+The Catalog and the preserved Skills Manager deliberately expose parallel
+operator surfaces: each has a scriptable CLI and a UI, but they own different
+state. Use one source of truth for each action.
+
+| Area | Catalog CLI / UI owns | Skills Manager CLI / UI owns |
+| --- | --- | --- |
+| Skills | Immutable revision, profile, intended use, review state, notes, feedback | Upstream skill instance and provider availability |
+| Templates | Versioned membership of Catalog skills | Upstream presets, if independently needed for delivery |
+| Projects | Default template, work-scope overlays, pinned activation plan, policy history | Project discovery and provider binding scope |
+| Apply | Records and verifies a reviewed plan | Previews and changes the actual provider binding |
+
+In the Catalog UI, use the **Skills** page for skill metadata and review work,
+**Templates** only to compose skill membership, and **Projects** to select and
+apply a set. History is shown with its project; review and source-adoption work
+is shown with its skill. This removes duplicate navigation without merging
+Catalog policy into upstream delivery.
+
+The matching Catalog CLI group is `skill`:
+
+```bash
+node apps/skills-catalog/src/cli.js skill list \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry
+node apps/skills-catalog/src/cli.js skill search review \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry
+node apps/skills-catalog/src/cli.js skill profile set <lineage-id> \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
+  --purpose "Review UI implementation" --use-when "Before merge" \
+  --review-state reviewed
+```
+
 ## 1. Import and review a skill revision
 
 Inspect before importing; import preserves a canonical immutable copy. A newer

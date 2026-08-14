@@ -2,7 +2,7 @@ const http = require("node:http");
 const { URL } = require("node:url");
 const { assignPreset, createPreset, getProject, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay, updatePresetTemplate } = require("./catalog-state");
 const { buildProjectSystemPrompt, createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
-const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
+const { addSkillFeedback, getSkillFeedbackSummary, getSkillProfile, listSkillFeedback, searchSkills, updateSkillProfile } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
 const { compareRecordedPlanWithObservedState, listObservedStates, recordObservedState } = require("./observed-state");
 const { adoptApprovedRevisionIntoPreset, latestSourceReview, listSourceAdoptionCandidates, recordSourceReview } = require("./source-review");
@@ -82,6 +82,17 @@ function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = cr
       }
       if (request.method === "GET" && url.pathname === "/api/registry/skills") {
         return json(response, 200, { skills: latestSkillsByArtifact(await listRegistrySkills(registryRoot)) });
+      }
+      if (request.method === "GET" && url.pathname === "/api/skills") {
+        return json(response, 200, { skills: await searchSkills({
+          catalogRoot,
+          registryRoot,
+          query: url.searchParams.get("query") ?? "",
+          tags: url.searchParams.getAll("tag"),
+          domains: url.searchParams.getAll("domain"),
+          providerId: url.searchParams.get("provider") ?? undefined,
+          reviewState: url.searchParams.get("review_state") ?? undefined,
+        }) });
       }
       const presetUpdate = url.pathname.match(/^\/api\/presets\/([^/]+)\/update$/);
       if (presetUpdate && request.method === "POST") {
@@ -242,6 +253,23 @@ function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = cr
           activationPlanId: body.activation_plan_id,
           redaction: body.redaction,
           metrics: body.metrics,
+        }) });
+      }
+      const skillProfile = url.pathname.match(/^\/api\/skills\/([^/]+)\/profile$/);
+      if (skillProfile && request.method === "GET") {
+        return json(response, 200, { profile: await getSkillProfile({
+          catalogRoot,
+          registryRoot,
+          lineageId: decodeURIComponent(skillProfile[1]),
+        }) });
+      }
+      if (skillProfile && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { profile: await updateSkillProfile({
+          catalogRoot,
+          registryRoot,
+          lineageId: decodeURIComponent(skillProfile[1]),
+          patch: body,
         }) });
       }
       const feedbackSummary = url.pathname.match(/^\/api\/skills\/([^/]+)\/feedback-summary$/);

@@ -68,6 +68,7 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   const projects = await (await fetch(`${base}/projects`)).json();
   const presets = await (await fetch(`${base}/presets`)).json();
   const registrySkills = await (await fetch(`${base}/registry/skills`)).json();
+  const managedSkills = await (await fetch(`${base}/skills`)).json();
   const effective = await (await fetch(`${base}/projects/demo/effective-set`)).json();
   const preview = await (await fetch(`${base}/projects/demo/activation-plan/preview`, {
     method: "POST",
@@ -82,6 +83,7 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(projects.projects[0].id, "demo");
   assert.ok(presets.presets.some((preset) => preset.id === "builtin-pristine"));
   assert.equal(registrySkills.skills[0].id, imported.skills[0].id);
+  assert.equal(managedSkills.skills[0].lineage.id, imported.skills[0].lineage_id);
   assert.equal(effective.skills[0].skill_name, "planning");
   assert.equal(preview.plan.operations[0].registry_skill_id, imported.skills[0].id);
   assert.equal(preview.plan.operations[0].skill_name, "planning");
@@ -94,6 +96,15 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(projectUpstreamStatus.status.manager_project_id, "demo");
   assert.equal(projectUpstreamStatus.status.summary.enabled, 1);
   assert.deepEqual(inspectedProjectIds, [null, "demo"]);
+
+  const updatedProfile = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/profile`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ purpose: "Plan a verified implementation.", use_when: ["Before implementation"], review_state: "reviewed" }),
+  })).json();
+  const loadedProfile = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/profile`)).json();
+  assert.equal(updatedProfile.profile.review_state, "reviewed");
+  assert.equal(loadedProfile.profile.purpose, "Plan a verified implementation.");
 
   const updatedPreset = await (await fetch(`${base}/presets/planning/update`, {
     method: "POST", headers: { "content-type": "application/json" },

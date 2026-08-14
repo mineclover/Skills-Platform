@@ -52,15 +52,27 @@ type SourceAdoptionCandidate = {
   review: SourceReview | null;
   compatible_presets: Array<{ id: string; name: string; selected_version: number; current_registry_skill_id: string; current_source_revision_id: string }>;
 };
+type CatalogSkill = {
+  lineage: { id: string; skill_name: string };
+  latest_skill: { id: string; source_revision_id: string; description: string | null } | null;
+  profile: {
+    title: string;
+    summary: string | null;
+    purpose: string | null;
+    use_when: string[];
+    tags: string[];
+    review_state: "unreviewed" | "reviewed" | "deprecated";
+    risk_level: string;
+  };
+  notes: Array<{ id: string }>;
+};
 
 const catalogApi = import.meta.env.VITE_CATALOG_API?.replace(/\/$/, "") ?? "";
 
 const navigation = [
-  { label: "Registry", icon: Database },
+  { label: "Skills", icon: Database },
   { label: "Templates", icon: FileText },
   { label: "Projects", icon: ClipboardCheck },
-  { label: "History", icon: RefreshCcw },
-  { label: "Review", icon: ShieldCheck },
 ];
 
 const skillRows: SkillRow[] = [
@@ -126,6 +138,44 @@ function SideNavigation({ activePage, onNavigate }: { activePage: string; onNavi
       <button className="nav-item settings" type="button"><AppIcon icon={Settings} /><span>Settings</span></button>
     </aside>
   );
+}
+
+function SkillWorkspace({ skills, selectedLineageId, onSelect, onSave, saving }: {
+  skills: CatalogSkill[];
+  selectedLineageId: string | null;
+  onSelect: (lineageId: string) => void;
+  onSave: (lineageId: string, patch: { purpose: string | null; use_when: string[]; review_state: "unreviewed" | "reviewed" | "deprecated" }) => void;
+  saving: boolean;
+}) {
+  const [query, setQuery] = useState("");
+  const selected = skills.find((skill) => skill.lineage.id === selectedLineageId) ?? skills[0] ?? null;
+  const [purpose, setPurpose] = useState("");
+  const [useWhen, setUseWhen] = useState("");
+  const [reviewState, setReviewState] = useState<"unreviewed" | "reviewed" | "deprecated">("unreviewed");
+  useEffect(() => {
+    setPurpose(selected?.profile.purpose ?? "");
+    setUseWhen(selected?.profile.use_when.join(", ") ?? "");
+    setReviewState(selected?.profile.review_state ?? "unreviewed");
+  }, [selected?.lineage.id, selected?.profile.purpose, selected?.profile.review_state, selected?.profile.use_when]);
+  const visible = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    if (!needle) return skills;
+    return skills.filter((skill) => [skill.lineage.skill_name, skill.profile.summary, skill.profile.purpose, ...skill.profile.tags].filter(Boolean).join(" ").toLocaleLowerCase().includes(needle));
+  }, [query, skills]);
+  return <section className="skills-workspace">
+    <header className="template-header skills-header"><div><h1>Skills</h1><p>Manage immutable revisions, intended use, and review state. Templates only compose these managed skills.</p></div><label className="skill-search"><span className="sr-only">Search skills</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search skills" /></label></header>
+    {skills.length === 0 ? <div className="review-empty"><AlertTriangle size={22} className="review-icon" /><span>No managed skill is registered yet.</span></div> : <div className="skills-manager-layout">
+      <div className="managed-skill-list" aria-label="Managed skills">{visible.map((skill) => <button type="button" key={skill.lineage.id} className={skill.lineage.id === selected?.lineage.id ? "managed-skill selected" : "managed-skill"} onClick={() => onSelect(skill.lineage.id)}><span className={skill.profile.review_state === "reviewed" ? "skill-health reviewed" : "skill-health"} /><span><strong>{skill.profile.title || skill.lineage.skill_name}</strong><small>{skill.latest_skill?.description ?? "No current revision description"}</small></span><em>{skill.profile.review_state.replaceAll("_", " ")}</em></button>)}</div>
+      {selected ? <form className="skill-detail" onSubmit={(event) => { event.preventDefault(); onSave(selected.lineage.id, { purpose: purpose.trim() || null, use_when: useWhen.split(",").map((item) => item.trim()).filter(Boolean), review_state: reviewState }); }}>
+        <div className="skill-detail-heading"><div><p className="section-label">Immutable skill</p><h2>{selected.profile.title || selected.lineage.skill_name}</h2><p>{selected.latest_skill?.description ?? "No description is available for the latest revision."}</p></div><span className={`review-decision ${reviewState}`}>{reviewState}</span></div>
+        <dl className="skill-facts"><div><dt>Lineage</dt><dd>{selected.lineage.id}</dd></div><div><dt>Latest revision</dt><dd>{selected.latest_skill?.source_revision_id.slice(0, 12) ?? "Unavailable"}</dd></div><div><dt>Notes</dt><dd>{selected.notes.length}</dd></div><div><dt>Risk</dt><dd>{selected.profile.risk_level}</dd></div></dl>
+        <label className="template-field">Purpose<textarea value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="What this skill is intended to accomplish" /></label>
+        <label className="template-field">Use when <input value={useWhen} onChange={(event) => setUseWhen(event.target.value)} placeholder="Before implementation, during review" /><small>Separate conditions with commas.</small></label>
+        <label className="template-field">Review state<select value={reviewState} onChange={(event) => setReviewState(event.target.value as typeof reviewState)}><option value="unreviewed">Unreviewed</option><option value="reviewed">Reviewed</option><option value="deprecated">Deprecated</option></select></label>
+        <button className="primary-action skill-save" type="submit" disabled={saving}>{saving ? <LoaderCircle size={20} className="spin" /> : <Check size={20} />}{saving ? "Saving skill…" : "Save skill profile"}</button>
+      </form> : null}
+    </div>}
+  </section>;
 }
 
 function TemplateWorkspace({ presets, skills, selectedTemplateId, onSelectTemplate, onSave, onCreate, saving }: {
@@ -324,6 +374,9 @@ export function CatalogApp() {
   const [projects, setProjects] = useState<RemoteProject[]>([]);
   const [presets, setPresets] = useState<RemotePreset[]>([]);
   const [registrySkills, setRegistrySkills] = useState<RegistrySkill[]>([]);
+  const [catalogSkills, setCatalogSkills] = useState<CatalogSkill[]>([]);
+  const [selectedSkillLineageId, setSelectedSkillLineageId] = useState<string | null>(null);
+  const [savingSkillProfile, setSavingSkillProfile] = useState(false);
   const [projectAssignments, setProjectAssignments] = useState<RemoteAssignment[]>([]);
   const [history, setHistory] = useState<RemoteHistory | null>(null);
   const [comparison, setComparison] = useState<RemoteComparison | null>(null);
@@ -364,6 +417,20 @@ export function CatalogApp() {
       .catch((error: Error) => active && setRemoteError(error.message));
     return () => { active = false; };
   }, []);
+
+  const refreshCatalogSkills = useCallback(() => {
+    if (!catalogApi) return Promise.resolve();
+    return fetch(`${catalogApi}/api/skills`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load managed skills")))
+      .then((body: { skills: CatalogSkill[] }) => setCatalogSkills(body.skills));
+  }, []);
+
+  useEffect(() => { void refreshCatalogSkills().catch(() => setCatalogSkills([])); }, [refreshCatalogSkills]);
+
+  useEffect(() => {
+    if (selectedSkillLineageId || catalogSkills.length === 0) return;
+    setSelectedSkillLineageId(catalogSkills[0].lineage.id);
+  }, [catalogSkills, selectedSkillLineageId]);
 
   useEffect(() => {
     if (!catalogApi) return;
@@ -547,6 +614,19 @@ export function CatalogApp() {
       .catch((error: Error) => { setNotice(error.message); return false; })
       .finally(() => setSavingTemplate(false));
   }, []);
+  const saveSkillProfile = useCallback((lineageId: string, patch: { purpose: string | null; use_when: string[]; review_state: "unreviewed" | "reviewed" | "deprecated" }) => {
+    if (!catalogApi) return;
+    setSavingSkillProfile(true);
+    setNotice(null);
+    fetch(`${catalogApi}/api/skills/${encodeURIComponent(lineageId)}/profile`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(patch),
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Skill profile was rejected")))
+      .then(() => refreshCatalogSkills())
+      .then(() => setNotice("Skill profile saved. Template membership and provider delivery were not changed."))
+      .catch((error: Error) => setNotice(error.message))
+      .finally(() => setSavingSkillProfile(false));
+  }, [refreshCatalogSkills]);
   const previewPlan = useCallback(() => {
     setPreviewing(true);
     setNotice(null);
@@ -640,16 +720,14 @@ export function CatalogApp() {
 
   return (
     <main className="app-shell">
-      <SideNavigation activePage={activePage} onNavigate={(page) => setActivePage(page === "Templates" ? "Templates" : "Projects")} />
+      <SideNavigation activePage={activePage} onNavigate={setActivePage} />
       <div className="workspace">
-        {activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} onCreate={createTemplate} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
+        {activePage === "Skills" ? <><SkillWorkspace skills={catalogSkills} selectedLineageId={selectedSkillLineageId} onSelect={setSelectedSkillLineageId} onSave={saveSkillProfile} saving={savingSkillProfile} /><ReviewQueue items={reviewItems} remote={catalogApi !== ""} />{catalogApi ? <SourceChangeQueue candidates={sourceCandidates} summaries={sourceReviewSummaries} actionId={sourceActionId} onSummaryChange={updateSourceSummary} onReview={reviewSourceCandidate} onAdopt={adoptSourceCandidate} /> : null}</> : activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} onCreate={createTemplate} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
            <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} /><LiveActivationStatus globalStatus={globalStatus} projectStatus={projectStatus} loading={loadingLiveStatus} error={liveStatusError} onRefresh={() => void refreshLiveStatus()} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
            <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onApply={applyPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} applying={applyingPlan} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />
         </div>
         <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} comparison={comparison} />
-        <ReviewQueue items={reviewItems} remote={catalogApi !== ""} />
-        {catalogApi ? <SourceChangeQueue candidates={sourceCandidates} summaries={sourceReviewSummaries} actionId={sourceActionId} onSummaryChange={updateSourceSummary} onReview={reviewSourceCandidate} onAdopt={adoptSourceCandidate} /> : null}
         </>}
       </div>
     </main>

@@ -73,6 +73,12 @@ the identical canonical digest, calls `skill preview`, runs the upstream CLI,
 and stores its report with a post-apply provider/binding inspection. It rejects
 missing or mismatched upstream skills instead of importing them implicitly.
 
+`GET /api/skills` exposes the managed skill catalog (lineage, latest immutable
+revision, profile, and active notes). `GET|POST /api/skills/:lineage/profile`
+reads or updates Catalog-only profile metadata. These endpoints support the
+Skills UI and mirror the `skill list`, `skill search`, and `skill profile`
+CLI group; they never change template membership or provider delivery.
+
 ## MVP catalog flow
 
 ```bash

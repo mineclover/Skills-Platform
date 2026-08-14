@@ -4,6 +4,12 @@ This app is the management surface for Skills Platform. It never writes a
 provider `skills/` directory. It resolves and previews Catalog policy, then
 hands a validated `ActivationPlan` to Skills Manager for materialization.
 
+The navigation has three non-overlapping areas: **Skills** manages immutable
+registry revisions, profile metadata, and review work; **Templates** composes
+those skills into versioned membership; **Projects** assigns a template,
+resolves a work scope, and applies a recorded plan. Project history remains in
+Projects, while the review/source-adoption queues are part of Skills.
+
 ## Local prototype
 
 ```bash
@@ -59,6 +65,11 @@ same revision in Skills Manager, preview every binding, apply through the
 upstream CLI, and re-inspect the result. It never imports a missing Registry
 skill into Skills Manager automatically; a matching upstream instance and
 digest are required.
+
+The **Skills** screen is backed by `GET /api/skills` and
+`GET|POST /api/skills/:lineage/profile`. Saving a profile updates only Catalog
+metadata such as purpose, use conditions, and review state; it does not create
+a template revision or change a provider binding.
 
 When connected to the local bridge, the same inspector can pin any registered
 template—including `Pristine`—as that project's default. This changes only the
