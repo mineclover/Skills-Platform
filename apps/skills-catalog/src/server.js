@@ -20,6 +20,10 @@ function json(response, status, value) {
   response.end(`${JSON.stringify(value, null, 2)}\n`);
 }
 
+function streamJson(response, value) {
+  response.write(`${JSON.stringify(value)}\n`);
+}
+
 function parseJsonBody(request) {
   return new Promise((resolve, reject) => {
     const parts = [];
@@ -381,6 +385,31 @@ function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = cr
           upstreamCli,
         });
         return json(response, result.status === "confirmation_required" ? 409 : 201, result);
+      }
+      const applyStream = url.pathname.match(/^\/api\/activation-plans\/([^/]+)\/apply\/stream$/);
+      if (request.method === "POST" && applyStream) {
+        const body = await parseJsonBody(request);
+        response.writeHead(200, {
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "GET, POST, OPTIONS",
+          "access-control-allow-headers": "content-type",
+          "content-type": "application/x-ndjson; charset=utf-8",
+          "cache-control": "no-cache",
+        });
+        try {
+          const result = await applyRecordedActivationPlan({
+            catalogRoot,
+            planId: decodeURIComponent(applyStream[1]),
+            confirmed: body.confirmed === true,
+            upstreamCli,
+            onProgress: (progress) => streamJson(response, { type: "progress", progress }),
+          });
+          streamJson(response, { type: "result", result });
+        } catch (error) {
+          streamJson(response, { type: "error", error: error.message });
+        }
+        response.end();
+        return;
       }
       const observedComparison = url.pathname.match(/^\/api\/activation-plans\/([^/]+)\/observed-state-comparison$/);
       if (observedComparison && request.method === "GET") {

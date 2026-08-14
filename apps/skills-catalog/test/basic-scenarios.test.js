@@ -86,10 +86,18 @@ test("basic scenario: select, confirm, apply, return to Pristine, and reject an 
   assert.equal(pending.body.status, "confirmation_required");
   assert.equal(calls.some((args) => args[0] === "skill" && args[1] === "enable"), false);
 
-  const applied = await request(base, `/activation-plans/${recorded.body.plan.plan_id}/apply`, { confirmed: true });
-  assert.equal(applied.response.status, 201);
-  assert.equal(applied.body.status, "completed");
-  assert.equal(applied.body.report.summary.applied, 1);
+  const streamResponse = await fetch(`${base}/activation-plans/${recorded.body.plan.plan_id}/apply/stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ confirmed: true }),
+  });
+  const stream = (await streamResponse.text()).trim().split("\n").map((line) => JSON.parse(line));
+  const applied = stream.find((event) => event.type === "result").result;
+  assert.equal(streamResponse.status, 200);
+  assert.ok(stream.some((event) => event.type === "progress" && event.progress.stage === "preview"));
+  assert.ok(stream.some((event) => event.type === "progress" && event.progress.stage === "verify"));
+  assert.equal(applied.status, "completed");
+  assert.equal(applied.report.summary.applied, 1);
   assert.deepEqual(calls.find((args) => args[0] === "skill" && args[1] === "enable"), ["skill", "enable", "--id", "project:manager-demo:planning", "--tool", "codex", "--project", "manager-demo"]);
   const history = await request(base, "/projects/demo/history");
   assert.equal(history.body.history[0].reports.length, 1);

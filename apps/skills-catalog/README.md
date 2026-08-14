@@ -79,6 +79,12 @@ reads or updates Catalog-only profile metadata. These endpoints support the
 Skills UI and mirror the `skill list`, `skill search`, and `skill profile`
 CLI group; they never change template membership or provider delivery.
 
+`POST /api/activation-plans/:id/apply/stream` is the streaming form of the
+confirmed apply endpoint. It emits NDJSON `progress` records for inspection,
+immutable revision resolution, preview, each apply operation, and verification,
+then a final `result` (or `error`) record. It does not bypass the same digest,
+confirmation, or reporting safeguards.
+
 ## MVP catalog flow
 
 ```bash

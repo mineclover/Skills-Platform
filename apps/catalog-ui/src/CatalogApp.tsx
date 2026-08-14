@@ -66,6 +66,16 @@ type CatalogSkill = {
   };
   notes: Array<{ id: string }>;
 };
+type SkillFeedback = { id: string; outcome: string; evidence_type: string; summary: string; created_at: string };
+type FeedbackSummary = {
+  health: "unknown" | "healthy" | "needs_review";
+  total_feedback: number;
+  success_rate: number | null;
+  by_outcome: Record<string, number>;
+  latest_feedback_at: string | null;
+};
+type ApplyProgress = { stage: string; completed: number; total: number; message: string };
+type ApplyResult = { status: string; report: { summary: { applied: number; skipped: number; failed: number } }; error?: string };
 
 const catalogApi = import.meta.env.VITE_CATALOG_API?.replace(/\/$/, "") ?? "";
 
@@ -121,6 +131,30 @@ async function copyText(content: string) {
   if (!copied) throw new Error("The browser did not allow copying to the clipboard");
 }
 
+async function readApplyStream(response: Response, onProgress: (progress: ApplyProgress) => void) {
+  if (!response.ok || !response.body) throw new Error("Skills Manager progress stream was unavailable");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: ApplyResult | null = null;
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as { type: "progress" | "result" | "error"; progress?: ApplyProgress; result?: ApplyResult; error?: string };
+      if (event.type === "progress" && event.progress) onProgress(event.progress);
+      if (event.type === "result" && event.result) result = event.result;
+      if (event.type === "error") throw new Error(event.error ?? "Skills Manager apply failed");
+    }
+    if (done) break;
+  }
+  if (!result) throw new Error("Skills Manager did not return an apply result");
+  return result;
+}
+
 function AppIcon({ icon: Icon, active }: { icon: typeof Database; active?: boolean }) {
   return <Icon aria-hidden="true" size={21} strokeWidth={1.7} className={active ? "nav-icon active" : "nav-icon"} />;
 }
@@ -140,18 +174,26 @@ function SideNavigation({ activePage, onNavigate }: { activePage: string; onNavi
   );
 }
 
-function SkillWorkspace({ skills, selectedLineageId, onSelect, onSave, saving }: {
+function SkillWorkspace({ skills, selectedLineageId, onSelect, onSave, saving, feedback, feedbackSummary, loadingEvidence, recordingFeedback, onRecordFeedback }: {
   skills: CatalogSkill[];
   selectedLineageId: string | null;
   onSelect: (lineageId: string) => void;
   onSave: (lineageId: string, patch: { purpose: string | null; use_when: string[]; review_state: "unreviewed" | "reviewed" | "deprecated" }) => void;
   saving: boolean;
+  feedback: SkillFeedback[];
+  feedbackSummary: FeedbackSummary | null;
+  loadingEvidence: boolean;
+  recordingFeedback: boolean;
+  onRecordFeedback: (lineageId: string, patch: { outcome: string; evidence_type: string; summary: string }) => void;
 }) {
   const [query, setQuery] = useState("");
   const selected = skills.find((skill) => skill.lineage.id === selectedLineageId) ?? skills[0] ?? null;
   const [purpose, setPurpose] = useState("");
   const [useWhen, setUseWhen] = useState("");
   const [reviewState, setReviewState] = useState<"unreviewed" | "reviewed" | "deprecated">("unreviewed");
+  const [feedbackOutcome, setFeedbackOutcome] = useState("success");
+  const [feedbackEvidence, setFeedbackEvidence] = useState("manual");
+  const [feedbackText, setFeedbackText] = useState("");
   useEffect(() => {
     setPurpose(selected?.profile.purpose ?? "");
     setUseWhen(selected?.profile.use_when.join(", ") ?? "");
@@ -166,14 +208,14 @@ function SkillWorkspace({ skills, selectedLineageId, onSelect, onSave, saving }:
     <header className="template-header skills-header"><div><h1>Skills</h1><p>Manage immutable revisions, intended use, and review state. Templates only compose these managed skills.</p></div><label className="skill-search"><span className="sr-only">Search skills</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search skills" /></label></header>
     {skills.length === 0 ? <div className="review-empty"><AlertTriangle size={22} className="review-icon" /><span>No managed skill is registered yet.</span></div> : <div className="skills-manager-layout">
       <div className="managed-skill-list" aria-label="Managed skills">{visible.map((skill) => <button type="button" key={skill.lineage.id} className={skill.lineage.id === selected?.lineage.id ? "managed-skill selected" : "managed-skill"} onClick={() => onSelect(skill.lineage.id)}><span className={skill.profile.review_state === "reviewed" ? "skill-health reviewed" : "skill-health"} /><span><strong>{skill.profile.title || skill.lineage.skill_name}</strong><small>{skill.latest_skill?.description ?? "No current revision description"}</small></span><em>{skill.profile.review_state.replaceAll("_", " ")}</em></button>)}</div>
-      {selected ? <form className="skill-detail" onSubmit={(event) => { event.preventDefault(); onSave(selected.lineage.id, { purpose: purpose.trim() || null, use_when: useWhen.split(",").map((item) => item.trim()).filter(Boolean), review_state: reviewState }); }}>
+      {selected ? <div className="skill-detail-panel"><form className="skill-detail" onSubmit={(event) => { event.preventDefault(); onSave(selected.lineage.id, { purpose: purpose.trim() || null, use_when: useWhen.split(",").map((item) => item.trim()).filter(Boolean), review_state: reviewState }); }}>
         <div className="skill-detail-heading"><div><p className="section-label">Immutable skill</p><h2>{selected.profile.title || selected.lineage.skill_name}</h2><p>{selected.latest_skill?.description ?? "No description is available for the latest revision."}</p></div><span className={`review-decision ${reviewState}`}>{reviewState}</span></div>
         <dl className="skill-facts"><div><dt>Lineage</dt><dd>{selected.lineage.id}</dd></div><div><dt>Latest revision</dt><dd>{selected.latest_skill?.source_revision_id.slice(0, 12) ?? "Unavailable"}</dd></div><div><dt>Notes</dt><dd>{selected.notes.length}</dd></div><div><dt>Risk</dt><dd>{selected.profile.risk_level}</dd></div></dl>
         <label className="template-field">Purpose<textarea value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="What this skill is intended to accomplish" /></label>
         <label className="template-field">Use when <input value={useWhen} onChange={(event) => setUseWhen(event.target.value)} placeholder="Before implementation, during review" /><small>Separate conditions with commas.</small></label>
         <label className="template-field">Review state<select value={reviewState} onChange={(event) => setReviewState(event.target.value as typeof reviewState)}><option value="unreviewed">Unreviewed</option><option value="reviewed">Reviewed</option><option value="deprecated">Deprecated</option></select></label>
         <button className="primary-action skill-save" type="submit" disabled={saving}>{saving ? <LoaderCircle size={20} className="spin" /> : <Check size={20} />}{saving ? "Saving skill…" : "Save skill profile"}</button>
-      </form> : null}
+      </form><section className="skill-feedback"><div className="skill-feedback-heading"><div><p className="section-label">Feedback health</p><strong>{loadingEvidence ? "Loading evidence…" : feedbackSummary?.health.replaceAll("_", " ") ?? "Unknown"}</strong><small>{feedbackSummary ? `${feedbackSummary.total_feedback} records${feedbackSummary.success_rate === null ? "" : ` · ${Math.round(feedbackSummary.success_rate * 100)}% success`}` : "No feedback recorded"}</small></div><span className={`review-decision ${feedbackSummary?.health ?? "unknown"}`}>{feedbackSummary?.health ?? "unknown"}</span></div><form className="feedback-form" onSubmit={(event) => { event.preventDefault(); if (!feedbackText.trim()) return; onRecordFeedback(selected.lineage.id, { outcome: feedbackOutcome, evidence_type: feedbackEvidence, summary: feedbackText.trim() }); setFeedbackText(""); }}><label className="template-field">Outcome<select value={feedbackOutcome} onChange={(event) => setFeedbackOutcome(event.target.value)}><option value="success">Success</option><option value="correction">Correction</option><option value="scope_mismatch">Scope mismatch</option><option value="freshness">Freshness</option><option value="risk">Risk</option><option value="neutral">Neutral</option></select></label><label className="template-field">Evidence<select value={feedbackEvidence} onChange={(event) => setFeedbackEvidence(event.target.value)}><option value="manual">Manual</option><option value="evaluation">Evaluation</option><option value="activation_report">Activation report</option><option value="user_feedback">User feedback</option><option value="incident">Incident</option></select></label><label className="template-field feedback-summary-field">Summary<input value={feedbackText} onChange={(event) => setFeedbackText(event.target.value)} placeholder="What happened and what should be retained" /></label><button className="quiet-action feedback-save" type="submit" disabled={recordingFeedback || !feedbackText.trim()}>{recordingFeedback ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{recordingFeedback ? "Recording…" : "Record feedback"}</button></form>{feedback.length ? <div className="feedback-history">{feedback.slice(0, 3).map((item) => <div key={item.id}><span>{item.outcome.replaceAll("_", " ")}</span><p>{item.summary}</p><small>{item.evidence_type.replaceAll("_", " ")}</small></div>)}</div> : null}</section></div> : null}
     </div>}
   </section>;
 }
@@ -222,7 +264,15 @@ function SkillTable({ skills }: { skills: DisplaySkill[] }) {
   );
 }
 
-function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, presets, overlayTemplate, overlayPresetId, overlayActive, onPristine, onDefaultTemplate, onOverlayTemplate, onPreview, onApply, onCopyPrompt, previewing, applying, copyingPrompt, updatingDefault, updatingOverlay }: {
+function ApplyProgressView({ progress }: { progress: ApplyProgress | null }) {
+  if (!progress) return null;
+  const stageBase: Record<string, number> = { inspect: 5, resolve: 18, preview: 42, apply: 62, verify: 92, completed: 100, failed: 100 };
+  const base = stageBase[progress.stage] ?? 0;
+  const percent = progress.stage === "completed" || progress.stage === "failed" ? 100 : Math.min(98, Math.round(base + (progress.total ? (progress.completed / progress.total) * 18 : 0)));
+  return <div className="apply-progress" role="status" aria-live="polite"><div><span>{progress.stage.replaceAll("_", " ")}</span><strong>{percent}%</strong></div><p>{progress.message}</p><div className="progress-track"><span className={progress.stage === "failed" ? "progress-fill drift" : "progress-fill"} style={{ width: `${percent}%` }} /></div></div>;
+}
+
+function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, presets, overlayTemplate, overlayPresetId, overlayActive, onPristine, onDefaultTemplate, onOverlayTemplate, onPreview, onApply, onCopyPrompt, previewing, applying, applyProgress, copyingPrompt, updatingDefault, updatingOverlay }: {
   scope: Scope;
   pristine: boolean;
   defaultTemplate: string;
@@ -239,6 +289,7 @@ function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, 
   onCopyPrompt: () => void;
   previewing: boolean;
   applying: boolean;
+  applyProgress: ApplyProgress | null;
   copyingPrompt: boolean;
   updatingDefault: boolean;
   updatingOverlay: boolean;
@@ -268,6 +319,7 @@ function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, 
         <button className="quiet-action apply-action" type="button" onClick={onApply} disabled={applying || previewing}>
           {applying ? <LoaderCircle size={17} className="spin" /> : <Check size={17} />} {applying ? "Applying through CLI…" : "Apply through Skills Manager CLI"}
         </button>
+        <ApplyProgressView progress={applyProgress} />
         <button className="quiet-action prompt-copy" type="button" onClick={onCopyPrompt} disabled={copyingPrompt}>
           {copyingPrompt ? <LoaderCircle size={17} className="spin" /> : <Copy size={17} />} {copyingPrompt ? "Preparing prompt…" : "Copy system prompt"}
         </button>
@@ -377,6 +429,10 @@ export function CatalogApp() {
   const [catalogSkills, setCatalogSkills] = useState<CatalogSkill[]>([]);
   const [selectedSkillLineageId, setSelectedSkillLineageId] = useState<string | null>(null);
   const [savingSkillProfile, setSavingSkillProfile] = useState(false);
+  const [skillFeedback, setSkillFeedback] = useState<SkillFeedback[]>([]);
+  const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary | null>(null);
+  const [loadingSkillEvidence, setLoadingSkillEvidence] = useState(false);
+  const [recordingFeedback, setRecordingFeedback] = useState(false);
   const [projectAssignments, setProjectAssignments] = useState<RemoteAssignment[]>([]);
   const [history, setHistory] = useState<RemoteHistory | null>(null);
   const [comparison, setComparison] = useState<RemoteComparison | null>(null);
@@ -395,6 +451,7 @@ export function CatalogApp() {
   const [loadingLiveStatus, setLoadingLiveStatus] = useState(false);
   const [liveStatusError, setLiveStatusError] = useState<string | null>(null);
   const [applyingPlan, setApplyingPlan] = useState(false);
+  const [applyProgress, setApplyProgress] = useState<ApplyProgress | null>(null);
 
   const refreshSourceCandidates = useCallback(() => {
     if (!catalogApi) return Promise.resolve();
@@ -431,6 +488,30 @@ export function CatalogApp() {
     if (selectedSkillLineageId || catalogSkills.length === 0) return;
     setSelectedSkillLineageId(catalogSkills[0].lineage.id);
   }, [catalogSkills, selectedSkillLineageId]);
+
+  const refreshSkillEvidence = useCallback(() => {
+    if (!catalogApi || !selectedSkillLineageId) {
+      setSkillFeedback([]);
+      setFeedbackSummary(null);
+      return Promise.resolve();
+    }
+    setLoadingSkillEvidence(true);
+    return Promise.all([
+      fetch(`${catalogApi}/api/skills/${encodeURIComponent(selectedSkillLineageId)}/feedback`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load skill feedback"))),
+      fetch(`${catalogApi}/api/skills/${encodeURIComponent(selectedSkillLineageId)}/feedback-summary`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load skill health"))),
+    ])
+      .then(([feedbackBody, summaryBody]: [{ feedback: SkillFeedback[] }, FeedbackSummary]) => {
+        setSkillFeedback(feedbackBody.feedback);
+        setFeedbackSummary(summaryBody);
+      })
+      .catch(() => {
+        setSkillFeedback([]);
+        setFeedbackSummary(null);
+      })
+      .finally(() => setLoadingSkillEvidence(false));
+  }, [selectedSkillLineageId]);
+
+  useEffect(() => { void refreshSkillEvidence(); }, [refreshSkillEvidence]);
 
   useEffect(() => {
     if (!catalogApi) return;
@@ -627,6 +708,18 @@ export function CatalogApp() {
       .catch((error: Error) => setNotice(error.message))
       .finally(() => setSavingSkillProfile(false));
   }, [refreshCatalogSkills]);
+  const recordSkillFeedback = useCallback((lineageId: string, patch: { outcome: string; evidence_type: string; summary: string }) => {
+    if (!catalogApi) return;
+    setRecordingFeedback(true);
+    fetch(`${catalogApi}/api/skills/${encodeURIComponent(lineageId)}/feedback`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope: "global", ...patch }),
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Feedback was rejected")))
+      .then(() => refreshSkillEvidence())
+      .then(() => setNotice("Feedback recorded for this skill. Templates and provider bindings were not changed."))
+      .catch((error: Error) => setNotice(error.message))
+      .finally(() => setRecordingFeedback(false));
+  }, [refreshSkillEvidence]);
   const previewPlan = useCallback(() => {
     setPreviewing(true);
     setNotice(null);
@@ -655,20 +748,28 @@ export function CatalogApp() {
     if (!window.confirm("Apply this immutable plan through Skills Manager CLI? The upstream manager may change provider bindings.")) return;
     setApplyingPlan(true);
     setNotice(null);
+    setApplyProgress({ stage: "record", completed: 0, total: 1, message: "Recording the immutable activation plan" });
     fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/activation-plan`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ work_scope_tags: [scope], preset_id: pristine ? "builtin-pristine" : undefined }),
     })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Activation plan could not be recorded")))
-      .then((body: { plan: { plan_id: string } }) => fetch(`${catalogApi}/api/activation-plans/${encodeURIComponent(body.plan.plan_id)}/apply`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirmed: true }),
-      }).then((response) => response.ok ? response.json() : response.json().then((error) => Promise.reject(new Error(error.error ?? "Skills Manager rejected the plan")))))
-      .then((body: { report: { summary: { applied: number; skipped: number; failed: number } } }) => {
+      .then(async (body: { plan: { plan_id: string; operations: unknown[] } }) => {
+        setApplyProgress({ stage: "inspect", completed: 0, total: body.plan.operations.length, message: "Starting Skills Manager preflight" });
+        const response = await fetch(`${catalogApi}/api/activation-plans/${encodeURIComponent(body.plan.plan_id)}/apply/stream`, {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirmed: true }),
+        });
+        return readApplyStream(response, setApplyProgress);
+      })
+      .then((body) => {
         const summary = body.report.summary;
-        setNotice(`Skills Manager CLI completed: ${summary.applied} applied · ${summary.skipped} skipped · ${summary.failed} failed.`);
+        setNotice(`Skills Manager CLI ${body.status}: ${summary.applied} applied · ${summary.skipped} skipped · ${summary.failed} failed.`);
         void refreshLiveStatus();
       })
-      .catch((error: Error) => setNotice(error.message))
+      .catch((error: Error) => {
+        setApplyProgress({ stage: "failed", completed: 0, total: 0, message: error.message });
+        setNotice(error.message);
+      })
       .finally(() => setApplyingPlan(false));
   }, [pristine, refreshLiveStatus, scope, selectedProjectId]);
   const copySystemPrompt = useCallback(() => {
@@ -722,10 +823,10 @@ export function CatalogApp() {
     <main className="app-shell">
       <SideNavigation activePage={activePage} onNavigate={setActivePage} />
       <div className="workspace">
-        {activePage === "Skills" ? <><SkillWorkspace skills={catalogSkills} selectedLineageId={selectedSkillLineageId} onSelect={setSelectedSkillLineageId} onSave={saveSkillProfile} saving={savingSkillProfile} /><ReviewQueue items={reviewItems} remote={catalogApi !== ""} />{catalogApi ? <SourceChangeQueue candidates={sourceCandidates} summaries={sourceReviewSummaries} actionId={sourceActionId} onSummaryChange={updateSourceSummary} onReview={reviewSourceCandidate} onAdopt={adoptSourceCandidate} /> : null}</> : activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} onCreate={createTemplate} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
+        {activePage === "Skills" ? <><SkillWorkspace skills={catalogSkills} selectedLineageId={selectedSkillLineageId} onSelect={setSelectedSkillLineageId} onSave={saveSkillProfile} saving={savingSkillProfile} feedback={skillFeedback} feedbackSummary={feedbackSummary} loadingEvidence={loadingSkillEvidence} recordingFeedback={recordingFeedback} onRecordFeedback={recordSkillFeedback} /><ReviewQueue items={reviewItems} remote={catalogApi !== ""} />{catalogApi ? <SourceChangeQueue candidates={sourceCandidates} summaries={sourceReviewSummaries} actionId={sourceActionId} onSummaryChange={updateSourceSummary} onReview={reviewSourceCandidate} onAdopt={adoptSourceCandidate} /> : null}</> : activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} onCreate={createTemplate} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
            <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} /><LiveActivationStatus globalStatus={globalStatus} projectStatus={projectStatus} loading={loadingLiveStatus} error={liveStatusError} onRefresh={() => void refreshLiveStatus()} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
-           <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onApply={applyPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} applying={applyingPlan} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />
+           <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onApply={applyPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} applying={applyingPlan} applyProgress={applyProgress} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />
         </div>
         <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} comparison={comparison} />
         </>}

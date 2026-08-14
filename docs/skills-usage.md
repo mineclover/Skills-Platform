@@ -48,6 +48,12 @@ node apps/skills-catalog/src/cli.js skill profile set <lineage-id> \
   --review-state reviewed
 ```
 
+The Skills UI exposes the same profile scope and also records global feedback
+with its outcome and evidence type. It shows the derived `unknown`, `healthy`,
+or `needs_review` health state, the evidence count, and recent entries. This
+evidence updates Catalog review work only; it does not activate or deactivate
+a provider skill.
+
 ## 1. Import and review a skill revision
 
 Inspect before importing; import preserves a canonical immutable copy. A newer
@@ -130,6 +136,12 @@ The bridge follows this safety sequence:
 4. Calls `skill enable` or `skill disable` only after confirmation, adding
    `--confirm-shared` only when the reviewed plan authorizes shared-root impact.
 5. Re-inspects providers and bindings, then stores an activation report.
+
+While an apply is running, `POST /api/activation-plans/:id/apply/stream`
+returns newline-delimited JSON progress events for `inspect`, immutable
+revision `resolve`, `preview`, each `apply`, and `verify`. The Catalog UI uses
+these events to show the live stage and progress bar; the final stream record
+contains the same stored activation report as the non-streaming endpoint.
 
 A missing or digest-mismatched upstream skill is rejected. Catalog never
 imports it into Skills Manager automatically. Create or import that upstream

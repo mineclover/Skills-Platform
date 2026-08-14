@@ -71,6 +71,12 @@ The **Skills** screen is backed by `GET /api/skills` and
 metadata such as purpose, use conditions, and review state; it does not create
 a template revision or change a provider binding.
 
+The same screen records global feedback with an outcome and evidence type, and
+shows its derived health summary and recent evidence. During a confirmed apply,
+the Projects inspector displays the upstream CLI stages—inspect, revision
+resolution, preview, binding apply, and verification—using the bridge's
+progress stream.
+
 When connected to the local bridge, the same inspector can pin any registered
 template—including `Pristine`—as that project's default. This changes only the
 Catalog project-policy record; it does not apply a delivery plan or repin any

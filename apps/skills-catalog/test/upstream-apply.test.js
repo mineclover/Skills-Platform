@@ -45,10 +45,14 @@ test("CLI apply resolves immutable upstream instances, previews, confirms, appli
   assert.equal(pending.status, "confirmation_required");
   assert.equal(calls.some((args) => args[0] === "skill" && args[1] === "enable"), false);
 
-  const completed = await applyRecordedActivationPlan({ catalogRoot, planId: plan.plan_id, confirmed: true, upstreamCli });
+  const progress = [];
+  const completed = await applyRecordedActivationPlan({ catalogRoot, planId: plan.plan_id, confirmed: true, upstreamCli, onProgress: (event) => progress.push(event) });
   assert.equal(completed.status, "completed");
   assert.equal(completed.report.transport, "skills-manager-cli");
   assert.equal(completed.report.summary.applied, 1);
+  assert.ok(progress.some((event) => event.stage === "resolve"));
+  assert.ok(progress.some((event) => event.stage === "preview"));
+  assert.equal(progress.at(-1).stage, "completed");
   assert.deepEqual(calls.find((args) => args[0] === "skill" && args[1] === "enable"), ["skill", "enable", "--id", "project:manager-demo:planning", "--tool", "codex", "--project", "manager-demo"]);
   assert.equal((await listActivationHistory({ catalogRoot, projectId: "demo" }))[0].reports.length, 1);
 
