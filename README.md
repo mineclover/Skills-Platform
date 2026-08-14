@@ -8,6 +8,7 @@ It separates policy and canonical content from agent-visible delivery paths.
 ```text
 apps/
   skills-catalog/    Registry, catalog, evaluation, project policy, and activation plans
+  catalog-ui/        Project effective-set and activation-progress UI prototype
   skills-manager/    Pinned delivery adapter: provider discovery, links, copies, and verification
 packages/
   skill-contracts/   Shared versioned contracts between the catalog and adapters
@@ -39,3 +40,19 @@ To initialize submodules after a normal clone:
 ```bash
 git submodule update --init --recursive
 ```
+
+## Catalog UI prototype
+
+The separate Catalog UI owns the management experience, while the preserved
+Skills Manager submodule continues to own delivery/provider concerns.
+
+```bash
+cd apps/catalog-ui
+npm install
+npm run dev
+```
+
+The current project screen makes a pinned default template, work-scope overlay,
+effective selected/disabled skills, Pristine reset, plan preview state, and
+activation history visible. Its sample data will be replaced by Catalog API
+bindings as the delivery-adapter integration is completed.

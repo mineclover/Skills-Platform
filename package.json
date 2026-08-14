@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Monorepo for the Skills Catalog control plane and the Skills Manager delivery adapter.",
-  "workspaces": ["apps/skills-catalog", "packages/*"],
+  "workspaces": ["apps/skills-catalog", "apps/catalog-ui", "packages/*"],
   "scripts": {
     "check": "npm run --workspaces --if-present check",
     "test": "npm run --workspaces --if-present test"
