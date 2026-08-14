@@ -78,6 +78,14 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(createdFeedback.feedback.outcome, "success");
   assert.equal(feedbackSummary.reported_metrics.successful, 1);
 
+  const sourceReview = await (await fetch(`${base}/source-revisions/${imported.source_revision_id}/review`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ decision: "approved", summary: "Initial revision reviewed." }),
+  })).json();
+  const loadedReview = await (await fetch(`${base}/source-revisions/${imported.source_revision_id}/review`)).json();
+  assert.equal(sourceReview.review.decision, "approved");
+  assert.equal(loadedReview.review.id, sourceReview.review.id);
+
   const createdCase = await (await fetch(`${base}/evaluation-cases`, {
     method: "POST",
     headers: { "content-type": "application/json" },

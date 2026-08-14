@@ -5,6 +5,7 @@ const { createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection }
 const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
 const { compareRecordedPlanWithObservedState, listObservedStates, recordObservedState } = require("./observed-state");
+const { adoptApprovedRevisionIntoPreset, latestSourceReview, recordSourceReview } = require("./source-review");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -54,6 +55,24 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
     try {
       if (request.method === "GET" && url.pathname === "/api/projects") {
         return json(response, 200, { projects: await listProjects(catalogRoot) });
+      }
+      const sourceReview = url.pathname.match(/^\/api\/source-revisions\/([^/]+)\/review$/);
+      if (sourceReview && request.method === "GET") {
+        return json(response, 200, { review: await latestSourceReview({ catalogRoot, sourceRevisionId: decodeURIComponent(sourceReview[1]) }) });
+      }
+      if (sourceReview && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { review: await recordSourceReview({
+          catalogRoot, registryRoot, sourceRevisionId: decodeURIComponent(sourceReview[1]), decision: body.decision,
+          summary: body.summary, reviewer: body.reviewer,
+        }) });
+      }
+      const presetAdoption = url.pathname.match(/^\/api\/presets\/([^/]+)\/adopt$/);
+      if (presetAdoption && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { adoption: await adoptApprovedRevisionIntoPreset({
+          catalogRoot, registryRoot, presetId: decodeURIComponent(presetAdoption[1]), registrySkillId: body.registry_skill_id,
+        }) });
       }
       if (request.method === "GET" && url.pathname === "/api/review-queue") {
         return json(response, 200, { items: await listReviewQueue({ catalogRoot, registryRoot }) });
