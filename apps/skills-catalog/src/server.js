@@ -1,6 +1,6 @@
 const http = require("node:http");
 const { URL } = require("node:url");
-const { listActivationHistory, listProjects, recordActivationPlan, recordActivationReport } = require("./catalog-state");
+const { assignPreset, listActivationHistory, listPresets, listProjects, recordActivationPlan, recordActivationReport } = require("./catalog-state");
 const { buildProjectSystemPrompt, createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
@@ -55,6 +55,24 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
     try {
       if (request.method === "GET" && url.pathname === "/api/projects") {
         return json(response, 200, { projects: await listProjects(catalogRoot) });
+      }
+      if (request.method === "GET" && url.pathname === "/api/presets") {
+        return json(response, 200, { presets: await listPresets(catalogRoot) });
+      }
+      const defaultAssignment = url.pathname.match(/^\/api\/projects\/([^/]+)\/default-preset$/);
+      if (defaultAssignment && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const project = await assignPreset({
+          catalogRoot,
+          projectId: decodeURIComponent(defaultAssignment[1]),
+          presetId: body.preset_id,
+          version: body.template_version,
+          role: "default",
+        });
+        return json(response, 201, {
+          project,
+          assignment: project.preset_assignments.find((item) => item.role === "default") ?? null,
+        });
       }
       if (request.method === "GET" && url.pathname === "/api/source-adoption-candidates") {
         return json(response, 200, { candidates: await listSourceAdoptionCandidates({ catalogRoot, registryRoot }) });
