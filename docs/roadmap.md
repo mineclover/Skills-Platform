@@ -173,6 +173,10 @@ to `Pristine` safely.
 **Goal:** make existing Skills Manager the real provider adapter without making
 it a registry.
 
+> Status: Reference adapter now emits preview, operation-progress, and complete
+> events in a stable NDJSON form. Existing Skills Manager app integration and
+> provider inventory mapping remain.
+
 - Embed plan validation in Skills Manager commands.
 - Add local plan import/preview/apply and stable activation-report event stream.
 - Map provider inventory, shared roots, direct skills, and existing links to

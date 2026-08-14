@@ -12,4 +12,6 @@ without becoming the registry of record.
 ```bash
 node src/cli.js preview ./activation-plan.json
 node src/cli.js apply ./activation-plan.json --confirm
+# NDJSON: preview, one event per operation, then complete with the final report.
+node src/cli.js apply ./activation-plan.json --confirm --events
 ```

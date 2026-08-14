@@ -87,8 +87,19 @@ async function materialize(previewOperation) {
 }
 
 async function applyActivationPlan(plan, { confirm = false, onProgress = () => {} } = {}) {
+  const events = applyActivationPlanEvents(plan, { confirm });
+  let completedReport = null;
+  for await (const event of events) {
+    if (event.type === "operation") onProgress({ processed_count: event.processed_count, total_count: event.total_count, operation: event.operation });
+    if (event.type === "complete") completedReport = event.report;
+  }
+  return completedReport;
+}
+
+async function* applyActivationPlanEvents(plan, { confirm = false } = {}) {
   if (!confirm) throw new Error("Explicit confirmation is required to materialize an activation plan");
   const preview = await previewActivationPlan(plan);
+  yield { type: "preview", plan_id: plan.plan_id, preview };
   if (!preview.valid) {
     const error = new Error("Activation plan cannot be applied because preview has invalid operations or conflicts");
     error.preview = preview;
@@ -98,9 +109,15 @@ async function applyActivationPlan(plan, { confirm = false, onProgress = () => {
   for (const [index, operation] of preview.operations.entries()) {
     const result = await materialize(operation);
     completed.push(result);
-    onProgress({ processed_count: index + 1, total_count: preview.operations.length, operation: result });
+    yield {
+      type: "operation",
+      plan_id: plan.plan_id,
+      processed_count: index + 1,
+      total_count: preview.operations.length,
+      operation: result,
+    };
   }
-  return {
+  const report = {
     plan_id: plan.plan_id,
     completed_at: new Date().toISOString(),
     operations: completed,
@@ -110,6 +127,8 @@ async function applyActivationPlan(plan, { confirm = false, onProgress = () => {
       return result;
     }, {}),
   };
+  yield { type: "complete", plan_id: plan.plan_id, report };
+  return report;
 }
 
-module.exports = { applyActivationPlan, previewActivationPlan };
+module.exports = { applyActivationPlan, applyActivationPlanEvents, previewActivationPlan };

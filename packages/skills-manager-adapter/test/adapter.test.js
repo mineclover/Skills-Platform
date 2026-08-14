@@ -4,7 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 const { createActivationPlan, digestDirectory } = require("../../skill-contracts/src");
-const { applyActivationPlan, previewActivationPlan } = require("../src");
+const { applyActivationPlan, applyActivationPlanEvents, previewActivationPlan } = require("../src");
 
 async function fixture(context, desiredState = "enabled") {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-manager-adapter-"));
@@ -64,4 +64,15 @@ test("never overwrites an unmanaged directory at a delivery path", async (contex
   assert.equal(preview.valid, false);
   assert.equal(preview.operations[0].status, "conflict");
   await assert.rejects(() => applyActivationPlan(plan, { confirm: true }), /cannot be applied/);
+});
+
+test("streams preview, per-operation progress, and the persisted final report", async (context) => {
+  const { plan } = await fixture(context);
+  const events = [];
+  for await (const event of applyActivationPlanEvents(plan, { confirm: true })) events.push(event);
+
+  assert.deepEqual(events.map((event) => event.type), ["preview", "operation", "complete"]);
+  assert.equal(events[1].processed_count, 1);
+  assert.equal(events[1].total_count, 1);
+  assert.equal(events[2].report.summary.applied, 1);
 });
