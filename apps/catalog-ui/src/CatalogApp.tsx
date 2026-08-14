@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, Check, ChevronDown, CircleCheck, ClipboardCheck, Database,
+  AlertTriangle, ArrowLeft, Check, ChevronDown, CircleCheck, ClipboardCheck, Database,
   Eye, FileText, Layers3, LoaderCircle, RefreshCcw, Settings, ShieldCheck,
   Sparkles, X,
 } from "lucide-react";
@@ -25,6 +25,8 @@ type RemoteSet = {
 };
 type RemoteProject = { id: string; name: string };
 type RemoteHistory = { plan_id: string; mode: string; recorded_at: string; reports: Array<{ status: string; report: { summary?: Record<string, number> } }> };
+type ReviewReason = { code: string; severity: "critical" | "high" | "medium" | "low"; detail: string };
+type ReviewItem = { lineage: { id: string; skill_name: string }; severity: "critical" | "high" | "medium" | "low"; reasons: ReviewReason[]; latest_source_revision_id: string | null };
 
 const catalogApi = import.meta.env.VITE_CATALOG_API?.replace(/\/$/, "") ?? "";
 
@@ -40,6 +42,11 @@ const skillRows: SkillRow[] = [
   { name: "Planning", source: "Build v2", defaultEnabled: true, defaultReason: "Default inclusion in Build v2" },
   { name: "Testing", source: "Verification v1", defaultEnabled: false, overlayEnabled: true, defaultReason: "Not included by Build v2", overlayReason: "Verification overlay includes Testing" },
   { name: "UI Design", source: "Build v2", defaultEnabled: false, defaultReason: "Not included by Build v2" },
+];
+
+const demoReviewQueue: ReviewItem[] = [
+  { lineage: { id: "lineage_testing", skill_name: "Testing" }, severity: "medium", latest_source_revision_id: "revision_demo", reasons: [{ code: "unevaluated_current_revision", severity: "medium", detail: "The latest source revision has no recorded active-case evaluation." }] },
+  { lineage: { id: "lineage_ui", skill_name: "UI Design" }, severity: "low", latest_source_revision_id: "revision_demo", reasons: [{ code: "unreviewed_profile", severity: "medium", detail: "The skill profile has not been reviewed." }] },
 ];
 
 function statusFor(row: SkillRow, scope: Scope, pristine: boolean) {
@@ -152,6 +159,16 @@ function PlanHistory({ scope, pristine, previewing, skills, defaultTemplate, rem
   );
 }
 
+function ReviewQueue({ items, remote }: { items: ReviewItem[]; remote: boolean }) {
+  const queue = remote ? items : demoReviewQueue;
+  return (
+    <section className="review-queue" aria-labelledby="review-queue-title">
+      <div className="review-title"><div><h2 id="review-queue-title">Review queue</h2><p>Evidence that needs a human decision. No policy is changed automatically.</p></div><span>{queue.length} open</span></div>
+      {queue.length === 0 ? <div className="review-empty"><CircleCheck size={22} className="mint" /><span>No current review signals.</span></div> : <div className="review-list">{queue.map((item) => <article className="review-row" key={item.lineage.id}><AlertTriangle size={21} className={`review-icon ${item.severity}`} /><div className="review-skill"><strong>{item.lineage.skill_name}</strong><small>{item.latest_source_revision_id ? `Pinned revision · ${item.latest_source_revision_id.slice(0, 12)}` : "No source revision recorded"}</small></div><div className="review-reasons">{item.reasons.map((reason) => <span key={reason.code} title={reason.detail}>{reason.code.replaceAll("_", " ")}</span>)}</div><span className={`severity ${item.severity}`}>{item.severity}</span><ChevronDown size={20} className="row-chevron" aria-hidden="true" /></article>)}</div>}
+    </section>
+  );
+}
+
 export function CatalogApp() {
   const [scope, setScope] = useState<Scope>("implementation");
   const [pristine, setPristine] = useState(false);
@@ -162,6 +179,7 @@ export function CatalogApp() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<RemoteProject[]>([]);
   const [history, setHistory] = useState<RemoteHistory | null>(null);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
   useEffect(() => {
     if (!catalogApi) return;
@@ -175,6 +193,16 @@ export function CatalogApp() {
         setRemoteError(body.projects.length === 0 ? "No catalog projects are registered." : null);
       })
       .catch((error: Error) => active && setRemoteError(error.message));
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!catalogApi) return;
+    let active = true;
+    fetch(`${catalogApi}/api/review-queue`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load review queue")))
+      .then((body: { items: ReviewItem[] }) => active && setReviewItems(body.items))
+      .catch(() => active && setReviewItems([]));
     return () => { active = false; };
   }, []);
 
@@ -245,6 +273,7 @@ export function CatalogApp() {
           <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} overlayTemplate={overlayTemplate} onPristine={togglePristine} onPreview={previewPlan} previewing={previewing} />
         </div>
         <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} />
+        <ReviewQueue items={reviewItems} remote={catalogApi !== ""} />
       </div>
     </main>
   );

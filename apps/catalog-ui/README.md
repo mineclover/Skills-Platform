@@ -15,9 +15,9 @@ Without configuration, the project screen is an interactive visual prototype.
 
 ## Connect a local Catalog
 
-Start the read-only Catalog bridge in another terminal. It exposes project
-policy, effective skill sets, history, and plan preview; it does not apply a
-plan or mutate a delivery path.
+Start the local Catalog bridge in another terminal. The UI reads project
+policy, effective skill sets, history, plan previews, and the evidence-derived
+review queue; it does not apply a plan or mutate a delivery path.
 
 ```bash
 cd ../skills-catalog
@@ -34,3 +34,6 @@ npm run dev
 
 The UI displays the first registered project, its pinned template and matching
 overlays, every selected/disabled skill reason, and the adapter-ready preview.
+It also shows why any skill needs review—unreviewed metadata, declared risk,
+feedback signals, missing current-revision evaluations, or failed/blocked
+evaluation results.
