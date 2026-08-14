@@ -51,7 +51,9 @@ Available endpoints are `GET /api/projects`, `GET
 /api/projects/:id/activation-plan/preview`. `POST
 /api/projects/:id/activation-plan` records a plan before sending it to an
 adapter; `POST /api/activation-plans/:id/report` stores the report returned by
-that adapter. Neither endpoint applies a delivery operation.
+that adapter. `GET|POST /api/skills/:lineage/feedback` records or reads
+structured evidence, and `GET /api/skills/:lineage/feedback-summary` provides
+its aggregate health indicators. Neither endpoint applies a delivery operation.
 
 ## MVP catalog flow
 
@@ -107,6 +109,26 @@ node src/cli.js skill search keyboard --catalog ./.skills-platform/catalog \
 node src/cli.js skill revisions lineage_example --registry ./.skills-platform/registry
 node src/cli.js skill diff lineage_example revision_old revision_new \
   --registry ./.skills-platform/registry
+```
+
+## Structured feedback and health
+
+Feedback is append-only evidence tied to a skill lineage and, where relevant,
+to a project, immutable revision, template, or activation run. It does not
+silently modify source content or selection policy.
+
+```bash
+# Record a reviewed evaluation with explicit counters.
+node src/cli.js skill feedback add lineage_example \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
+  --scope project --project-id demo --outcome success --evidence evaluation \
+  --summary "The task completed with the expected checks." \
+  --metrics '{"attempted":1,"successful":1}'
+
+# See the outcome/evidence breakdown, supplied counters, success rate, and
+# conservative healthy / needs_review / unknown state.
+node src/cli.js skill feedback summary lineage_example \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry
 ```
 
 ## Versioned preset templates

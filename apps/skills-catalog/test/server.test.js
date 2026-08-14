@@ -62,6 +62,22 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(preview.plan.operations[0].skill_name, "planning");
   assert.deepEqual(history.history, []);
 
+  const createdFeedback = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/feedback`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      scope: "project",
+      project_id: "demo",
+      outcome: "success",
+      evidence_type: "evaluation",
+      summary: "Planning output covered the expected constraints.",
+      metrics: { attempted: 1, successful: 1 },
+    }),
+  })).json();
+  const feedbackSummary = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/feedback-summary`)).json();
+  assert.equal(createdFeedback.feedback.outcome, "success");
+  assert.equal(feedbackSummary.reported_metrics.successful, 1);
+
   const recorded = await (await fetch(`${base}/projects/demo/activation-plan`, {
     method: "POST",
     headers: { "content-type": "application/json" },

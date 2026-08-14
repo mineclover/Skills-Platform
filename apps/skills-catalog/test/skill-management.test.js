@@ -5,14 +5,17 @@ const path = require("node:path");
 const test = require("node:test");
 const {
   addSkillNote,
+  addSkillFeedback,
   buildSystemPrompt,
   createPreset,
   createProject,
   deleteSkillNote,
   editSkillNote,
   getSkillProfile,
+  getSkillFeedbackSummary,
   importLocalSource,
   listSkillNotes,
+  listSkillFeedback,
   searchSkills,
   restoreSkillNote,
   updateSkillProfile,
@@ -145,4 +148,50 @@ test("prompt export includes only explicitly enabled notes for the requested con
   assert.doesNotMatch(withoutNotes.content, /keyboard checklist/);
   assert.match(withNotes.content, /keyboard checklist/);
   assert.doesNotMatch(withNotes.content, /Internal discussion/);
+});
+
+test("structured feedback retains evidence context and exposes an evidence-based health summary", async (context) => {
+  const { catalogRoot, imported, registryRoot, sourceRoot } = await fixture(context);
+  const skill = imported.skills[0];
+  await assert.rejects(
+    () => addSkillFeedback({
+      catalogRoot, registryRoot, lineageId: skill.lineage_id, scope: "project", summary: "Missing project target.",
+    }),
+    /project_id is required/,
+  );
+
+  const success = await addSkillFeedback({
+    catalogRoot,
+    registryRoot,
+    lineageId: skill.lineage_id,
+    scope: "project",
+    projectId: "website",
+    outcome: "success",
+    evidenceType: "evaluation",
+    summary: "The review caught the intended keyboard-navigation regression.",
+    author: "mina",
+    metrics: { attempted: 1, successful: 1 },
+  });
+  await addSkillFeedback({
+    catalogRoot,
+    registryRoot,
+    lineageId: skill.lineage_id,
+    sourceRevisionId: skill.source_revision_id,
+    scope: "revision",
+    outcome: "risk",
+    evidenceType: "incident",
+    summary: "The revision needs review before it is recommended more broadly.",
+    redaction: "redacted",
+    metrics: { risk_events: 1 },
+  });
+
+  const projectFeedback = await listSkillFeedback({ catalogRoot, lineageId: skill.lineage_id, projectId: "website" });
+  const summary = await getSkillFeedbackSummary({ catalogRoot, registryRoot, lineageId: skill.lineage_id });
+  assert.equal(projectFeedback[0].id, success.id);
+  assert.equal(summary.total_feedback, 2);
+  assert.equal(summary.by_outcome.success, 1);
+  assert.equal(summary.by_outcome.risk, 1);
+  assert.equal(summary.reported_metrics.successful, 1);
+  assert.equal(summary.health, "needs_review");
+  assert.match(await fs.readFile(path.join(sourceRoot, "SKILL.md"), "utf8"), /Review interface designs/);
 });

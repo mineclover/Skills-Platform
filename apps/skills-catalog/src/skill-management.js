@@ -4,6 +4,9 @@ const { getPreset, loadCatalog, saveCatalog } = require("./catalog-state");
 
 const NOTE_SCOPES = new Set(["global", "project", "revision", "preset", "activation_run"]);
 const NOTE_KINDS = new Set(["usage", "caveat", "decision", "dependency", "migration", "review"]);
+const FEEDBACK_OUTCOMES = new Set(["success", "correction", "scope_mismatch", "freshness", "risk", "neutral"]);
+const EVIDENCE_TYPES = new Set(["manual", "evaluation", "activation_report", "user_feedback", "incident"]);
+const REDACTION_STATES = new Set(["none", "redacted", "withheld"]);
 const RISK_LEVELS = new Set(["unknown", "low", "medium", "high", "critical"]);
 const REVIEW_STATES = new Set(["unreviewed", "reviewed", "deprecated"]);
 const VISIBILITIES = new Set(["private", "team"]);
@@ -231,6 +234,138 @@ async function listSkillNotes({ catalogRoot, lineageId, scope, projectId, preset
   }).sort((left, right) => right.updated_at.localeCompare(left.updated_at));
 }
 
+function validateFeedbackTarget(feedback) {
+  if (!NOTE_SCOPES.has(feedback.scope)) throw new Error("Feedback scope is not valid");
+  if (!FEEDBACK_OUTCOMES.has(feedback.outcome)) throw new Error("Feedback outcome is not valid");
+  if (!EVIDENCE_TYPES.has(feedback.evidence_type)) throw new Error("Feedback evidence type is not valid");
+  if (!REDACTION_STATES.has(feedback.redaction)) throw new Error("Feedback redaction state is not valid");
+  if (typeof feedback.summary !== "string" || feedback.summary.trim() === "") throw new Error("Feedback summary is required");
+  const requiredByScope = {
+    project: "project_id",
+    revision: "source_revision_id",
+    preset: "preset_id",
+    activation_run: "activation_plan_id",
+  };
+  const requiredField = requiredByScope[feedback.scope];
+  if (requiredField && (typeof feedback[requiredField] !== "string" || feedback[requiredField].trim() === "")) {
+    throw new Error(`${requiredField} is required for ${feedback.scope} feedback`);
+  }
+}
+
+function normalizeFeedbackMetrics(metrics) {
+  if (metrics === undefined || metrics === null) return {};
+  if (!metrics || typeof metrics !== "object" || Array.isArray(metrics)) throw new Error("Feedback metrics must be an object");
+  const normalized = {};
+  for (const field of ["attempted", "successful", "corrections", "scope_mismatches", "freshness_issues", "risk_events"]) {
+    if (metrics[field] === undefined) continue;
+    const value = Number(metrics[field]);
+    if (!Number.isInteger(value) || value < 0) throw new Error(`Feedback metric ${field} must be a non-negative integer`);
+    normalized[field] = value;
+  }
+  for (const field of Object.keys(metrics)) {
+    if (!(field in normalized)) throw new Error(`Feedback metric is not supported: ${field}`);
+  }
+  return normalized;
+}
+
+async function addSkillFeedback({
+  catalogRoot,
+  registryRoot,
+  lineageId,
+  scope = "global",
+  outcome = "neutral",
+  evidenceType = "manual",
+  summary,
+  details = null,
+  author = "local",
+  projectId = null,
+  sourceRevisionId = null,
+  presetId = null,
+  activationPlanId = null,
+  redaction = "none",
+  metrics,
+}) {
+  await getSkillLineage(registryRoot, lineageId);
+  const feedback = {
+    id: `feedback_${crypto.randomUUID()}`,
+    lineage_id: lineageId,
+    scope,
+    outcome,
+    evidence_type: evidenceType,
+    summary: typeof summary === "string" ? summary.trim() : summary,
+    details: optionalText(details, "details"),
+    author: typeof author === "string" && author.trim() ? author.trim() : "local",
+    project_id: projectId,
+    source_revision_id: sourceRevisionId,
+    preset_id: presetId,
+    activation_plan_id: activationPlanId,
+    redaction,
+    metrics: normalizeFeedbackMetrics(metrics),
+    created_at: timestamp(),
+  };
+  validateFeedbackTarget(feedback);
+  const catalog = await loadCatalog(catalogRoot);
+  if (feedback.scope === "project" && !catalog.projects.some((project) => project.id === feedback.project_id)) {
+    throw new Error(`Project not found for feedback: ${feedback.project_id}`);
+  }
+  if (feedback.scope === "preset") await getPreset(catalogRoot, feedback.preset_id);
+  if (feedback.scope === "revision") await getSourceRevision(registryRoot, feedback.source_revision_id);
+  if (feedback.scope === "activation_run" && !catalog.activation_plans.some((plan) => plan.plan_id === feedback.activation_plan_id)) {
+    throw new Error(`Activation plan not found for feedback: ${feedback.activation_plan_id}`);
+  }
+  catalog.skill_feedback.push(feedback);
+  await saveCatalog(catalogRoot, catalog);
+  return feedback;
+}
+
+async function listSkillFeedback({ catalogRoot, lineageId, scope, outcome, evidenceType, projectId, presetId, sourceRevisionId, activationPlanId }) {
+  const catalog = await loadCatalog(catalogRoot);
+  return catalog.skill_feedback.filter((feedback) => {
+    if (lineageId && feedback.lineage_id !== lineageId) return false;
+    if (scope && feedback.scope !== scope) return false;
+    if (outcome && feedback.outcome !== outcome) return false;
+    if (evidenceType && feedback.evidence_type !== evidenceType) return false;
+    if (projectId && feedback.project_id !== projectId) return false;
+    if (presetId && feedback.preset_id !== presetId) return false;
+    if (sourceRevisionId && feedback.source_revision_id !== sourceRevisionId) return false;
+    if (activationPlanId && feedback.activation_plan_id !== activationPlanId) return false;
+    return true;
+  }).sort((left, right) => right.created_at.localeCompare(left.created_at));
+}
+
+function emptyCounts(keys) {
+  return Object.fromEntries([...keys].sort().map((key) => [key, 0]));
+}
+
+async function getSkillFeedbackSummary({ catalogRoot, registryRoot, lineageId, projectId, sourceRevisionId }) {
+  await getSkillLineage(registryRoot, lineageId);
+  const feedback = await listSkillFeedback({ catalogRoot, lineageId, projectId, sourceRevisionId });
+  const byOutcome = emptyCounts(FEEDBACK_OUTCOMES);
+  const byEvidenceType = emptyCounts(EVIDENCE_TYPES);
+  const reportedMetrics = { attempted: 0, successful: 0, corrections: 0, scope_mismatches: 0, freshness_issues: 0, risk_events: 0 };
+  for (const item of feedback) {
+    byOutcome[item.outcome] += 1;
+    byEvidenceType[item.evidence_type] += 1;
+    for (const [name, value] of Object.entries(item.metrics ?? {})) reportedMetrics[name] += value;
+  }
+  const signalCount = byOutcome.success + byOutcome.correction + byOutcome.scope_mismatch + byOutcome.freshness + byOutcome.risk;
+  const successRate = signalCount === 0 ? null : Number((byOutcome.success / signalCount).toFixed(3));
+  const health = feedback.length === 0 ? "unknown"
+    : (byOutcome.risk > 0 || byOutcome.scope_mismatch > byOutcome.success || byOutcome.freshness > byOutcome.success ? "needs_review" : "healthy");
+  return {
+    lineage_id: lineageId,
+    project_id: projectId ?? null,
+    source_revision_id: sourceRevisionId ?? null,
+    total_feedback: feedback.length,
+    by_outcome: byOutcome,
+    by_evidence_type: byEvidenceType,
+    reported_metrics: reportedMetrics,
+    success_rate: successRate,
+    health,
+    latest_feedback_at: feedback[0]?.created_at ?? null,
+  };
+}
+
 async function searchSkills({ catalogRoot, registryRoot, query = "", tags = [], domains = [], providerId, reviewState }) {
   const [catalog, context] = await Promise.all([loadCatalog(catalogRoot), skillContext(registryRoot)]);
   const queryText = query.trim().toLocaleLowerCase();
@@ -271,13 +406,19 @@ async function searchSkills({ catalogRoot, registryRoot, query = "", tags = [], 
 module.exports = {
   NOTE_KINDS,
   NOTE_SCOPES,
+  EVIDENCE_TYPES,
+  FEEDBACK_OUTCOMES,
+  REDACTION_STATES,
   REVIEW_STATES,
   RISK_LEVELS,
   VISIBILITIES,
+  addSkillFeedback,
   addSkillNote,
   deleteSkillNote,
   editSkillNote,
   getSkillProfile,
+  getSkillFeedbackSummary,
+  listSkillFeedback,
   listSkillNotes,
   searchSkills,
   restoreSkillNote,

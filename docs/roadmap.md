@@ -76,6 +76,27 @@ Rules:
 4. Notes retain edit history and recoverable deletion.
 5. Only explicitly marked notes may be added to a system-prompt export.
 
+### 3.3 Feedback is structured evidence
+
+Feedback is append-only evidence rather than an unscoped rating. Every record
+belongs to a skill lineage and can be narrowed to a project, source revision,
+preset, or activation run.
+
+```text
+SkillFeedback
+- id, skill_lineage_id, scope and the matching target identifier
+- outcome: success | correction | scope_mismatch | freshness | risk | neutral
+- evidence_type: manual | evaluation | activation_report | user_feedback | incident
+- summary, optional details, author, created_at, redaction state
+- optional counters: attempted, successful, corrections, scope_mismatches,
+  freshness_issues, risk_events
+```
+
+The default summary exposes outcome/evidence counts, supplied counters,
+success rate across non-neutral signals, latest evidence, and a conservative
+`healthy` / `needs_review` / `unknown` health state. It never changes preset
+policy automatically.
+
 ## 4. Preset templates
 
 A template replaces a loose collection of toggles with reusable and explainable
@@ -226,6 +247,11 @@ every active skill.
 ### Phase 6 — Evaluation and continuous improvement
 
 **Goal:** recommend and improve skills from evidence, not installation count.
+
+> Status: Structured feedback records, evidence/redaction conventions, numeric
+> counters, and per-lineage health summaries are available through the Catalog
+> CLI and local bridge. Evaluation-case execution, revision comparisons, and a
+> review queue remain.
 
 - Structured feedback with evidence type and redaction.
 - Evaluation cases and per-revision outcomes.

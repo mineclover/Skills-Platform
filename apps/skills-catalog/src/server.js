@@ -2,6 +2,7 @@ const http = require("node:http");
 const { URL } = require("node:url");
 const { listActivationHistory, listProjects, recordActivationPlan, recordActivationReport } = require("./catalog-state");
 const { createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
+const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -51,6 +52,48 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
     try {
       if (request.method === "GET" && url.pathname === "/api/projects") {
         return json(response, 200, { projects: await listProjects(catalogRoot) });
+      }
+      const feedback = url.pathname.match(/^\/api\/skills\/([^/]+)\/feedback$/);
+      if (feedback && request.method === "GET") {
+        return json(response, 200, { feedback: await listSkillFeedback({
+          catalogRoot,
+          lineageId: decodeURIComponent(feedback[1]),
+          scope: url.searchParams.get("scope") ?? undefined,
+          outcome: url.searchParams.get("outcome") ?? undefined,
+          evidenceType: url.searchParams.get("evidence_type") ?? undefined,
+          projectId: url.searchParams.get("project_id") ?? undefined,
+          sourceRevisionId: url.searchParams.get("source_revision_id") ?? undefined,
+        }) });
+      }
+      if (feedback && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { feedback: await addSkillFeedback({
+          catalogRoot,
+          registryRoot,
+          lineageId: decodeURIComponent(feedback[1]),
+          scope: body.scope,
+          outcome: body.outcome,
+          evidenceType: body.evidence_type,
+          summary: body.summary,
+          details: body.details,
+          author: body.author,
+          projectId: body.project_id,
+          sourceRevisionId: body.source_revision_id,
+          presetId: body.preset_id,
+          activationPlanId: body.activation_plan_id,
+          redaction: body.redaction,
+          metrics: body.metrics,
+        }) });
+      }
+      const feedbackSummary = url.pathname.match(/^\/api\/skills\/([^/]+)\/feedback-summary$/);
+      if (feedbackSummary && request.method === "GET") {
+        return json(response, 200, await getSkillFeedbackSummary({
+          catalogRoot,
+          registryRoot,
+          lineageId: decodeURIComponent(feedbackSummary[1]),
+          projectId: url.searchParams.get("project_id") ?? undefined,
+          sourceRevisionId: url.searchParams.get("source_revision_id") ?? undefined,
+        }));
       }
       const effective = url.pathname.match(/^\/api\/projects\/([^/]+)\/effective-set$/);
       if (request.method === "GET" && effective) {

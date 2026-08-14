@@ -5,7 +5,7 @@ const { validateActivationPlan } = require("../../../packages/skill-contracts/sr
 
 const crypto = require("node:crypto");
 
-const CATALOG_SCHEMA_VERSION = 5;
+const CATALOG_SCHEMA_VERSION = 6;
 const PRISTINE_PRESET_ID = "builtin-pristine";
 const TEMPLATE_LIFECYCLES = new Set(["draft", "reviewed", "deprecated"]);
 const PROJECT_PRESET_ROLES = new Set(["default", "recommended", "work_scope_overlay"]);
@@ -25,6 +25,7 @@ function blankCatalog() {
     presets: [],
     skill_profiles: [],
     skill_notes: [],
+    skill_feedback: [],
     activation_plans: [],
     activation_reports: [],
   };
@@ -113,13 +114,14 @@ function presentPreset(preset, version = preset.active_version) {
 }
 
 function normalizeCatalog(catalog) {
-  if (![1, 2, 3, 4, CATALOG_SCHEMA_VERSION].includes(catalog.schema_version)) {
+  if (![1, 2, 3, 4, 5, CATALOG_SCHEMA_VERSION].includes(catalog.schema_version)) {
     throw new Error(`Unsupported catalog schema: ${catalog.schema_version}`);
   }
   catalog.projects = (catalog.projects ?? []).map(normalizeProject);
   catalog.presets = (catalog.presets ?? []).map(normalizePreset);
   catalog.skill_profiles ??= [];
   catalog.skill_notes ??= [];
+  catalog.skill_feedback ??= [];
   catalog.activation_plans ??= [];
   catalog.activation_reports ??= [];
   catalog.schema_version = CATALOG_SCHEMA_VERSION;

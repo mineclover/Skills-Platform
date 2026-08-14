@@ -3,6 +3,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const {
   createPlanFromRegistry,
+  addSkillFeedback,
   addPresetTemplateNote,
   addSkillNote,
   deleteSkillNote,
@@ -10,6 +11,7 @@ const {
   editSkillNote,
   getPreset,
   getSkillProfile,
+  getSkillFeedbackSummary,
   createPreset,
   createProject,
   createProjectPlan,
@@ -28,6 +30,7 @@ const {
   listSourceUpdateCandidates,
   listSkillRevisions,
   listSkillNotes,
+  listSkillFeedback,
   listActivationHistory,
   recordActivationPlan,
   recordActivationReport,
@@ -96,6 +99,8 @@ function usage() {
     "  skills-catalog skill note add <lineage-id> --body <text> [--scope <scope>] [--kind <kind>]",
     "  skills-catalog skill note list [--lineage <id>] | skill note edit <note-id> --body <text>",
     "  skills-catalog skill note delete|restore <note-id>",
+    "  skills-catalog skill feedback add <lineage-id> --summary <text> [--outcome <outcome>] [--evidence <type>]",
+    "  skills-catalog skill feedback list [--lineage <id>] | skill feedback summary <lineage-id>",
     "  skills-catalog plan --skill <registry-skill-id>... --provider <id> --delivery-root <path>",
     "      [--registry <path>] [--project-id <id> --project-path <path> | --global] [--copy]",
   ].join("\n");
@@ -238,6 +243,57 @@ async function run(argv) {
       }
       if (action === "delete") return deleteSkillNote({ catalogRoot, noteId: subject, author: flags.author });
       if (action === "restore") return restoreSkillNote({ catalogRoot, noteId: subject });
+    }
+    if (area === "feedback") {
+      if (action === "add") {
+        let metrics;
+        if (flags.metrics !== undefined) {
+          try {
+            metrics = JSON.parse(flags.metrics);
+          } catch {
+            throw new Error("Feedback metrics must be valid JSON");
+          }
+        }
+        return addSkillFeedback({
+          catalogRoot,
+          registryRoot,
+          lineageId: subject,
+          summary: flags.summary,
+          details: flags.details,
+          scope: flags.scope,
+          outcome: flags.outcome,
+          evidenceType: flags.evidence,
+          author: flags.author,
+          projectId: flags["project-id"],
+          sourceRevisionId: flags["source-revision-id"],
+          presetId: flags["preset-id"],
+          activationPlanId: flags["activation-plan-id"],
+          redaction: flags.redaction,
+          metrics,
+        });
+      }
+      if (action === "list") {
+        return listSkillFeedback({
+          catalogRoot,
+          lineageId: flags.lineage,
+          scope: flags.scope,
+          outcome: flags.outcome,
+          evidenceType: flags.evidence,
+          projectId: flags["project-id"],
+          sourceRevisionId: flags["source-revision-id"],
+          presetId: flags["preset-id"],
+          activationPlanId: flags["activation-plan-id"],
+        });
+      }
+      if (action === "summary") {
+        return getSkillFeedbackSummary({
+          catalogRoot,
+          registryRoot,
+          lineageId: subject,
+          projectId: flags["project-id"],
+          sourceRevisionId: flags["source-revision-id"],
+        });
+      }
     }
   }
 

@@ -67,6 +67,29 @@ test("CLI manages a skill profile, scoped note, and metadata search", async (con
   assert.equal(found[0].lineage.id, lineageId);
 });
 
+test("CLI records structured feedback and reads its health summary", async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-catalog-cli-feedback-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const sourcePath = path.join(root, "source", "demo");
+  const registryRoot = path.join(root, "registry");
+  const catalogRoot = path.join(root, "catalog");
+  await fs.mkdir(sourcePath, { recursive: true });
+  await fs.writeFile(path.join(sourcePath, "SKILL.md"), "---\nname: demo-skill\ndescription: Demo workflow.\n---\n\n# Demo skill\n");
+  const imported = await run(["import-local", path.join(root, "source"), "--registry", registryRoot]);
+  const lineageId = imported.skills[0].lineage_id;
+
+  const feedback = await run([
+    "skill", "feedback", "add", lineageId, "--catalog", catalogRoot, "--registry", registryRoot,
+    "--outcome", "success", "--evidence", "evaluation", "--summary", "Expected checks passed.",
+    "--metrics", '{"attempted":1,"successful":1}',
+  ]);
+  const summary = await run(["skill", "feedback", "summary", lineageId, "--catalog", catalogRoot, "--registry", registryRoot]);
+
+  assert.equal(feedback.evidence_type, "evaluation");
+  assert.equal(summary.health, "healthy");
+  assert.equal(summary.reported_metrics.attempted, 1);
+});
+
 test("CLI versions and annotates preset templates", async (context) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-catalog-cli-template-"));
   context.after(() => fs.rm(root, { recursive: true, force: true }));
