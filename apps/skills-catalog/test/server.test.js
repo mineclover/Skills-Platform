@@ -125,4 +125,17 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   const updatedHistory = await (await fetch(`${base}/projects/demo/history`)).json();
   assert.equal(report.report.plan_id, recorded.plan.plan_id);
   assert.equal(updatedHistory.history[0].reports.length, 1);
+
+  const observed = await (await fetch(`${base}/projects/demo/observed-state`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      provider_id: "codex",
+      inventory: { checked_at: 1, providers: [{ provider_id: "codex", detected: true, reachable: true }], orca: {} },
+      bindings: [{ provider_id: "codex", state: "enabled", target_path: recorded.plan.operations[0].delivery_path }],
+    }),
+  })).json();
+  const observedComparison = await (await fetch(`${base}/activation-plans/${recorded.plan.plan_id}/observed-state-comparison`)).json();
+  assert.equal(observed.observed_state.project_id, "demo");
+  assert.equal(observedComparison.in_sync, true);
 });

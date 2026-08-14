@@ -3,6 +3,7 @@ module.exports = {
   ...require("./catalog-state"),
   ...require("./catalog-workflows"),
   ...require("./evaluation"),
+  ...require("./observed-state"),
   ...require("./registry"),
   ...require("./skill-management"),
   ...require("./server"),

@@ -57,7 +57,10 @@ its aggregate health indicators. `GET|POST /api/evaluation-cases` and
 `GET|POST /api/evaluation-cases/:id/runs` manage revision-pinned evaluation
 evidence; `GET /api/skills/:lineage/evaluation-summary` and `GET
 /api/review-queue` expose derived evaluation and review state. None of these
-endpoints applies a delivery operation.
+endpoints applies a delivery operation. `GET|POST
+/api/projects/:id/observed-state` retains provider snapshots, while `GET
+/api/activation-plans/:id/observed-state-comparison` compares a pinned plan
+with the latest matching snapshot.
 
 ## MVP catalog flow
 
@@ -161,6 +164,30 @@ node src/cli.js evaluation run record review-contract \
 node src/cli.js review queue --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry
 ```
+
+## Skills Manager observed state
+
+The existing Skills Manager remains an independent upstream application. Its
+`skills-manager-inspect` CLI can produce provider and binding snapshots without
+changing delivery state; Catalog retains those snapshots and compares them with
+an immutable recorded plan.
+
+```bash
+# Run these from the upstream Skills Manager checkout.
+npm run inspect -- providers --project <manager-project-id> --json > providers.json
+npm run inspect -- bindings --project <manager-project-id> --provider codex --json > bindings.json
+
+# Record the observation against the Catalog project, then check for drift.
+node src/cli.js observed-state record demo \
+  --catalog ./.skills-platform/catalog --provider codex \
+  --inventory ./providers.json --bindings ./bindings.json
+node src/cli.js observed-state compare <catalog-plan-id> \
+  --catalog ./.skills-platform/catalog
+```
+
+Comparison is observational: it reports `matched`, `missing`, `disabled`,
+`still_enabled`, `conflict`, or `provider_unavailable`. It never changes the
+upstream Skills Manager, the registry, or an agent delivery path.
 
 ## Versioned preset templates
 

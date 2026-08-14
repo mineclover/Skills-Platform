@@ -212,8 +212,10 @@ to `Pristine` safely.
 it a registry.
 
 > Status: Reference adapter now emits preview, operation-progress, and complete
-> events in a stable NDJSON form. Existing Skills Manager app integration and
-> provider inventory mapping remain.
+> events in a stable NDJSON form. Catalog can now retain immutable snapshots
+> from the upstream Skills Manager `providers --json` / `bindings --json`
+> inspection interface and compare them against a recorded pinned plan. Direct
+> plan apply through the upstream app remains.
 
 - Embed plan validation in Skills Manager commands.
 - Add local plan import/preview/apply and stable activation-report event stream.

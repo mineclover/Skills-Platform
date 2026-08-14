@@ -19,6 +19,7 @@ const {
   createProjectPlan,
   clonePresetTemplate,
   comparePresetVersions,
+  compareRecordedPlanWithObservedState,
   defaultRegistryRoot,
   buildSystemPrompt,
   assignPreset,
@@ -36,6 +37,7 @@ const {
   listEvaluationCases,
   listEvaluationRuns,
   listReviewQueue,
+  listObservedStates,
   listActivationHistory,
   recordActivationPlan,
   recordActivationReport,
@@ -44,6 +46,7 @@ const {
   startCatalogServer,
   restoreSkillNote,
   recordEvaluationRun,
+  recordObservedState,
   resolveProjectEffectiveSet,
   updateSkillProfile,
   updateEvaluationCase,
@@ -111,6 +114,8 @@ function usage() {
     "  skills-catalog evaluation case create <id> --lineage <id> --name <name> --objective <text> --criterion <text>...",
     "  skills-catalog evaluation case list [--lineage <id>] | evaluation run record <case-id> --revision <id> --outcome <outcome>",
     "      --summary <text> --criterion-results <json> | evaluation summary <lineage-id> | review queue",
+    "  skills-catalog observed-state record <project-id> --provider <id> --inventory <file> --bindings <file>",
+    "      | observed-state list [--project-id <id>] | observed-state compare <plan-id>",
     "  skills-catalog plan --skill <registry-skill-id>... --provider <id> --delivery-root <path>",
     "      [--registry <path>] [--project-id <id> --project-path <path> | --global] [--copy]",
   ].join("\n");
@@ -375,6 +380,28 @@ async function run(argv) {
   }
 
   if (command === "review" && sourcePath === "queue") return listReviewQueue({ catalogRoot, registryRoot });
+
+  if (command === "observed-state") {
+    const [action, subject] = positional.slice(1);
+    if (action === "record") {
+      if (!flags.inventory || !flags.bindings) throw new Error("observed-state record requires --inventory and --bindings JSON files");
+      const [inventory, bindings] = await Promise.all([
+        fs.readFile(path.resolve(flags.inventory), "utf8").then(JSON.parse),
+        fs.readFile(path.resolve(flags.bindings), "utf8").then(JSON.parse),
+      ]);
+      return recordObservedState({
+        catalogRoot,
+        projectId: subject,
+        providerId: flags.provider?.[0],
+        inventory,
+        bindings,
+        capturedAt: flags["captured-at"],
+        source: flags.source,
+      });
+    }
+    if (action === "list") return listObservedStates({ catalogRoot, projectId: flags["project-id"], providerId: flags.provider?.[0] });
+    if (action === "compare") return compareRecordedPlanWithObservedState({ catalogRoot, planId: subject, observedStateId: flags["observed-state-id"] });
+  }
 
   if (command === "project") {
     const [action, projectId] = positional.slice(1);

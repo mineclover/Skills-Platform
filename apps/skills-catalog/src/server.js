@@ -4,6 +4,7 @@ const { listActivationHistory, listProjects, recordActivationPlan, recordActivat
 const { createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
+const { compareRecordedPlanWithObservedState, listObservedStates, recordObservedState } = require("./observed-state");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -171,6 +172,26 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
           projectId: decodeURIComponent(history[1]),
         }) });
       }
+      const observedState = url.pathname.match(/^\/api\/projects\/([^/]+)\/observed-state$/);
+      if (observedState && request.method === "GET") {
+        return json(response, 200, { observed_states: await listObservedStates({
+          catalogRoot,
+          projectId: decodeURIComponent(observedState[1]),
+          providerId: url.searchParams.get("provider_id") ?? undefined,
+        }) });
+      }
+      if (observedState && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { observed_state: await recordObservedState({
+          catalogRoot,
+          projectId: decodeURIComponent(observedState[1]),
+          providerId: body.provider_id,
+          inventory: body.inventory,
+          bindings: body.bindings,
+          capturedAt: body.captured_at,
+          source: body.source,
+        }) });
+      }
       const preview = url.pathname.match(/^\/api\/projects\/([^/]+)\/activation-plan\/preview$/);
       if (request.method === "POST" && preview) {
         const body = await parseJsonBody(request);
@@ -206,6 +227,14 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
           planId: decodeURIComponent(report[1]),
           report: body,
         }) });
+      }
+      const observedComparison = url.pathname.match(/^\/api\/activation-plans\/([^/]+)\/observed-state-comparison$/);
+      if (observedComparison && request.method === "GET") {
+        return json(response, 200, await compareRecordedPlanWithObservedState({
+          catalogRoot,
+          planId: decodeURIComponent(observedComparison[1]),
+          observedStateId: url.searchParams.get("observed_state_id") ?? undefined,
+        }));
       }
       return json(response, 404, { error: "Not found" });
     } catch (error) {
