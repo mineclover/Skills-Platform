@@ -77,6 +77,12 @@ the Projects inspector displays the upstream CLI stages—inspect, revision
 resolution, preview, binding apply, and verification—using the bridge's
 progress stream.
 
+Skills can also add global usage/caveat/dependency notes and explicitly mark a
+note for system-prompt injection. Its evaluation card reports the active-case
+coverage, pass rate, and latest outcome for the current immutable revision;
+the detailed evaluation-case authoring workflow remains available in the
+Catalog CLI.
+
 When connected to the local bridge, the same inspector can pin any registered
 template—including `Pristine`—as that project's default. This changes only the
 Catalog project-policy record; it does not apply a delivery plan or repin any

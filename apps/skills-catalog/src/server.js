@@ -2,7 +2,7 @@ const http = require("node:http");
 const { URL } = require("node:url");
 const { assignPreset, createPreset, getProject, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay, updatePresetTemplate } = require("./catalog-state");
 const { buildProjectSystemPrompt, createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
-const { addSkillFeedback, getSkillFeedbackSummary, getSkillProfile, listSkillFeedback, searchSkills, updateSkillProfile } = require("./skill-management");
+const { addSkillFeedback, addSkillNote, getSkillFeedbackSummary, getSkillProfile, listSkillFeedback, listSkillNotes, searchSkills, updateSkillProfile } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
 const { compareRecordedPlanWithObservedState, listObservedStates, recordObservedState } = require("./observed-state");
 const { adoptApprovedRevisionIntoPreset, latestSourceReview, listSourceAdoptionCandidates, recordSourceReview } = require("./source-review");
@@ -257,6 +257,35 @@ function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = cr
           activationPlanId: body.activation_plan_id,
           redaction: body.redaction,
           metrics: body.metrics,
+        }) });
+      }
+      const notes = url.pathname.match(/^\/api\/skills\/([^/]+)\/notes$/);
+      if (notes && request.method === "GET") {
+        return json(response, 200, { notes: await listSkillNotes({
+          catalogRoot,
+          lineageId: decodeURIComponent(notes[1]),
+          scope: url.searchParams.get("scope") ?? undefined,
+          projectId: url.searchParams.get("project_id") ?? undefined,
+          presetId: url.searchParams.get("preset_id") ?? undefined,
+          sourceRevisionId: url.searchParams.get("source_revision_id") ?? undefined,
+        }) });
+      }
+      if (notes && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { note: await addSkillNote({
+          catalogRoot,
+          registryRoot,
+          lineageId: decodeURIComponent(notes[1]),
+          scope: body.scope,
+          kind: body.kind,
+          body: body.body,
+          author: body.author,
+          projectId: body.project_id,
+          sourceRevisionId: body.source_revision_id,
+          presetId: body.preset_id,
+          activationPlanId: body.activation_plan_id,
+          visibility: body.visibility,
+          injectIntoPrompt: body.inject_into_prompt === true,
         }) });
       }
       const skillProfile = url.pathname.match(/^\/api\/skills\/([^/]+)\/profile$/);

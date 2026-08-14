@@ -74,6 +74,14 @@ type FeedbackSummary = {
   by_outcome: Record<string, number>;
   latest_feedback_at: string | null;
 };
+type SkillNote = { id: string; kind: string; body: string; inject_into_prompt: boolean; updated_at: string };
+type EvaluationSummary = {
+  active_case_count: number;
+  evaluated_active_case_count: number;
+  total_runs: number;
+  pass_rate: number | null;
+  latest_outcome: string | null;
+};
 type ApplyProgress = { stage: string; completed: number; total: number; message: string };
 type ApplyResult = { status: string; report: { summary: { applied: number; skipped: number; failed: number } }; error?: string };
 
@@ -174,7 +182,7 @@ function SideNavigation({ activePage, onNavigate }: { activePage: string; onNavi
   );
 }
 
-function SkillWorkspace({ skills, selectedLineageId, onSelect, onSave, saving, feedback, feedbackSummary, loadingEvidence, recordingFeedback, onRecordFeedback }: {
+function SkillWorkspace({ skills, selectedLineageId, onSelect, onSave, saving, feedback, feedbackSummary, notes, evaluationSummary, loadingEvidence, recordingFeedback, recordingNote, onRecordFeedback, onAddNote }: {
   skills: CatalogSkill[];
   selectedLineageId: string | null;
   onSelect: (lineageId: string) => void;
@@ -182,9 +190,13 @@ function SkillWorkspace({ skills, selectedLineageId, onSelect, onSave, saving, f
   saving: boolean;
   feedback: SkillFeedback[];
   feedbackSummary: FeedbackSummary | null;
+  notes: SkillNote[];
+  evaluationSummary: EvaluationSummary | null;
   loadingEvidence: boolean;
   recordingFeedback: boolean;
+  recordingNote: boolean;
   onRecordFeedback: (lineageId: string, patch: { outcome: string; evidence_type: string; summary: string }) => void;
+  onAddNote: (lineageId: string, patch: { kind: string; body: string; inject_into_prompt: boolean }) => void;
 }) {
   const [query, setQuery] = useState("");
   const selected = skills.find((skill) => skill.lineage.id === selectedLineageId) ?? skills[0] ?? null;
@@ -194,6 +206,9 @@ function SkillWorkspace({ skills, selectedLineageId, onSelect, onSave, saving, f
   const [feedbackOutcome, setFeedbackOutcome] = useState("success");
   const [feedbackEvidence, setFeedbackEvidence] = useState("manual");
   const [feedbackText, setFeedbackText] = useState("");
+  const [noteKind, setNoteKind] = useState("usage");
+  const [noteText, setNoteText] = useState("");
+  const [injectNote, setInjectNote] = useState(false);
   useEffect(() => {
     setPurpose(selected?.profile.purpose ?? "");
     setUseWhen(selected?.profile.use_when.join(", ") ?? "");
@@ -215,7 +230,7 @@ function SkillWorkspace({ skills, selectedLineageId, onSelect, onSave, saving, f
         <label className="template-field">Use when <input value={useWhen} onChange={(event) => setUseWhen(event.target.value)} placeholder="Before implementation, during review" /><small>Separate conditions with commas.</small></label>
         <label className="template-field">Review state<select value={reviewState} onChange={(event) => setReviewState(event.target.value as typeof reviewState)}><option value="unreviewed">Unreviewed</option><option value="reviewed">Reviewed</option><option value="deprecated">Deprecated</option></select></label>
         <button className="primary-action skill-save" type="submit" disabled={saving}>{saving ? <LoaderCircle size={20} className="spin" /> : <Check size={20} />}{saving ? "Saving skill…" : "Save skill profile"}</button>
-      </form><section className="skill-feedback"><div className="skill-feedback-heading"><div><p className="section-label">Feedback health</p><strong>{loadingEvidence ? "Loading evidence…" : feedbackSummary?.health.replaceAll("_", " ") ?? "Unknown"}</strong><small>{feedbackSummary ? `${feedbackSummary.total_feedback} records${feedbackSummary.success_rate === null ? "" : ` · ${Math.round(feedbackSummary.success_rate * 100)}% success`}` : "No feedback recorded"}</small></div><span className={`review-decision ${feedbackSummary?.health ?? "unknown"}`}>{feedbackSummary?.health ?? "unknown"}</span></div><form className="feedback-form" onSubmit={(event) => { event.preventDefault(); if (!feedbackText.trim()) return; onRecordFeedback(selected.lineage.id, { outcome: feedbackOutcome, evidence_type: feedbackEvidence, summary: feedbackText.trim() }); setFeedbackText(""); }}><label className="template-field">Outcome<select value={feedbackOutcome} onChange={(event) => setFeedbackOutcome(event.target.value)}><option value="success">Success</option><option value="correction">Correction</option><option value="scope_mismatch">Scope mismatch</option><option value="freshness">Freshness</option><option value="risk">Risk</option><option value="neutral">Neutral</option></select></label><label className="template-field">Evidence<select value={feedbackEvidence} onChange={(event) => setFeedbackEvidence(event.target.value)}><option value="manual">Manual</option><option value="evaluation">Evaluation</option><option value="activation_report">Activation report</option><option value="user_feedback">User feedback</option><option value="incident">Incident</option></select></label><label className="template-field feedback-summary-field">Summary<input value={feedbackText} onChange={(event) => setFeedbackText(event.target.value)} placeholder="What happened and what should be retained" /></label><button className="quiet-action feedback-save" type="submit" disabled={recordingFeedback || !feedbackText.trim()}>{recordingFeedback ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{recordingFeedback ? "Recording…" : "Record feedback"}</button></form>{feedback.length ? <div className="feedback-history">{feedback.slice(0, 3).map((item) => <div key={item.id}><span>{item.outcome.replaceAll("_", " ")}</span><p>{item.summary}</p><small>{item.evidence_type.replaceAll("_", " ")}</small></div>)}</div> : null}</section></div> : null}
+      </form><section className="skill-feedback"><div className="skill-feedback-heading"><div><p className="section-label">Feedback health</p><strong>{loadingEvidence ? "Loading evidence…" : feedbackSummary?.health.replaceAll("_", " ") ?? "Unknown"}</strong><small>{feedbackSummary ? `${feedbackSummary.total_feedback} records${feedbackSummary.success_rate === null ? "" : ` · ${Math.round(feedbackSummary.success_rate * 100)}% success`}` : "No feedback recorded"}</small></div><span className={`review-decision ${feedbackSummary?.health ?? "unknown"}`}>{feedbackSummary?.health ?? "unknown"}</span></div><form className="feedback-form" onSubmit={(event) => { event.preventDefault(); if (!feedbackText.trim()) return; onRecordFeedback(selected.lineage.id, { outcome: feedbackOutcome, evidence_type: feedbackEvidence, summary: feedbackText.trim() }); setFeedbackText(""); }}><label className="template-field">Outcome<select value={feedbackOutcome} onChange={(event) => setFeedbackOutcome(event.target.value)}><option value="success">Success</option><option value="correction">Correction</option><option value="scope_mismatch">Scope mismatch</option><option value="freshness">Freshness</option><option value="risk">Risk</option><option value="neutral">Neutral</option></select></label><label className="template-field">Evidence<select value={feedbackEvidence} onChange={(event) => setFeedbackEvidence(event.target.value)}><option value="manual">Manual</option><option value="evaluation">Evaluation</option><option value="activation_report">Activation report</option><option value="user_feedback">User feedback</option><option value="incident">Incident</option></select></label><label className="template-field feedback-summary-field">Summary<input value={feedbackText} onChange={(event) => setFeedbackText(event.target.value)} placeholder="What happened and what should be retained" /></label><button className="quiet-action feedback-save" type="submit" disabled={recordingFeedback || !feedbackText.trim()}>{recordingFeedback ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{recordingFeedback ? "Recording…" : "Record feedback"}</button></form>{feedback.length ? <div className="feedback-history">{feedback.slice(0, 3).map((item) => <div key={item.id}><span>{item.outcome.replaceAll("_", " ")}</span><p>{item.summary}</p><small>{item.evidence_type.replaceAll("_", " ")}</small></div>)}</div> : null}</section><section className="skill-evaluation"><p className="section-label">Latest revision evaluation</p><strong>{loadingEvidence ? "Loading evaluation…" : evaluationSummary ? `${evaluationSummary.evaluated_active_case_count}/${evaluationSummary.active_case_count} active cases evaluated` : "No evaluation data"}</strong><small>{evaluationSummary?.pass_rate === null || evaluationSummary?.pass_rate === undefined ? "No completed run" : `${Math.round(evaluationSummary.pass_rate * 100)}% pass rate`} · {evaluationSummary?.latest_outcome ?? "No latest outcome"}</small></section><section className="skill-notes"><div className="skill-feedback-heading"><div><p className="section-label">Usage notes</p><strong>{notes.length} active notes</strong></div></div><form className="note-form" onSubmit={(event) => { event.preventDefault(); if (!noteText.trim()) return; onAddNote(selected.lineage.id, { kind: noteKind, body: noteText.trim(), inject_into_prompt: injectNote }); setNoteText(""); setInjectNote(false); }}><label className="template-field">Kind<select value={noteKind} onChange={(event) => setNoteKind(event.target.value)}><option value="usage">Usage</option><option value="caveat">Caveat</option><option value="dependency">Dependency</option><option value="migration">Migration</option><option value="review">Review</option></select></label><label className="template-field note-body-field">Note<input value={noteText} onChange={(event) => setNoteText(event.target.value)} placeholder="Guidance that should accompany this skill" /></label><label className="note-inject"><input type="checkbox" checked={injectNote} onChange={(event) => setInjectNote(event.target.checked)} /> Include in system prompt</label><button className="quiet-action feedback-save" type="submit" disabled={recordingNote || !noteText.trim()}>{recordingNote ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{recordingNote ? "Saving…" : "Add note"}</button></form>{notes.length ? <div className="feedback-history note-history">{notes.slice(0, 3).map((note) => <div key={note.id}><span>{note.kind}</span><p>{note.body}</p><small>{note.inject_into_prompt ? "Prompt enabled" : "Catalog only"}</small></div>)}</div> : null}</section></div> : null}
     </div>}
   </section>;
 }
@@ -431,8 +446,11 @@ export function CatalogApp() {
   const [savingSkillProfile, setSavingSkillProfile] = useState(false);
   const [skillFeedback, setSkillFeedback] = useState<SkillFeedback[]>([]);
   const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary | null>(null);
+  const [skillNotes, setSkillNotes] = useState<SkillNote[]>([]);
+  const [evaluationSummary, setEvaluationSummary] = useState<EvaluationSummary | null>(null);
   const [loadingSkillEvidence, setLoadingSkillEvidence] = useState(false);
   const [recordingFeedback, setRecordingFeedback] = useState(false);
+  const [recordingNote, setRecordingNote] = useState(false);
   const [projectAssignments, setProjectAssignments] = useState<RemoteAssignment[]>([]);
   const [history, setHistory] = useState<RemoteHistory | null>(null);
   const [comparison, setComparison] = useState<RemoteComparison | null>(null);
@@ -493,23 +511,32 @@ export function CatalogApp() {
     if (!catalogApi || !selectedSkillLineageId) {
       setSkillFeedback([]);
       setFeedbackSummary(null);
+      setSkillNotes([]);
+      setEvaluationSummary(null);
       return Promise.resolve();
     }
+    const sourceRevisionId = catalogSkills.find((skill) => skill.lineage.id === selectedSkillLineageId)?.latest_skill?.source_revision_id;
     setLoadingSkillEvidence(true);
     return Promise.all([
       fetch(`${catalogApi}/api/skills/${encodeURIComponent(selectedSkillLineageId)}/feedback`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load skill feedback"))),
       fetch(`${catalogApi}/api/skills/${encodeURIComponent(selectedSkillLineageId)}/feedback-summary`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load skill health"))),
+      fetch(`${catalogApi}/api/skills/${encodeURIComponent(selectedSkillLineageId)}/notes`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load skill notes"))),
+      fetch(`${catalogApi}/api/skills/${encodeURIComponent(selectedSkillLineageId)}/evaluation-summary${sourceRevisionId ? `?source_revision_id=${encodeURIComponent(sourceRevisionId)}` : ""}`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load skill evaluation"))),
     ])
-      .then(([feedbackBody, summaryBody]: [{ feedback: SkillFeedback[] }, FeedbackSummary]) => {
+      .then(([feedbackBody, summaryBody, notesBody, evaluationBody]: [{ feedback: SkillFeedback[] }, FeedbackSummary, { notes: SkillNote[] }, EvaluationSummary]) => {
         setSkillFeedback(feedbackBody.feedback);
         setFeedbackSummary(summaryBody);
+        setSkillNotes(notesBody.notes);
+        setEvaluationSummary(evaluationBody);
       })
       .catch(() => {
         setSkillFeedback([]);
         setFeedbackSummary(null);
+        setSkillNotes([]);
+        setEvaluationSummary(null);
       })
       .finally(() => setLoadingSkillEvidence(false));
-  }, [selectedSkillLineageId]);
+  }, [catalogSkills, selectedSkillLineageId]);
 
   useEffect(() => { void refreshSkillEvidence(); }, [refreshSkillEvidence]);
 
@@ -720,6 +747,18 @@ export function CatalogApp() {
       .catch((error: Error) => setNotice(error.message))
       .finally(() => setRecordingFeedback(false));
   }, [refreshSkillEvidence]);
+  const addSkillUsageNote = useCallback((lineageId: string, patch: { kind: string; body: string; inject_into_prompt: boolean }) => {
+    if (!catalogApi) return;
+    setRecordingNote(true);
+    fetch(`${catalogApi}/api/skills/${encodeURIComponent(lineageId)}/notes`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope: "global", ...patch }),
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Skill note was rejected")))
+      .then(() => refreshSkillEvidence())
+      .then(() => setNotice("Skill note saved. It is injected only when explicitly marked for prompts."))
+      .catch((error: Error) => setNotice(error.message))
+      .finally(() => setRecordingNote(false));
+  }, [refreshSkillEvidence]);
   const previewPlan = useCallback(() => {
     setPreviewing(true);
     setNotice(null);
@@ -823,7 +862,7 @@ export function CatalogApp() {
     <main className="app-shell">
       <SideNavigation activePage={activePage} onNavigate={setActivePage} />
       <div className="workspace">
-        {activePage === "Skills" ? <><SkillWorkspace skills={catalogSkills} selectedLineageId={selectedSkillLineageId} onSelect={setSelectedSkillLineageId} onSave={saveSkillProfile} saving={savingSkillProfile} feedback={skillFeedback} feedbackSummary={feedbackSummary} loadingEvidence={loadingSkillEvidence} recordingFeedback={recordingFeedback} onRecordFeedback={recordSkillFeedback} /><ReviewQueue items={reviewItems} remote={catalogApi !== ""} />{catalogApi ? <SourceChangeQueue candidates={sourceCandidates} summaries={sourceReviewSummaries} actionId={sourceActionId} onSummaryChange={updateSourceSummary} onReview={reviewSourceCandidate} onAdopt={adoptSourceCandidate} /> : null}</> : activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} onCreate={createTemplate} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
+        {activePage === "Skills" ? <><SkillWorkspace skills={catalogSkills} selectedLineageId={selectedSkillLineageId} onSelect={setSelectedSkillLineageId} onSave={saveSkillProfile} saving={savingSkillProfile} feedback={skillFeedback} feedbackSummary={feedbackSummary} notes={skillNotes} evaluationSummary={evaluationSummary} loadingEvidence={loadingSkillEvidence} recordingFeedback={recordingFeedback} recordingNote={recordingNote} onRecordFeedback={recordSkillFeedback} onAddNote={addSkillUsageNote} /><ReviewQueue items={reviewItems} remote={catalogApi !== ""} />{catalogApi ? <SourceChangeQueue candidates={sourceCandidates} summaries={sourceReviewSummaries} actionId={sourceActionId} onSummaryChange={updateSourceSummary} onReview={reviewSourceCandidate} onAdopt={adoptSourceCandidate} /> : null}</> : activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} onCreate={createTemplate} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
            <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} /><LiveActivationStatus globalStatus={globalStatus} projectStatus={projectStatus} loading={loadingLiveStatus} error={liveStatusError} onRefresh={() => void refreshLiveStatus()} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
            <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onApply={applyPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} applying={applyingPlan} applyProgress={applyProgress} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />

@@ -79,6 +79,11 @@ reads or updates Catalog-only profile metadata. These endpoints support the
 Skills UI and mirror the `skill list`, `skill search`, and `skill profile`
 CLI group; they never change template membership or provider delivery.
 
+`GET|POST /api/skills/:lineage/notes` lists or adds scoped usage notes. The
+bridge validates the target scope and records whether a note may be injected
+into a system prompt. This mirrors the `skill note` CLI group and leaves
+template membership and provider delivery unchanged.
+
 `POST /api/activation-plans/:id/apply/stream` is the streaming form of the
 confirmed apply endpoint. It emits NDJSON `progress` records for inspection,
 immutable revision resolution, preview, each apply operation, and verification,

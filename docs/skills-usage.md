@@ -54,6 +54,12 @@ or `needs_review` health state, the evidence count, and recent entries. This
 evidence updates Catalog review work only; it does not activate or deactivate
 a provider skill.
 
+Skills also manages global usage notes. A note has an explicit kind and is
+included in a copied system prompt only when its prompt-injection flag is set.
+The UI displays the latest immutable revision's evaluation coverage and pass
+rate; defining evaluation cases and recording detailed criteria remains
+available through the `evaluation` CLI group.
+
 ## 1. Import and review a skill revision
 
 Inspect before importing; import preserves a canonical immutable copy. A newer

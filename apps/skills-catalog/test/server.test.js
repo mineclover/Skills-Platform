@@ -106,6 +106,15 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(updatedProfile.profile.review_state, "reviewed");
   assert.equal(loadedProfile.profile.purpose, "Plan a verified implementation.");
 
+  const createdNote = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/notes`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ scope: "global", kind: "usage", body: "Use after collecting the task constraints.", inject_into_prompt: true }),
+  })).json();
+  const notes = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/notes`)).json();
+  assert.equal(createdNote.note.inject_into_prompt, true);
+  assert.equal(notes.notes[0].body, "Use after collecting the task constraints.");
+
   const updatedPreset = await (await fetch(`${base}/presets/planning/update`, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ purpose: "Plan with a verified scope." }),
