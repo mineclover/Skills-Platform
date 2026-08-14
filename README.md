@@ -8,7 +8,7 @@ It separates policy and canonical content from agent-visible delivery paths.
 ```text
 apps/
   skills-catalog/    Registry, catalog, evaluation, project policy, and activation plans
-  catalog-ui/        Project effective-set and activation-progress UI prototype
+  catalog-ui/        Skills, template, and project policy management UI
   skills-manager/    Pinned delivery adapter: provider discovery, links, copies, and verification
 packages/
   skill-contracts/   Shared versioned contracts between the catalog and adapters
@@ -30,7 +30,9 @@ roadmap](./docs/roadmap.md) for skill management, metadata, notes, templates,
 and activation milestones. Operators should follow the
 [repository management guide](./docs/repository-management.md) and the
 [skills usage guide](./docs/skills-usage.md). The executable core-flow evidence
-is recorded in the [basic scenario proof](./docs/basic-scenario-proof.md).
+is recorded in the [basic scenario proof](./docs/basic-scenario-proof.md). For
+the implemented boundary, control surfaces, and verification scope, see the
+[current status](./docs/current-status.md).
 
 ## Bootstrap
 
@@ -45,7 +47,7 @@ To initialize submodules after a normal clone:
 git submodule update --init --recursive
 ```
 
-## Catalog UI prototype
+## Catalog UI
 
 The separate Catalog UI owns the management experience, while the preserved
 Skills Manager submodule continues to own delivery/provider concerns.
@@ -56,7 +58,8 @@ npm install
 npm run dev
 ```
 
-The current project screen makes a pinned default template, work-scope overlay,
-effective selected/disabled skills, Pristine reset, plan preview/application
-state, live upstream status, and activation history visible. Connect it to the
-local Catalog bridge to operate on registered projects.
+The UI separates Skills, Templates, and Projects. It makes a pinned default
+template, work-scope overlay, effective selected/disabled skills, Pristine
+reset, prompt copy, plan preview/application progress, live upstream status,
+and activation history visible. Connect it to the local Catalog bridge to
+operate on registered projects.

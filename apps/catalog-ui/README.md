@@ -10,22 +10,23 @@ those skills into versioned membership; **Projects** assigns a template,
 resolves a work scope, and applies a recorded plan. Project history remains in
 Projects, while the review/source-adoption queues are part of Skills.
 
-## Local prototype
+## Local use
 
 ```bash
 npm install
 npm run dev
 ```
 
-Without configuration, the project screen is an interactive visual prototype.
+Without configuration, the project screen is an interactive visual preview.
 
 ## Connect a local Catalog
 
 Start the local Catalog bridge in another terminal. The UI reads project
 policy, effective skill sets, history, plan previews, and the evidence-derived
-review queue. It can also record an explicit source review and create a new
-template version from an approved revision; it does not apply a plan or mutate
-a provider delivery path.
+review queue. It can record an explicit source review, create a new template
+version from an approved revision, and request a confirmed plan application.
+The bridge delegates that application to Skills Manager's CLI; neither the UI
+nor Catalog writes a provider delivery path directly.
 
 ```bash
 cd ../skills-catalog

@@ -150,7 +150,7 @@ resolves to explicit disabled operations for every managed skill in scope.
 
 ## 6. Delivery roadmap
 
-### Current — Core CLI MVP complete
+### Current — Core policy and delivery boundary complete
 
 - Local import into immutable content-addressed revisions.
 - Project profiles, reusable presets, and `Pristine` baseline.
@@ -158,9 +158,13 @@ resolves to explicit disabled operations for every managed skill in scope.
 - Reference adapter: digest verification, preview, confirmed linking/removal,
   and unmanaged-path collision rejection.
 - Cross-package test from Catalog import to adapter-created link.
+- Dedicated Skills, Templates, and Projects UI control surfaces.
+- Confirmed upstream CLI apply with live progress and post-apply verification.
+- Structured feedback, revision-pinned evaluation status, and prompt-enabled
+  skill notes.
 
-Limits: local sources and JSON persistence only, CLI Catalog, and reference
-adapter not yet embedded in the existing Skills Manager application.
+Limits: local/commit-pinned sources and JSON persistence only, no team sync,
+and per-skill CLI delivery rather than an upstream batch operation.
 
 ### Phase 1 — Registry enrichment and skill management
 
@@ -211,20 +215,19 @@ to `Pristine` safely.
 **Goal:** make existing Skills Manager the real provider adapter without making
 it a registry.
 
-> Status: Skills Manager CLI is now the accepted integration boundary. Catalog
-> can read live global and mapped-project state from upstream `projects`,
-> `providers --json`, and `bindings --json`, retain immutable snapshots, and
-> compare them against a recorded pinned plan. The reference adapter remains a
-> contract test harness only; direct Catalog filesystem delivery is not a
-> product path. The bridge now translates a recorded plan only when every
-> immutable Registry digest has a matching upstream instance, previews each
-> operation, requires confirmation, applies with the CLI, then records a fresh
-> upstream inspection. Batch optimization and UI progress streaming remain.
+> Status: implemented for the per-skill CLI path. Catalog reads live global and
+> mapped-project state from upstream `projects`, `providers --json`, and
+> `bindings --json`, records immutable snapshots, resolves a plan only when
+> every Registry digest matches an upstream instance, previews every binding,
+> requires confirmation, streams progress, applies through the CLI, and records
+> a fresh inspection. The reference adapter remains a contract-test harness;
+> direct Catalog filesystem delivery is not a product path. Batch optimization
+> and richer shared-root visualization remain.
 
 - Maintain the CLI runner and registry-revision → upstream instance mapping.
 - Add `batch` optimization without weakening preview/confirmation safeguards.
-- Stream upstream JSON operation progress to the UI while preserving the final
-  report and re-inspected state.
+- Add upstream batch use only after it can preserve per-operation preview,
+  confirmation, progress, and report evidence.
 - Map provider inventory, shared roots, direct skills, and existing links to
   preview reasons and progress UI.
 - Preserve independent upstream tracking; Catalog storage remains external.
@@ -255,23 +258,17 @@ the exact revision adopted by each template/project.
 
 **Goal:** deliver the same model without CLI expertise.
 
-> Status: Project effective-set UI shell implemented — it visualizes the
-> pinned default template, work-scope overlay, selected/disabled reasons,
-> Pristine reset, preview progress, and recorded plan status. It is currently
-> usable with its local Catalog bridge, which provides real project policy,
-> read-only plan previews, and an explicit source decision queue. That queue
-> requires a written rationale and can only create a new template version; it
-> never repins projects or changes a provider delivery path. The inspector can
-> copy the resolved, revision-marked system prompt for the selected scope.
-> It can also pin a chosen registered template, including Pristine, as the
-> selected project's default and replace/clear an exact work-scope overlay.
-> Templates can now revise skill membership into a new immutable version;
-> metadata editing and adapter report streaming remain.
+> Status: core management UI implemented. **Skills** owns immutable revision
+> context, profile metadata, review work, feedback, notes, and evaluation
+> status. **Templates** owns immutable membership versions. **Projects** owns
+> default/overlay selection, Pristine reset, effective-set explanation, prompt
+> copy, plan history, confirmed upstream CLI application, and live progress.
+> The local bridge provides the policy and delivery boundary; a missing or
+> digest-mismatched upstream instance is rejected rather than imported.
 
-- Build Registry, Skill Detail, Notes, Templates, Projects, History, Review Queue.
-- Add import wizard: inspect -> select -> enrich -> template -> preview -> activate.
-- Surface prompt copy/export, note inclusion, provenance, and plan progress.
-- Add portable template/profile sharing, then team sync and visibility controls.
+- Add source/revision content diff and import-wizard UI.
+- Add richer review-queue filtering and portable template/profile sharing.
+- Add team sync and visibility controls after portable sharing is defined.
 
 **Exit:** the Phase 2 workflow is completable in UI with clear explanation of
 every active skill.

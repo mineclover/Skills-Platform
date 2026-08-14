@@ -1,7 +1,8 @@
 # Skills Catalog MVP
 
-> Status: core CLI MVP implemented. Catalog now delegates confirmed plan
-> application to the upstream Skills Manager CLI and retains its verification report.
+> Status: implemented. Catalog has both CLI and local UI control surfaces. A
+> confirmed plan is resolved, previewed, applied, progress-streamed, and
+> verified through the upstream Skills Manager CLI.
 
 The first MVP is complete only when this repeatable, non-destructive flow works:
 
@@ -21,11 +22,15 @@ Those mutations stay in the Skills Manager delivery role. The reference adapter
 package continues to validate the protocol independently; production delivery
 uses the existing Skills Manager application's CLI boundary.
 
-## Explicit MVP limits
+## Current limits
 
-- Import supports local directories first; Git/skills.sh source resolution is
-  the next increment.
-- Catalog applies one reviewed plan operation at a time through the upstream
-  CLI. Batch optimization and streamed progress remain follow-up work.
-- Catalog state is local JSON (`registry.json` and `catalog.json`) so the
-  semantics are validated before adding a database or UI.
+- Catalog persistence is local JSON (`registry.json` and `catalog.json`); team
+  sync, access control, and hosted storage are future work.
+- Git sources resolve to an exact commit and are imported without executing
+  installers. GitHub shorthand, archives, and skills.sh pack parsing remain
+  future source adapters.
+- Applies are intentionally per-skill upstream CLI operations. This keeps the
+  preview, digest match, shared-root confirmation, and per-operation report
+  explicit; upstream batch optimization is not yet used.
+- Automated evaluators and provider-specific integration tests remain owned by
+  their respective delivery/evaluation environments.
