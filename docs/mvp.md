@@ -1,6 +1,7 @@
 # Skills Catalog MVP
 
-> Status: core CLI MVP implemented and covered by the catalog-to-adapter integration test.
+> Status: core CLI MVP implemented. Catalog now delegates confirmed plan
+> application to the upstream Skills Manager CLI and retains its verification report.
 
 The first MVP is complete only when this repeatable, non-destructive flow works:
 
@@ -11,19 +12,20 @@ The first MVP is complete only when this repeatable, non-destructive flow works:
    `ActivationPlan` for the Skills Manager delivery adapter.
 5. Export the selected canonical `SKILL.md` content, including provenance, as a
    system-prompt payload.
-6. Preview and explicitly confirm the plan in the delivery adapter, which
-   verifies digests and only creates/removes managed symbolic links.
+6. Preview and explicitly confirm the plan through Skills Manager, which
+   verifies the matching immutable revision, changes only its managed binding,
+   and returns a post-apply report.
 
 The catalog does not create links, copies, or provider configuration changes.
 Those mutations stay in the Skills Manager delivery role. The reference adapter
-package validates this protocol independently until it is embedded behind the
-existing Skills Manager application's command boundary.
+package continues to validate the protocol independently; production delivery
+uses the existing Skills Manager application's CLI boundary.
 
 ## Explicit MVP limits
 
 - Import supports local directories first; Git/skills.sh source resolution is
   the next increment.
-- Plans are exported JSON; automatic adapter transport follows after the
-  Skills Manager compatibility contract is implemented.
+- Catalog applies one reviewed plan operation at a time through the upstream
+  CLI. Batch optimization and streamed progress remain follow-up work.
 - Catalog state is local JSON (`registry.json` and `catalog.json`) so the
   semantics are validated before adding a database or UI.

@@ -42,8 +42,9 @@ node src/cli.js plan --registry ./.skills-platform/registry \
 
 ## Local Catalog bridge
 
-The bridge gives the separate Catalog UI a local, read-only view of Catalog
-state. It has no endpoint that applies a plan or writes provider paths.
+The bridge gives the separate Catalog UI a local view of Catalog state. Its
+single delivery write endpoint delegates only to the upstream Skills Manager
+CLI; it never writes provider paths itself.
 
 ```bash
 node src/cli.js serve --catalog ./.skills-platform/catalog \

@@ -27,7 +27,9 @@ provider delivery.
 See [the architecture](./docs/architecture.md) for responsibilities, [the MVP
 definition](./docs/mvp.md) for the implemented core flow, and [the product
 roadmap](./docs/roadmap.md) for skill management, metadata, notes, templates,
-and activation milestones.
+and activation milestones. Operators should follow the
+[repository management guide](./docs/repository-management.md) and the
+[skills usage guide](./docs/skills-usage.md).
 
 ## Bootstrap
 
@@ -54,6 +56,6 @@ npm run dev
 ```
 
 The current project screen makes a pinned default template, work-scope overlay,
-effective selected/disabled skills, Pristine reset, plan preview state, and
-activation history visible. Its sample data will be replaced by Catalog API
-bindings as the delivery-adapter integration is completed.
+effective selected/disabled skills, Pristine reset, plan preview/application
+state, live upstream status, and activation history visible. Connect it to the
+local Catalog bridge to operate on registered projects.
