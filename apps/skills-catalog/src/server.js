@@ -1,11 +1,12 @@
 const http = require("node:http");
 const { URL } = require("node:url");
-const { assignPreset, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay } = require("./catalog-state");
+const { assignPreset, createPreset, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay, updatePresetTemplate } = require("./catalog-state");
 const { buildProjectSystemPrompt, createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
 const { compareRecordedPlanWithObservedState, listObservedStates, recordObservedState } = require("./observed-state");
 const { adoptApprovedRevisionIntoPreset, latestSourceReview, listSourceAdoptionCandidates, recordSourceReview } = require("./source-review");
+const { latestSkillsByArtifact, listRegistrySkills } = require("./registry");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -58,6 +59,42 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
       }
       if (request.method === "GET" && url.pathname === "/api/presets") {
         return json(response, 200, { presets: await listPresets(catalogRoot) });
+      }
+      if (request.method === "POST" && url.pathname === "/api/presets") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { preset: await createPreset({
+          catalogRoot,
+          registryRoot,
+          id: body.id,
+          name: body.name,
+          description: body.description,
+          purpose: body.purpose,
+          workScopeTags: body.work_scope_tags,
+          owner: body.owner,
+          lifecycle: body.lifecycle,
+          registrySkillIds: body.registry_skill_ids,
+        }) });
+      }
+      if (request.method === "GET" && url.pathname === "/api/registry/skills") {
+        return json(response, 200, { skills: latestSkillsByArtifact(await listRegistrySkills(registryRoot)) });
+      }
+      const presetUpdate = url.pathname.match(/^\/api\/presets\/([^/]+)\/update$/);
+      if (presetUpdate && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { preset: await updatePresetTemplate({
+          catalogRoot,
+          registryRoot,
+          presetId: decodeURIComponent(presetUpdate[1]),
+          patch: {
+            name: body.name,
+            description: body.description,
+            purpose: body.purpose,
+            workScopeTags: body.work_scope_tags,
+            owner: body.owner,
+            lifecycle: body.lifecycle,
+            registrySkillIds: body.registry_skill_ids,
+          },
+        }) });
       }
       const defaultAssignment = url.pathname.match(/^\/api\/projects\/([^/]+)\/default-preset$/);
       if (defaultAssignment && request.method === "POST") {

@@ -49,6 +49,7 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
 
   const projects = await (await fetch(`${base}/projects`)).json();
   const presets = await (await fetch(`${base}/presets`)).json();
+  const registrySkills = await (await fetch(`${base}/registry/skills`)).json();
   const effective = await (await fetch(`${base}/projects/demo/effective-set`)).json();
   const preview = await (await fetch(`${base}/projects/demo/activation-plan/preview`, {
     method: "POST",
@@ -60,12 +61,19 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
 
   assert.equal(projects.projects[0].id, "demo");
   assert.ok(presets.presets.some((preset) => preset.id === "builtin-pristine"));
+  assert.equal(registrySkills.skills[0].id, imported.skills[0].id);
   assert.equal(effective.skills[0].skill_name, "planning");
   assert.equal(preview.plan.operations[0].registry_skill_id, imported.skills[0].id);
   assert.equal(preview.plan.operations[0].skill_name, "planning");
   assert.deepEqual(history.history, []);
   assert.equal(systemPrompt.project_id, "demo");
   assert.match(systemPrompt.content, /# Planning/);
+
+  const updatedPreset = await (await fetch(`${base}/presets/planning/update`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ purpose: "Plan with a verified scope." }),
+  })).json();
+  assert.ok(updatedPreset.preset.selected_version > 1);
 
   const pristineAssignment = await (await fetch(`${base}/projects/demo/default-preset`, {
     method: "POST", headers: { "content-type": "application/json" },
@@ -105,7 +113,7 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
     body: JSON.stringify({ registry_skill_id: importedCandidate.skills[0].id }),
   })).json();
   assert.equal(candidateReview.review.decision, "approved");
-  assert.equal(adopted.adoption.selected_version, 2);
+  assert.equal(adopted.adoption.selected_version, updatedPreset.preset.selected_version + 1);
   assert.deepEqual((await (await fetch(`${base}/source-adoption-candidates`)).json()).candidates, []);
 
   const createdFeedback = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/feedback`, {
