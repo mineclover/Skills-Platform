@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle, ArrowLeft, Check, ChevronDown, CircleCheck, ClipboardCheck, Database,
+  AlertTriangle, ArrowLeft, Check, ChevronDown, CircleCheck, ClipboardCheck, Copy, Database,
   Eye, FileText, Layers3, LoaderCircle, RefreshCcw, Settings, ShieldCheck,
   Sparkles, X,
 } from "lucide-react";
@@ -78,6 +78,23 @@ function presetName(assignments: Assignment[], role: string, fallback: string) {
   return assignments.find((assignment) => assignment.role === role)?.name ?? fallback;
 }
 
+async function copyText(content: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(content);
+    return;
+  }
+  const area = document.createElement("textarea");
+  area.value = content;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.append(area);
+  area.select();
+  const copied = document.execCommand("copy");
+  area.remove();
+  if (!copied) throw new Error("The browser did not allow copying to the clipboard");
+}
+
 function AppIcon({ icon: Icon, active }: { icon: typeof Database; active?: boolean }) {
   return <Icon aria-hidden="true" size={21} strokeWidth={1.7} className={active ? "nav-icon active" : "nav-icon"} />;
 }
@@ -116,14 +133,16 @@ function SkillTable({ skills }: { skills: DisplaySkill[] }) {
   );
 }
 
-function TemplateInspector({ scope, pristine, defaultTemplate, overlayTemplate, onPristine, onPreview, previewing }: {
+function TemplateInspector({ scope, pristine, defaultTemplate, overlayTemplate, onPristine, onPreview, onCopyPrompt, previewing, copyingPrompt }: {
   scope: Scope;
   pristine: boolean;
   defaultTemplate: string;
   overlayTemplate: string;
   onPristine: () => void;
   onPreview: () => void;
+  onCopyPrompt: () => void;
   previewing: boolean;
+  copyingPrompt: boolean;
 }) {
   const overlayShown = scope === "implementation" && !pristine;
   return (
@@ -145,8 +164,11 @@ function TemplateInspector({ scope, pristine, defaultTemplate, overlayTemplate, 
         <button className="primary-action" type="button" onClick={onPreview} disabled={previewing}>
           {previewing ? <LoaderCircle size={21} className="spin" /> : <Eye size={21} />} {previewing ? "Resolving plan…" : "Preview activation plan"}
         </button>
+        <button className="quiet-action prompt-copy" type="button" onClick={onCopyPrompt} disabled={copyingPrompt}>
+          {copyingPrompt ? <LoaderCircle size={17} className="spin" /> : <Copy size={17} />} {copyingPrompt ? "Preparing prompt…" : "Copy system prompt"}
+        </button>
         <button className="quiet-action" type="button" onClick={onPristine}><RefreshCcw size={17} /> {pristine ? "Restore project template" : "Return to Pristine"}</button>
-        <p>Preview validates the pinned plan before any delivery path changes.</p>
+        <p>Copy uses the resolved pinned skills and injected notes; neither action changes a delivery path.</p>
       </div>
     </aside>
   );
@@ -210,6 +232,7 @@ export function CatalogApp() {
   const [scope, setScope] = useState<Scope>("implementation");
   const [pristine, setPristine] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [copyingPrompt, setCopyingPrompt] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [remoteSet, setRemoteSet] = useState<RemoteSet | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
@@ -324,6 +347,22 @@ export function CatalogApp() {
       setNotice(`${enabledCount} enabled and ${3 - enabledCount} disabled operations are ready for preview.`);
     }, 620);
   }, [enabledCount, pristine, scope, selectedProjectId]);
+  const copySystemPrompt = useCallback(() => {
+    if (!catalogApi || !selectedProjectId) {
+      setNotice("Connect the local Catalog bridge before copying a resolved system prompt.");
+      return;
+    }
+    setCopyingPrompt(true);
+    setNotice(null);
+    const params = new URLSearchParams({ work_scope: scope, include_notes: "true" });
+    if (pristine) params.set("preset", "builtin-pristine");
+    fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/system-prompt?${params}`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not prepare the system prompt")))
+      .then((body: { content: string; included_skill_ids: string[]; skipped_skill_ids: string[] }) => copyText(body.content).then(() => body))
+      .then((body) => setNotice(`Copied ${body.included_skill_ids.length} pinned skill prompt${body.included_skill_ids.length === 1 ? "" : "s"}${body.skipped_skill_ids.length ? `; ${body.skipped_skill_ids.length} skipped` : ""}.`))
+      .catch((error: Error) => setNotice(error.message))
+      .finally(() => setCopyingPrompt(false));
+  }, [pristine, scope, selectedProjectId]);
   const updateSourceSummary = useCallback((sourceRevisionId: string, summary: string) => {
     setSourceReviewSummaries((current) => ({ ...current, [sourceRevisionId]: summary }));
   }, []);
@@ -362,7 +401,7 @@ export function CatalogApp() {
         <header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
           <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
-          <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} overlayTemplate={overlayTemplate} onPristine={togglePristine} onPreview={previewPlan} previewing={previewing} />
+          <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} overlayTemplate={overlayTemplate} onPristine={togglePristine} onPreview={previewPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} copyingPrompt={copyingPrompt} />
         </div>
         <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} comparison={comparison} />
         <ReviewQueue items={reviewItems} remote={catalogApi !== ""} />

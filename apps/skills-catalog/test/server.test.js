@@ -55,12 +55,15 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
     body: JSON.stringify({ work_scope_tags: ["implementation"] }),
   })).json();
   const history = await (await fetch(`${base}/projects/demo/history`)).json();
+  const systemPrompt = await (await fetch(`${base}/projects/demo/system-prompt?include_notes=true`)).json();
 
   assert.equal(projects.projects[0].id, "demo");
   assert.equal(effective.skills[0].skill_name, "planning");
   assert.equal(preview.plan.operations[0].registry_skill_id, imported.skills[0].id);
   assert.equal(preview.plan.operations[0].skill_name, "planning");
   assert.deepEqual(history.history, []);
+  assert.equal(systemPrompt.project_id, "demo");
+  assert.match(systemPrompt.content, /# Planning/);
 
   await fs.appendFile(path.join(sourcePath, "SKILL.md"), "\nUpdated planning instruction.\n", "utf8");
   const importedCandidate = await importLocalSource({ registryRoot, sourcePath: path.dirname(sourcePath) });

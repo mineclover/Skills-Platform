@@ -255,8 +255,9 @@ the exact revision adopted by each template/project.
 > usable with its local Catalog bridge, which provides real project policy,
 > read-only plan previews, and an explicit source decision queue. That queue
 > requires a written rationale and can only create a new template version; it
-> never repins projects or changes a provider delivery path. Full template
-> editing and adapter report streaming remain.
+> never repins projects or changes a provider delivery path. The inspector can
+> copy the resolved, revision-marked system prompt for the selected scope.
+> Full template editing and adapter report streaming remain.
 
 - Build Registry, Skill Detail, Notes, Templates, Projects, History, Review Queue.
 - Add import wizard: inspect -> select -> enrich -> template -> preview -> activate.

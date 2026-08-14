@@ -173,4 +173,66 @@ async function buildSystemPrompt({ catalogRoot, registryRoot, presetId, includeI
   };
 }
 
-module.exports = { buildSystemPrompt, createProjectPlan, exportActivationPlan, resolveProjectEffectiveSet, resolveProjectSelection };
+async function buildProjectSystemPrompt({ catalogRoot, registryRoot, projectId, presetId, workScopeTags = [], includeInjectedNotes = false }) {
+  const selection = await resolveProjectSelection({ catalogRoot, projectId, presetId, workScopeTags });
+  if (selection.mode === "pristine") {
+    return {
+      project_id: selection.project.id,
+      requested_work_scope_tags: selection.requested_work_scope_tags,
+      assignments: selection.assignments,
+      included_skill_ids: [],
+      skipped_skill_ids: [],
+      content: "",
+    };
+  }
+  const selectedBySkillId = new Map(selection.selected.map((item) => [item.registry_skill_id, item]));
+  const skills = await getRegistrySkills(registryRoot, selection.selected.map((item) => item.registry_skill_id));
+  const includedSkillIds = [];
+  const skippedSkillIds = [];
+  const sections = [];
+  for (const skill of skills) {
+    try {
+      const skillMarkdown = await fs.readFile(path.join(skill.canonical_path, "SKILL.md"), "utf8");
+      if (skillMarkdown.trim() === "") throw new Error("Empty SKILL.md");
+      includedSkillIds.push(skill.id);
+      const selected = selectedBySkillId.get(skill.id);
+      const section = [
+        `<!-- registry_skill_id:${skill.id} revision:${skill.source_revision_id} digest:${skill.content_digest} -->`,
+        skillMarkdown.trim(),
+      ];
+      if (includeInjectedNotes) {
+        const notes = await listSkillNotes({ catalogRoot, lineageId: skill.lineage_id });
+        for (const note of notes.filter((item) => {
+          if (!item.inject_into_prompt) return false;
+          if (item.scope === "global") return true;
+          if (item.scope === "revision") return item.source_revision_id === skill.source_revision_id;
+          if (item.scope === "preset") return item.preset_id === selected?.preset_id;
+          if (item.scope === "project") return item.project_id === selection.project.id;
+          return false;
+        })) {
+          section.push(`<!-- registry_note:${note.id} scope:${note.scope} kind:${note.kind} -->`, note.body);
+        }
+      }
+      sections.push(section.join("\n"));
+    } catch {
+      skippedSkillIds.push(skill.id);
+    }
+  }
+  return {
+    project_id: selection.project.id,
+    requested_work_scope_tags: selection.requested_work_scope_tags,
+    assignments: selection.assignments,
+    included_skill_ids: includedSkillIds,
+    skipped_skill_ids: skippedSkillIds,
+    content: sections.join("\n\n"),
+  };
+}
+
+module.exports = {
+  buildProjectSystemPrompt,
+  buildSystemPrompt,
+  createProjectPlan,
+  exportActivationPlan,
+  resolveProjectEffectiveSet,
+  resolveProjectSelection,
+};

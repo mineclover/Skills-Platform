@@ -42,3 +42,8 @@ evaluation results. Imported source revisions that could replace a pinned
 template skill appear in a separate decision queue. A reviewer must add a
 decision note before approving or rejecting; approval only unlocks an explicit
 new-version adoption and never repins an existing project.
+
+The project inspector can also copy the resolved system prompt. Its content is
+assembled from the project's pinned default/overlay templates for the selected
+work scope, plus eligible injected notes. Copying is read-only and includes the
+immutable registry revision and digest markers for each skill.

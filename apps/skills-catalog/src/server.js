@@ -1,7 +1,7 @@
 const http = require("node:http");
 const { URL } = require("node:url");
 const { listActivationHistory, listProjects, recordActivationPlan, recordActivationReport } = require("./catalog-state");
-const { createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
+const { buildProjectSystemPrompt, createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 const { addSkillFeedback, getSkillFeedbackSummary, listSkillFeedback } = require("./skill-management");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
 const { compareRecordedPlanWithObservedState, listObservedStates, recordObservedState } = require("./observed-state");
@@ -185,6 +185,17 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
           projectId: decodeURIComponent(effective[1]),
           presetId: url.searchParams.get("preset") ?? undefined,
           workScopeTags: workScopeTags(url),
+        }));
+      }
+      const systemPrompt = url.pathname.match(/^\/api\/projects\/([^/]+)\/system-prompt$/);
+      if (request.method === "GET" && systemPrompt) {
+        return json(response, 200, await buildProjectSystemPrompt({
+          catalogRoot,
+          registryRoot,
+          projectId: decodeURIComponent(systemPrompt[1]),
+          presetId: url.searchParams.get("preset") ?? undefined,
+          workScopeTags: workScopeTags(url),
+          includeInjectedNotes: url.searchParams.get("include_notes") === "true",
         }));
       }
       const history = url.pathname.match(/^\/api\/projects\/([^/]+)\/history$/);

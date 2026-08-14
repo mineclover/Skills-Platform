@@ -5,7 +5,9 @@ const path = require("node:path");
 const test = require("node:test");
 const {
   PRISTINE_PRESET_ID,
+  addSkillNote,
   assignPreset,
+  buildProjectSystemPrompt,
   buildSystemPrompt,
   createPreset,
   createProject,
@@ -86,6 +88,40 @@ test("system prompt export uses the pinned canonical SKILL.md content", async (c
   assert.deepEqual(prompt.included_skill_ids, [writingSkill.id]);
   assert.match(prompt.content, /registry_skill_id:/);
   assert.match(prompt.content, /Use short sentences/);
+});
+
+test("project prompt export follows the effective selection and includes scoped notes", async (context) => {
+  const { catalogRoot, imported, project, registryRoot } = await setup(context);
+  const writingSkill = imported.skills.find((skill) => skill.skill_name === "writing-guide");
+  const preset = await createPreset({
+    catalogRoot,
+    registryRoot,
+    id: "docs-writing",
+    name: "Docs writing",
+    registrySkillIds: [writingSkill.id],
+  });
+  await assignPreset({ catalogRoot, projectId: project.id, presetId: preset.id });
+  await addSkillNote({
+    catalogRoot,
+    registryRoot,
+    lineageId: writingSkill.lineage_id,
+    scope: "project",
+    projectId: project.id,
+    body: "Project-only guardrail.",
+    injectIntoPrompt: true,
+  });
+
+  const prompt = await buildProjectSystemPrompt({
+    catalogRoot,
+    registryRoot,
+    projectId: project.id,
+    workScopeTags: ["implementation"],
+    includeInjectedNotes: true,
+  });
+
+  assert.equal(prompt.project_id, project.id);
+  assert.deepEqual(prompt.included_skill_ids, [writingSkill.id]);
+  assert.match(prompt.content, /Project-only guardrail\./);
 });
 
 test("records immutable plan context and adapter reports for project history", async (context) => {
