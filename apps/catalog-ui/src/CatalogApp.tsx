@@ -172,7 +172,7 @@ function SkillTable({ skills }: { skills: DisplaySkill[] }) {
   );
 }
 
-function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, presets, overlayTemplate, overlayPresetId, overlayActive, onPristine, onDefaultTemplate, onOverlayTemplate, onPreview, onCopyPrompt, previewing, copyingPrompt, updatingDefault, updatingOverlay }: {
+function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, presets, overlayTemplate, overlayPresetId, overlayActive, onPristine, onDefaultTemplate, onOverlayTemplate, onPreview, onApply, onCopyPrompt, previewing, applying, copyingPrompt, updatingDefault, updatingOverlay }: {
   scope: Scope;
   pristine: boolean;
   defaultTemplate: string;
@@ -185,8 +185,10 @@ function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, 
   onDefaultTemplate: (presetId: string) => void;
   onOverlayTemplate: (presetId: string) => void;
   onPreview: () => void;
+  onApply: () => void;
   onCopyPrompt: () => void;
   previewing: boolean;
+  applying: boolean;
   copyingPrompt: boolean;
   updatingDefault: boolean;
   updatingOverlay: boolean;
@@ -213,11 +215,14 @@ function TemplateInspector({ scope, pristine, defaultTemplate, defaultPresetId, 
         <button className="primary-action" type="button" onClick={onPreview} disabled={previewing}>
           {previewing ? <LoaderCircle size={21} className="spin" /> : <Eye size={21} />} {previewing ? "Resolving plan…" : "Preview activation plan"}
         </button>
+        <button className="quiet-action apply-action" type="button" onClick={onApply} disabled={applying || previewing}>
+          {applying ? <LoaderCircle size={17} className="spin" /> : <Check size={17} />} {applying ? "Applying through CLI…" : "Apply through Skills Manager CLI"}
+        </button>
         <button className="quiet-action prompt-copy" type="button" onClick={onCopyPrompt} disabled={copyingPrompt}>
           {copyingPrompt ? <LoaderCircle size={17} className="spin" /> : <Copy size={17} />} {copyingPrompt ? "Preparing prompt…" : "Copy system prompt"}
         </button>
         <button className="quiet-action" type="button" onClick={onPristine}><RefreshCcw size={17} /> {pristine ? "Restore project template" : "Return to Pristine"}</button>
-        <p>Copy uses the resolved pinned skills and injected notes; neither action changes a delivery path.</p>
+        <p>Apply records the immutable plan, previews every upstream binding, then runs the confirmed Skills Manager CLI command. Copy never changes a delivery path.</p>
       </div>
     </aside>
   );
@@ -336,6 +341,7 @@ export function CatalogApp() {
   const [projectStatus, setProjectStatus] = useState<UpstreamStatus | null>(null);
   const [loadingLiveStatus, setLoadingLiveStatus] = useState(false);
   const [liveStatusError, setLiveStatusError] = useState<string | null>(null);
+  const [applyingPlan, setApplyingPlan] = useState(false);
 
   const refreshSourceCandidates = useCallback(() => {
     if (!catalogApi) return Promise.resolve();
@@ -561,6 +567,30 @@ export function CatalogApp() {
       setNotice(`${enabledCount} enabled and ${3 - enabledCount} disabled operations are ready for preview.`);
     }, 620);
   }, [enabledCount, pristine, scope, selectedProjectId]);
+  const applyPlan = useCallback(() => {
+    if (!catalogApi || !selectedProjectId) {
+      setNotice("Connect the local Catalog bridge before applying through Skills Manager CLI.");
+      return;
+    }
+    if (!window.confirm("Apply this immutable plan through Skills Manager CLI? The upstream manager may change provider bindings.")) return;
+    setApplyingPlan(true);
+    setNotice(null);
+    fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/activation-plan`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ work_scope_tags: [scope], preset_id: pristine ? "builtin-pristine" : undefined }),
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Activation plan could not be recorded")))
+      .then((body: { plan: { plan_id: string } }) => fetch(`${catalogApi}/api/activation-plans/${encodeURIComponent(body.plan.plan_id)}/apply`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirmed: true }),
+      }).then((response) => response.ok ? response.json() : response.json().then((error) => Promise.reject(new Error(error.error ?? "Skills Manager rejected the plan")))))
+      .then((body: { report: { summary: { applied: number; skipped: number; failed: number } } }) => {
+        const summary = body.report.summary;
+        setNotice(`Skills Manager CLI completed: ${summary.applied} applied · ${summary.skipped} skipped · ${summary.failed} failed.`);
+        void refreshLiveStatus();
+      })
+      .catch((error: Error) => setNotice(error.message))
+      .finally(() => setApplyingPlan(false));
+  }, [pristine, refreshLiveStatus, scope, selectedProjectId]);
   const copySystemPrompt = useCallback(() => {
     if (!catalogApi || !selectedProjectId) {
       setNotice("Connect the local Catalog bridge before copying a resolved system prompt.");
@@ -615,7 +645,7 @@ export function CatalogApp() {
         {activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} onCreate={createTemplate} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
            <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} /><LiveActivationStatus globalStatus={globalStatus} projectStatus={projectStatus} loading={loadingLiveStatus} error={liveStatusError} onRefresh={() => void refreshLiveStatus()} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
-          <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />
+           <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onApply={applyPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} applying={applyingPlan} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />
         </div>
         <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} comparison={comparison} />
         <ReviewQueue items={reviewItems} remote={catalogApi !== ""} />

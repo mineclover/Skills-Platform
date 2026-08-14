@@ -60,11 +60,17 @@ structured evidence, and `GET /api/skills/:lineage/feedback-summary` provides
 its aggregate health indicators. `GET|POST /api/evaluation-cases` and
 `GET|POST /api/evaluation-cases/:id/runs` manage revision-pinned evaluation
 evidence; `GET /api/skills/:lineage/evaluation-summary` and `GET
-/api/review-queue` expose derived evaluation and review state. None of these
+/api/review-queue` expose derived evaluation and review state. None of these policy and evidence
 endpoints applies a delivery operation. `GET|POST
 /api/projects/:id/observed-state` retains provider snapshots, while `GET
 /api/activation-plans/:id/observed-state-comparison` compares a pinned plan
 with the latest matching snapshot.
+
+`POST /api/activation-plans/:id/apply` is the sole write endpoint. It requires
+`{"confirmed":true}`, resolves each plan operation to an upstream instance with
+the identical canonical digest, calls `skill preview`, runs the upstream CLI,
+and stores its report with a post-apply provider/binding inspection. It rejects
+missing or mismatched upstream skills instead of importing them implicitly.
 
 ## MVP catalog flow
 

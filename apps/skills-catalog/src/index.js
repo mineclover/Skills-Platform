@@ -5,6 +5,7 @@ module.exports = {
   ...require("./evaluation"),
   ...require("./observed-state"),
   ...require("./upstream-inspector"),
+  ...require("./upstream-apply"),
   ...require("./source-review"),
   ...require("./registry"),
   ...require("./skill-management"),

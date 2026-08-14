@@ -63,9 +63,10 @@ or shared-root confirmation is invalid.
 | Change a resolved set | `batch enable` / `batch disable` | Yes, explicit confirmation |
 | Verify outcome | `providers`, `bindings` | No |
 
-The current bridge implements the discovery and verification row. A write
-adapter must first resolve an immutable Catalog registry revision to a Skills
-Manager `skill_instance_id`, and retain the following mapping as plan evidence:
+The bridge implements discovery, verification, and the confirmed per-skill CLI
+write path. Before a write it resolves an immutable Catalog registry revision
+to a Skills Manager `skill_instance_id`, and retains the following mapping as
+plan evidence:
 registry skill/revision/digest, manager instance ID, manager project ID,
 provider/tool ID, inspected source path, and observation time. It must call
 `skill preview` before every mutating command and record the upstream JSON

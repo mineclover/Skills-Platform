@@ -8,6 +8,7 @@ const { compareRecordedPlanWithObservedState, listObservedStates, recordObserved
 const { adoptApprovedRevisionIntoPreset, latestSourceReview, listSourceAdoptionCandidates, recordSourceReview } = require("./source-review");
 const { latestSkillsByArtifact, listRegistrySkills } = require("./registry");
 const { createSkillsManagerInspector } = require("./upstream-inspector");
+const { applyRecordedActivationPlan } = require("./upstream-apply");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -49,7 +50,7 @@ function workScopeTags(url, body = {}) {
   return url.searchParams.getAll("work_scope");
 }
 
-function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = createSkillsManagerInspector() }) {
+function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = createSkillsManagerInspector(), upstreamCli = upstreamInspector }) {
   if (!catalogRoot || !registryRoot) throw new Error("catalogRoot and registryRoot are required");
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
@@ -341,6 +342,17 @@ function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = cr
           planId: decodeURIComponent(report[1]),
           report: body,
         }) });
+      }
+      const apply = url.pathname.match(/^\/api\/activation-plans\/([^/]+)\/apply$/);
+      if (request.method === "POST" && apply) {
+        const body = await parseJsonBody(request);
+        const result = await applyRecordedActivationPlan({
+          catalogRoot,
+          planId: decodeURIComponent(apply[1]),
+          confirmed: body.confirmed === true,
+          upstreamCli,
+        });
+        return json(response, result.status === "confirmation_required" ? 409 : 201, result);
       }
       const observedComparison = url.pathname.match(/^\/api\/activation-plans\/([^/]+)\/observed-state-comparison$/);
       if (observedComparison && request.method === "GET") {

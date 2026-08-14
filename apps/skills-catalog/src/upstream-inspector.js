@@ -37,44 +37,46 @@ function parseInspectorJson(stdout, command) {
   }
 }
 
-function createSkillsManagerInspector({
+function createSkillsManagerCli({
   managerRoot = process.env.SKILLS_MANAGER_DIR ?? defaultManagerRoot(),
   binaryPath = process.env.SKILLS_MANAGER_INSPECT_PATH,
   fileExists = fs.existsSync,
-  execute = execFileAsync,
+  execute: executeOverride,
   timeoutMs = 45_000,
 } = {}) {
-  async function run(command, projectId) {
+  const executeFile = executeOverride ?? execFileAsync;
+  async function run(args) {
+    if (!Array.isArray(args) || args.length === 0 || args.some((arg) => typeof arg !== "string" || arg.trim() === "")) {
+      throw new Error("Skills Manager CLI arguments must be non-empty strings");
+    }
     const resolvedBinary = binaryPath ?? defaultInspectorBinary(managerRoot);
     const usingBinary = fileExists(resolvedBinary);
     // On Windows npm.cmd needs a shell, where the standard npm separator is
     // preserved for the inspector's own option parser.
-    const args = usingBinary ? [command] : ["run", "inspect", "--", command];
-    if (projectId) {
-      if (!/^[A-Za-z0-9._-]+$/.test(projectId)) throw new Error("Upstream Skills Manager project id contains unsupported shell characters");
-      args.push("--project", projectId);
-    }
-    args.push("--json");
+    const commandArgs = [...args, "--json"];
+    const invocationArgs = usingBinary ? commandArgs : ["run", "inspect", "--", ...commandArgs];
     try {
-      const { stdout } = await execute(usingBinary ? resolvedBinary : npmCommand(), args, {
+      const { stdout } = await executeFile(usingBinary ? resolvedBinary : npmCommand(), invocationArgs, {
         cwd: managerRoot,
         timeout: timeoutMs,
         windowsHide: true,
         shell: !usingBinary && process.platform === "win32",
         maxBuffer: 2 * 1024 * 1024,
       });
-      return parseInspectorJson(stdout, command);
+      return parseInspectorJson(stdout, args[0]);
     } catch (error) {
       const detail = error.stderr?.trim() || error.message;
-      throw new Error(`Skills Manager ${command} inspection failed: ${detail}`);
+      throw new Error(`Skills Manager ${args[0]} command failed: ${detail}`);
     }
   }
 
   return {
+    execute: run,
     async inspect({ projectId } = {}) {
+      if (projectId && !/^[A-Za-z0-9._-]+$/.test(projectId)) throw new Error("Upstream Skills Manager project id contains unsupported shell characters");
       const [inventory, bindings] = await Promise.all([
-        run("providers", projectId),
-        run("bindings", projectId),
+        run(["providers", ...(projectId ? ["--project", projectId] : [])]),
+        run(["bindings", ...(projectId ? ["--project", projectId] : [])]),
       ]);
       return {
         source: "skills-manager-inspect",
@@ -89,4 +91,8 @@ function createSkillsManagerInspector({
   };
 }
 
-module.exports = { createSkillsManagerInspector, stateSummary };
+function createSkillsManagerInspector(options = {}) {
+  return createSkillsManagerCli(options);
+}
+
+module.exports = { createSkillsManagerCli, createSkillsManagerInspector, stateSummary };

@@ -510,7 +510,7 @@ async function recordActivationReport({ catalogRoot, planId, report }) {
     report_id: `activation_report_${crypto.randomUUID()}`,
     plan_id: planId,
     recorded_at: now(),
-    status: report.completed_at ? "completed" : "reported",
+    status: report.status ?? (report.completed_at ? "completed" : "reported"),
     report: { ...report, plan_id: planId },
   };
   catalog.activation_reports.push(record);

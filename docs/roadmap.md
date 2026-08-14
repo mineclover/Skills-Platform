@@ -216,13 +216,15 @@ it a registry.
 > `providers --json`, and `bindings --json`, retain immutable snapshots, and
 > compare them against a recorded pinned plan. The reference adapter remains a
 > contract test harness only; direct Catalog filesystem delivery is not a
-> product path. CLI-backed write translation and apply remain.
+> product path. The bridge now translates a recorded plan only when every
+> immutable Registry digest has a matching upstream instance, previews each
+> operation, requires confirmation, applies with the CLI, then records a fresh
+> upstream inspection. Batch optimization and UI progress streaming remain.
 
 - Maintain the CLI runner and registry-revision → upstream instance mapping.
-- Translate a recorded plan into `skill preview` then confirmed
-  `skill enable`/`skill disable` or `batch` commands.
-- Store upstream JSON operation results and re-inspected state as the
-  activation report/event stream.
+- Add `batch` optimization without weakening preview/confirmation safeguards.
+- Stream upstream JSON operation progress to the UI while preserving the final
+  report and re-inspected state.
 - Map provider inventory, shared roots, direct skills, and existing links to
   preview reasons and progress UI.
 - Preserve independent upstream tracking; Catalog storage remains external.

@@ -53,6 +53,13 @@ assembled from the project's pinned default/overlay templates for the selected
 work scope, plus eligible injected notes. Copying is read-only and includes the
 immutable registry revision and digest markers for each skill.
 
+The inspector's **Apply through Skills Manager CLI** action records the exact
+plan, asks for browser confirmation, then requests the bridge to resolve the
+same revision in Skills Manager, preview every binding, apply through the
+upstream CLI, and re-inspect the result. It never imports a missing Registry
+skill into Skills Manager automatically; a matching upstream instance and
+digest are required.
+
 When connected to the local bridge, the same inspector can pin any registered
 template—including `Pristine`—as that project's default. This changes only the
 Catalog project-policy record; it does not apply a delivery plan or repin any
