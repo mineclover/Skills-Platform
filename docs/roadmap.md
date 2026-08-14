@@ -259,7 +259,8 @@ the exact revision adopted by each template/project.
 > copy the resolved, revision-marked system prompt for the selected scope.
 > It can also pin a chosen registered template, including Pristine, as the
 > selected project's default and replace/clear an exact work-scope overlay.
-> Full template editing and adapter report streaming remain.
+> Templates can now revise skill membership into a new immutable version;
+> metadata editing and adapter report streaming remain.
 
 - Build Registry, Skill Detail, Notes, Templates, Projects, History, Review Queue.
 - Add import wizard: inspect -> select -> enrich -> template -> preview -> activate.

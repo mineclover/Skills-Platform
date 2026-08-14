@@ -24,8 +24,9 @@ type RemoteSet = {
   skills: Array<{ skill_name: string; desired_state: "enabled" | "disabled"; reason: string; selected_by: { preset_id?: string } | null }>;
 };
 type RemoteProject = { id: string; name: string };
-type RemotePreset = { id: string; name: string; selected_version: number };
+type RemotePreset = { id: string; name: string; selected_version: number; registry_skill_ids: string[] };
 type RemoteAssignment = { preset_id: string; template_version: number; role: string; priority: number; work_scope_tags: string[]; enabled: boolean };
+type RegistrySkill = { id: string; skill_name: string; description: string | null; source_revision_id: string };
 type RemoteHistory = { plan_id: string; mode: string; recorded_at: string; reports: Array<{ status: string; report: { summary?: Record<string, number> } }> };
 type RemoteComparison = { in_sync: boolean; summary: Record<string, number>; captured_at: string; provider_id: string };
 type ReviewReason = { code: string; severity: "critical" | "high" | "medium" | "low"; detail: string };
@@ -101,19 +102,38 @@ function AppIcon({ icon: Icon, active }: { icon: typeof Database; active?: boole
   return <Icon aria-hidden="true" size={21} strokeWidth={1.7} className={active ? "nav-icon active" : "nav-icon"} />;
 }
 
-function SideNavigation() {
+function SideNavigation({ activePage, onNavigate }: { activePage: string; onNavigate: (page: string) => void }) {
   return (
     <aside className="sidebar">
       <div className="brand-mark" aria-label="Skills Catalog"><Sparkles size={20} strokeWidth={2} /></div>
       <nav aria-label="Catalog navigation" className="navigation">
         {navigation.map(({ label, icon }) => {
-          const active = label === "Projects";
-          return <button className={active ? "nav-item selected" : "nav-item"} key={label} type="button"><AppIcon icon={icon} active={active} /><span>{label}</span></button>;
+          const active = label === activePage;
+          return <button className={active ? "nav-item selected" : "nav-item"} key={label} type="button" onClick={() => onNavigate(label)}><AppIcon icon={icon} active={active} /><span>{label}</span></button>;
         })}
       </nav>
       <button className="nav-item settings" type="button"><AppIcon icon={Settings} /><span>Settings</span></button>
     </aside>
   );
+}
+
+function TemplateWorkspace({ presets, skills, selectedTemplateId, onSelectTemplate, onSave, saving }: {
+  presets: RemotePreset[];
+  skills: RegistrySkill[];
+  selectedTemplateId: string | null;
+  onSelectTemplate: (id: string) => void;
+  onSave: (presetId: string, skillIds: string[]) => void;
+  saving: boolean;
+}) {
+  const template = presets.find((item) => item.id === selectedTemplateId) ?? presets.find((item) => item.id !== "builtin-pristine") ?? null;
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  useEffect(() => setSelectedSkillIds(template?.registry_skill_ids ?? []), [template?.id, template?.selected_version]);
+  const toggleSkill = useCallback((skillId: string) => setSelectedSkillIds((current) => current.includes(skillId) ? current.filter((id) => id !== skillId) : [...current, skillId]), []);
+  const editable = template !== null && template.id !== "builtin-pristine";
+  return <section className="template-workspace">
+    <header className="template-header"><div><h1>Templates</h1><p>Versioned skill membership. Saving creates a new template version; project pins stay unchanged.</p></div><label className="template-picker"><span>Template</span><select value={template?.id ?? ""} onChange={(event) => onSelectTemplate(event.target.value)}>{presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name} · v{preset.selected_version}</option>)}</select></label></header>
+    {!template ? <div className="review-empty"><AlertTriangle size={22} className="review-icon" /><span>No editable template is registered.</span></div> : <div className="template-editor"><div className="template-editor-summary"><FileText size={25} className="mint" /><div><strong>{template.name}</strong><small>{editable ? `${selectedSkillIds.length} selected skill${selectedSkillIds.length === 1 ? "" : "s"} · next save creates v${template.selected_version + 1}` : "Pristine intentionally contains no managed skills"}</small></div></div><div className="template-skill-list">{skills.map((skill) => { const selected = selectedSkillIds.includes(skill.id); return <label className={selected ? "template-skill selected" : "template-skill"} key={skill.id}><input type="checkbox" checked={selected} disabled={!editable || saving} onChange={() => toggleSkill(skill.id)} /><div><strong>{skill.skill_name}</strong><small>{skill.description ?? `Revision ${skill.source_revision_id.slice(0, 12)}`}</small></div><span>{selected ? "Included" : "Available"}</span></label>; })}</div>{editable ? <button className="primary-action template-save" type="button" disabled={saving || selectedSkillIds.length === 0} onClick={() => onSave(template.id, selectedSkillIds)}>{saving ? <LoaderCircle size={20} className="spin" /> : <Check size={20} />} {saving ? "Saving version…" : `Save template v${template.selected_version + 1}`}</button> : null}</div>}
+  </section>;
 }
 
 function SkillTable({ skills }: { skills: DisplaySkill[] }) {
@@ -251,6 +271,7 @@ export function CatalogApp() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<RemoteProject[]>([]);
   const [presets, setPresets] = useState<RemotePreset[]>([]);
+  const [registrySkills, setRegistrySkills] = useState<RegistrySkill[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<RemoteAssignment[]>([]);
   const [history, setHistory] = useState<RemoteHistory | null>(null);
   const [comparison, setComparison] = useState<RemoteComparison | null>(null);
@@ -261,6 +282,9 @@ export function CatalogApp() {
   const [updatingDefault, setUpdatingDefault] = useState(false);
   const [updatingOverlay, setUpdatingOverlay] = useState(false);
   const [policyVersion, setPolicyVersion] = useState(0);
+  const [activePage, setActivePage] = useState("Projects");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   const refreshSourceCandidates = useCallback(() => {
     if (!catalogApi) return Promise.resolve();
@@ -293,6 +317,21 @@ export function CatalogApp() {
       .catch(() => active && setPresets([]));
     return () => { active = false; };
   }, [policyVersion]);
+
+  useEffect(() => {
+    if (!catalogApi) return;
+    let active = true;
+    fetch(`${catalogApi}/api/registry/skills`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load registry skills")))
+      .then((body: { skills: RegistrySkill[] }) => active && setRegistrySkills(body.skills))
+      .catch(() => active && setRegistrySkills([]));
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (selectedTemplateId || presets.length === 0) return;
+    setSelectedTemplateId(presets.find((preset) => preset.id !== "builtin-pristine")?.id ?? presets[0].id);
+  }, [presets, selectedTemplateId]);
 
   useEffect(() => {
     if (!catalogApi || !selectedProjectId) return;
@@ -403,6 +442,21 @@ export function CatalogApp() {
       .catch((error: Error) => setNotice(error.message))
       .finally(() => setUpdatingOverlay(false));
   }, [presets, scope, selectedProjectId]);
+  const saveTemplateMembership = useCallback((presetId: string, registrySkillIds: string[]) => {
+    if (!catalogApi) return;
+    setSavingTemplate(true);
+    fetch(`${catalogApi}/api/presets/${encodeURIComponent(presetId)}/update`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ registry_skill_ids: registrySkillIds }),
+    })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Template membership was rejected")))
+      .then((body: { preset: RemotePreset }) => {
+        setPresets((current) => current.map((preset) => preset.id === body.preset.id ? body.preset : preset));
+        setSelectedTemplateId(body.preset.id);
+        setNotice(`${body.preset.name} v${body.preset.selected_version} saved. Existing project pins were preserved.`);
+      })
+      .catch((error: Error) => setNotice(error.message))
+      .finally(() => setSavingTemplate(false));
+  }, []);
   const previewPlan = useCallback(() => {
     setPreviewing(true);
     setNotice(null);
@@ -472,9 +526,9 @@ export function CatalogApp() {
 
   return (
     <main className="app-shell">
-      <SideNavigation />
+      <SideNavigation activePage={activePage} onNavigate={(page) => setActivePage(page === "Templates" ? "Templates" : "Projects")} />
       <div className="workspace">
-        <header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
+        {activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
           <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
           <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />
@@ -482,6 +536,7 @@ export function CatalogApp() {
         <PlanHistory scope={scope} pristine={pristine} previewing={previewing} skills={skills} defaultTemplate={defaultTemplate} remote={remoteSet !== null} history={history} comparison={comparison} />
         <ReviewQueue items={reviewItems} remote={catalogApi !== ""} />
         {catalogApi ? <SourceChangeQueue candidates={sourceCandidates} summaries={sourceReviewSummaries} actionId={sourceActionId} onSummaryChange={updateSourceSummary} onReview={reviewSourceCandidate} onAdopt={adoptSourceCandidate} /> : null}
+        </>}
       </div>
     </main>
   );

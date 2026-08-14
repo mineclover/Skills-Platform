@@ -56,3 +56,7 @@ other project.
 For each active work scope, the inspector can also select or clear one overlay
 template. Replacing an overlay affects only that exact scope tag and preserves
 the project's default template and other scope assignments.
+
+The Templates navigation exposes the immutable membership editor: it lists the
+latest Registry artifact for each skill, lets an operator select membership,
+and saves a new template version. `Pristine` remains read-only by definition.
