@@ -60,3 +60,5 @@ the project's default template and other scope assignments.
 The Templates navigation exposes the immutable membership editor: it lists the
 latest Registry artifact for each skill, lets an operator select membership,
 and saves a new template version. `Pristine` remains read-only by definition.
+The same screen can create a new v1 template after the operator supplies an
+identifier, a name, and at least one selected Registry skill.

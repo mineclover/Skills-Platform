@@ -117,22 +117,28 @@ function SideNavigation({ activePage, onNavigate }: { activePage: string; onNavi
   );
 }
 
-function TemplateWorkspace({ presets, skills, selectedTemplateId, onSelectTemplate, onSave, saving }: {
+function TemplateWorkspace({ presets, skills, selectedTemplateId, onSelectTemplate, onSave, onCreate, saving }: {
   presets: RemotePreset[];
   skills: RegistrySkill[];
   selectedTemplateId: string | null;
   onSelectTemplate: (id: string) => void;
   onSave: (presetId: string, skillIds: string[]) => void;
+  onCreate: (id: string, name: string, skillIds: string[]) => Promise<boolean>;
   saving: boolean;
 }) {
   const template = presets.find((item) => item.id === selectedTemplateId) ?? presets.find((item) => item.id !== "builtin-pristine") ?? null;
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
-  useEffect(() => setSelectedSkillIds(template?.registry_skill_ids ?? []), [template?.id, template?.selected_version]);
+  const [creating, setCreating] = useState(false);
+  const [newTemplateId, setNewTemplateId] = useState("");
+  const [newTemplateName, setNewTemplateName] = useState("");
+  useEffect(() => { if (!creating) setSelectedSkillIds(template?.registry_skill_ids ?? []); }, [creating, template?.id, template?.selected_version]);
   const toggleSkill = useCallback((skillId: string) => setSelectedSkillIds((current) => current.includes(skillId) ? current.filter((id) => id !== skillId) : [...current, skillId]), []);
-  const editable = template !== null && template.id !== "builtin-pristine";
+  const editable = creating || (template !== null && template.id !== "builtin-pristine");
+  const beginCreate = () => { setCreating(true); setNewTemplateId(""); setNewTemplateName(""); setSelectedSkillIds([]); };
+  const cancelCreate = () => { setCreating(false); setSelectedSkillIds(template?.registry_skill_ids ?? []); };
   return <section className="template-workspace">
-    <header className="template-header"><div><h1>Templates</h1><p>Versioned skill membership. Saving creates a new template version; project pins stay unchanged.</p></div><label className="template-picker"><span>Template</span><select value={template?.id ?? ""} onChange={(event) => onSelectTemplate(event.target.value)}>{presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name} · v{preset.selected_version}</option>)}</select></label></header>
-    {!template ? <div className="review-empty"><AlertTriangle size={22} className="review-icon" /><span>No editable template is registered.</span></div> : <div className="template-editor"><div className="template-editor-summary"><FileText size={25} className="mint" /><div><strong>{template.name}</strong><small>{editable ? `${selectedSkillIds.length} selected skill${selectedSkillIds.length === 1 ? "" : "s"} · next save creates v${template.selected_version + 1}` : "Pristine intentionally contains no managed skills"}</small></div></div><div className="template-skill-list">{skills.map((skill) => { const selected = selectedSkillIds.includes(skill.id); return <label className={selected ? "template-skill selected" : "template-skill"} key={skill.id}><input type="checkbox" checked={selected} disabled={!editable || saving} onChange={() => toggleSkill(skill.id)} /><div><strong>{skill.skill_name}</strong><small>{skill.description ?? `Revision ${skill.source_revision_id.slice(0, 12)}`}</small></div><span>{selected ? "Included" : "Available"}</span></label>; })}</div>{editable ? <button className="primary-action template-save" type="button" disabled={saving || selectedSkillIds.length === 0} onClick={() => onSave(template.id, selectedSkillIds)}>{saving ? <LoaderCircle size={20} className="spin" /> : <Check size={20} />} {saving ? "Saving version…" : `Save template v${template.selected_version + 1}`}</button> : null}</div>}
+    <header className="template-header"><div><h1>Templates</h1><p>Versioned skill membership. Saving creates a new template version; project pins stay unchanged.</p></div>{creating ? <button className="quiet-action template-new" type="button" onClick={cancelCreate}>Cancel</button> : <div className="template-header-actions"><label className="template-picker"><span>Template</span><select value={template?.id ?? ""} onChange={(event) => onSelectTemplate(event.target.value)}>{presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name} · v{preset.selected_version}</option>)}</select></label><button className="quiet-action template-new" type="button" onClick={beginCreate}>New template</button></div>}</header>
+    {!template && !creating ? <div className="review-empty"><AlertTriangle size={22} className="review-icon" /><span>No editable template is registered.</span></div> : <div className="template-editor"><div className="template-editor-summary"><FileText size={25} className="mint" /><div>{creating ? <><label className="template-field">Template ID<input value={newTemplateId} onChange={(event) => setNewTemplateId(event.target.value)} placeholder="frontend-review" /></label><label className="template-field">Template name<input value={newTemplateName} onChange={(event) => setNewTemplateName(event.target.value)} placeholder="Frontend review" /></label></> : <><strong>{template!.name}</strong><small>{editable ? `${selectedSkillIds.length} selected skill${selectedSkillIds.length === 1 ? "" : "s"} · next save creates v${template!.selected_version + 1}` : "Pristine intentionally contains no managed skills"}</small></>}</div></div><div className="template-skill-list">{skills.map((skill) => { const selected = selectedSkillIds.includes(skill.id); return <label className={selected ? "template-skill selected" : "template-skill"} key={skill.id}><input type="checkbox" checked={selected} disabled={!editable || saving} onChange={() => toggleSkill(skill.id)} /><div><strong>{skill.skill_name}</strong><small>{skill.description ?? `Revision ${skill.source_revision_id.slice(0, 12)}`}</small></div><span>{selected ? "Included" : "Available"}</span></label>; })}</div>{editable ? <button className="primary-action template-save" type="button" disabled={saving || selectedSkillIds.length === 0 || (creating && (!newTemplateId.trim() || !newTemplateName.trim()))} onClick={() => { if (creating) onCreate(newTemplateId, newTemplateName, selectedSkillIds).then((created) => { if (created) setCreating(false); }); else onSave(template!.id, selectedSkillIds); }}>{saving ? <LoaderCircle size={20} className="spin" /> : <Check size={20} />} {saving ? "Saving template…" : creating ? "Create template v1" : `Save template v${template!.selected_version + 1}`}</button> : null}</div>}
   </section>;
 }
 
@@ -457,6 +463,15 @@ export function CatalogApp() {
       .catch((error: Error) => setNotice(error.message))
       .finally(() => setSavingTemplate(false));
   }, []);
+  const createTemplate = useCallback((id: string, name: string, registrySkillIds: string[]) => {
+    if (!catalogApi) return Promise.resolve(false);
+    setSavingTemplate(true);
+    return fetch(`${catalogApi}/api/presets`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, name, registry_skill_ids: registrySkillIds }) })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Template creation was rejected")))
+      .then((body: { preset: RemotePreset }) => { setPresets((current) => [...current, body.preset]); setSelectedTemplateId(body.preset.id); setNotice(`${body.preset.name} v1 created.`); return true; })
+      .catch((error: Error) => { setNotice(error.message); return false; })
+      .finally(() => setSavingTemplate(false));
+  }, []);
   const previewPlan = useCallback(() => {
     setPreviewing(true);
     setNotice(null);
@@ -528,7 +543,7 @@ export function CatalogApp() {
     <main className="app-shell">
       <SideNavigation activePage={activePage} onNavigate={(page) => setActivePage(page === "Templates" ? "Templates" : "Projects")} />
       <div className="workspace">
-        {activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
+        {activePage === "Templates" ? <TemplateWorkspace presets={presets} skills={registrySkills} selectedTemplateId={selectedTemplateId} onSelectTemplate={setSelectedTemplateId} onSave={saveTemplateMembership} onCreate={createTemplate} saving={savingTemplate} /> : <><header className="topbar"><button className="back-button" type="button" aria-label="Back to projects"><ArrowLeft size={25} /></button>{catalogApi && projects.length > 0 ? <label className="project-select"><span className="sr-only">Project</span><select value={selectedProjectId ?? ""} onChange={(event) => { setSelectedProjectId(event.target.value); setPristine(false); setNotice(null); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={18} aria-hidden="true" /></label> : <h1>Acme Web</h1>}<label className="scope-select">Work scope<select value={scope} onChange={(event) => { setScope(event.target.value as Scope); setPristine(false); setNotice(null); }}><option value="planning">planning</option><option value="implementation">implementation</option><option value="review">review</option></select><ChevronDown size={18} aria-hidden="true" /></label></header>
         <div className="project-layout">
           <section className="main-panel"><div className="panel-title"><div><h2 id="effective-set-title">Effective skill set</h2><p>Resolved from pinned templates and the selected work scope.</p></div><button className="pristine-button" onClick={togglePristine} type="button"><RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}</button></div><SkillTable skills={skills} />{remoteError ? <div className="plan-notice error"><X size={18} /> <span>{remoteError}</span></div> : null}{notice ? <div className="plan-notice"><Check size={18} /> <span>{notice}</span><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X size={16} /></button></div> : null}</section>
           <TemplateInspector scope={scope} pristine={pristine} defaultTemplate={defaultTemplate} defaultPresetId={defaultPresetId} presets={presets} overlayTemplate={overlayTemplate} overlayPresetId={overlayPresetId} overlayActive={overlayActive} onPristine={togglePristine} onDefaultTemplate={updateDefaultTemplate} onOverlayTemplate={updateWorkScopeOverlay} onPreview={previewPlan} onCopyPrompt={copySystemPrompt} previewing={previewing} copyingPrompt={copyingPrompt} updatingDefault={updatingDefault} updatingOverlay={updatingOverlay} />
