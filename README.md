@@ -29,7 +29,8 @@ definition](./docs/mvp.md) for the implemented core flow, and [the product
 roadmap](./docs/roadmap.md) for skill management, metadata, notes, templates,
 and activation milestones. Operators should follow the
 [repository management guide](./docs/repository-management.md) and the
-[skills usage guide](./docs/skills-usage.md).
+[skills usage guide](./docs/skills-usage.md). The executable core-flow evidence
+is recorded in the [basic scenario proof](./docs/basic-scenario-proof.md).
 
 ## Bootstrap
 

@@ -47,6 +47,8 @@ Use `git status --short` before and after work. Generated files such as
    rendered interaction check.
 3. Update the relevant usage or architecture document whenever a command,
    safety boundary, state model, or operator workflow changes.
+   Update [the basic scenario proof](./basic-scenario-proof.md) when a primary
+   user journey or its evidence changes.
 4. Run `npm run check`, `npm run test`, and `git diff --check` before commit.
 5. Use focused Conventional Commit-style messages, for example
    `feat(catalog): apply plans through Skills Manager CLI`.
