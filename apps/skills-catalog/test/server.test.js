@@ -61,4 +61,23 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(preview.plan.operations[0].registry_skill_id, imported.skills[0].id);
   assert.equal(preview.plan.operations[0].skill_name, "planning");
   assert.deepEqual(history.history, []);
+
+  const recorded = await (await fetch(`${base}/projects/demo/activation-plan`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  })).json();
+  const report = await (await fetch(`${base}/activation-plans/${recorded.plan.plan_id}/report`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      plan_id: recorded.plan.plan_id,
+      completed_at: "2026-08-14T00:00:00.000Z",
+      operations: [],
+      summary: { applied: 1 },
+    }),
+  })).json();
+  const updatedHistory = await (await fetch(`${base}/projects/demo/history`)).json();
+  assert.equal(report.report.plan_id, recorded.plan.plan_id);
+  assert.equal(updatedHistory.history[0].reports.length, 1);
 });

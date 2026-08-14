@@ -1,7 +1,7 @@
 const http = require("node:http");
 const { URL } = require("node:url");
-const { listActivationHistory, listProjects } = require("./catalog-state");
-const { createProjectPlan, resolveProjectEffectiveSet } = require("./catalog-workflows");
+const { listActivationHistory, listProjects, recordActivationPlan, recordActivationReport } = require("./catalog-state");
+const { createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -79,6 +79,31 @@ function createCatalogServer({ catalogRoot, registryRoot }) {
           createProjectPlan({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags, distribution: body.distribution }),
         ]);
         return json(response, 200, { effective_set: effectiveSet, plan });
+      }
+      const recordPlan = url.pathname.match(/^\/api\/projects\/([^/]+)\/activation-plan$/);
+      if (request.method === "POST" && recordPlan) {
+        const body = await parseJsonBody(request);
+        const projectId = decodeURIComponent(recordPlan[1]);
+        const tags = workScopeTags(url, body);
+        const [selection, plan] = await Promise.all([
+          resolveProjectSelection({ catalogRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
+          createProjectPlan({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags, distribution: body.distribution }),
+        ]);
+        return json(response, 201, { record: await recordActivationPlan({
+          catalogRoot,
+          plan,
+          projectId,
+          assignments: selection.assignments,
+        }), plan });
+      }
+      const report = url.pathname.match(/^\/api\/activation-plans\/([^/]+)\/report$/);
+      if (request.method === "POST" && report) {
+        const body = await parseJsonBody(request);
+        return json(response, 201, { report: await recordActivationReport({
+          catalogRoot,
+          planId: decodeURIComponent(report[1]),
+          report: body,
+        }) });
       }
       return json(response, 404, { error: "Not found" });
     } catch (error) {

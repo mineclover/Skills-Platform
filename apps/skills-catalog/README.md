@@ -40,7 +40,10 @@ node src/cli.js serve --catalog ./.skills-platform/catalog \
 
 Available endpoints are `GET /api/projects`, `GET
 /api/projects/:id/effective-set`, `GET /api/projects/:id/history`, and `POST
-/api/projects/:id/activation-plan/preview`.
+/api/projects/:id/activation-plan/preview`. `POST
+/api/projects/:id/activation-plan` records a plan before sending it to an
+adapter; `POST /api/activation-plans/:id/report` stores the report returned by
+that adapter. Neither endpoint applies a delivery operation.
 
 ## MVP catalog flow
 
