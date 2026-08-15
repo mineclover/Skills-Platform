@@ -32,7 +32,13 @@ and activation milestones. Operators should follow the
 [skills usage guide](./docs/skills-usage.md). The executable core-flow evidence
 is recorded in the [basic scenario proof](./docs/basic-scenario-proof.md). For
 the implemented boundary, control surfaces, and verification scope, see the
-[current status](./docs/current-status.md).
+[current status](./docs/current-status.md). The design principles for scoped
+agent execution and future runtime integrations are in
+[capability scoping and runtime integration principles](./docs/agent-execution-principles.md).
+The external design rationale and Anthropic-Codex comparison are captured in
+[agent design anti-patterns](./docs/agent-design-antipatterns.md).
+Authors of new or revised skills should begin with the
+[skill authoring reference catalog](./docs/skill-authoring-reference-catalog.md).
 
 ## Bootstrap
 
