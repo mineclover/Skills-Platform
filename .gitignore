@@ -4,3 +4,7 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Local Skills Platform catalog state and materialized delivery bindings
+.skills-platform/
+skills/
