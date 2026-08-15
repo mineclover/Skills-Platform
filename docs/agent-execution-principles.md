@@ -92,8 +92,9 @@ the current confirmation requirement implicitly.
 
 ## Background reading
 
-- [5 Agent Anti-patterns from Anthropic’s First Official Exam](https://www.youtube.com/watch?v=FWddN9xLv54)
-- [Claude Certified Architect 시험을 에이전틱 엔지니어링의 실전 지침서로 읽기](https://wikidocs.net/blog/%40jaehong/28145/)
+- [Agent Design Anti-patterns: Shared Principles from Anthropic and Codex](./agent-design-antipatterns.md)
+- Anthropic, [Writing effective tools for AI agents](https://www.anthropic.com/engineering/writing-tools-for-agents)
+- OpenAI, [Codex subagents](https://developers.openai.com/codex/subagents)
 
 These sources motivate the design direction. The normative Platform boundary
 remains [the architecture](./architecture.md), the shared contracts, and the

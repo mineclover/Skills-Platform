@@ -1,5 +1,10 @@
 # Skills usage guide
 
+For guidance on authoring or revising a skill, start with the
+[skill authoring reference catalog](./skill-authoring-reference-catalog.md).
+This guide covers the separate task of importing, reviewing, selecting, and
+delivering a skill through Skills Platform.
+
 ## Two complementary layers
 
 Skills Platform manages **intent**: which immutable skill revisions are
