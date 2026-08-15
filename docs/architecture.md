@@ -82,3 +82,14 @@ silently import arbitrary source content.
 4. Upstream updates create reviewable candidate revisions; they do not change a binding automatically.
 5. The catalog can request delivery, but only the adapter may mutate provider roots or configuration.
 6. The CLI is the only supported Catalog-to-Skills-Manager control channel.
+
+## Capability scoping and future runtime integration
+
+The Platform minimizes capability and context at the policy boundary: project
+presets and work-scope overlays select only the reviewed skills needed for a
+task. It persists evidence and bounded reports, not agent reasoning traces or
+unbounded tool logs. Any future runtime or CI integration needs a separately
+versioned, reviewable execution contract; it must not weaken the current
+preview, confirmation, or verification safeguards. See
+[capability scoping and runtime integration principles](./agent-execution-principles.md)
+for the design guidance and its current-contract boundary.
