@@ -3,7 +3,7 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
-const { createActivationPlan, digestDirectory } = require("../../skill-contracts/src");
+const { createActivationPlan, digestDirectory } = require("@skills-platform/contracts");
 const { applyActivationPlan, applyActivationPlanEvents, previewActivationPlan } = require("../src");
 
 async function fixture(context, desiredState = "enabled") {

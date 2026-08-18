@@ -96,6 +96,7 @@ function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = cr
           domains: url.searchParams.getAll("domain"),
           providerId: url.searchParams.get("provider") ?? undefined,
           reviewState: url.searchParams.get("review_state") ?? undefined,
+          artifactType: url.searchParams.get("artifact_type") ?? url.searchParams.get("type") ?? undefined,
         }) });
       }
       const presetUpdate = url.pathname.match(/^\/api\/presets\/([^/]+)\/update$/);

@@ -9,6 +9,7 @@
     "check": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@skills-platform/contracts": "*",
     "@vitejs/plugin-react": "^4.6.0",
     "lucide-react": "^0.563.0",
     "react": "^19.1.0",

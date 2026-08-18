@@ -181,7 +181,7 @@ async function run(argv) {
 
   if (command === "skill") {
     const [area, action, subject] = positional.slice(1);
-    if (area === "list") return searchSkills({ catalogRoot, registryRoot });
+    if (area === "list") return searchSkills({ catalogRoot, registryRoot, artifactType: flags.type ?? flags["artifact-type"] });
     if (area === "search") {
       return searchSkills({
         catalogRoot,
@@ -191,6 +191,7 @@ async function run(argv) {
         domains: flags.domain ?? [],
         providerId: flags.provider?.[0],
         reviewState: flags["review-state"],
+        artifactType: flags.type ?? flags["artifact-type"],
       });
     }
     if (area === "revisions") return listSkillRevisions({ registryRoot, lineageId: action });
@@ -223,6 +224,7 @@ async function run(argv) {
             runtime_requirements: flags.runtime,
             risk_level: flags["risk-level"],
             review_state: flags["review-state"],
+            artifact_type: flags.type ?? flags["artifact-type"],
           },
         });
       }

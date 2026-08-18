@@ -98,6 +98,20 @@ async function createProjectPlan({ catalogRoot, registryRoot, projectId, presetI
   });
 }
 
+async function readPrimaryManifest(canonicalPath) {
+  const candidates = [
+    "SKILL.md", "RULE.md", "HOOK.md", "PLUGIN.md", "plugin.json", "MCP.md", "mcp.json",
+    "skill.md", "rule.md", "hook.md", "plugin.md", "mcp.md",
+  ];
+  for (const candidate of candidates) {
+    try {
+      const content = await fs.readFile(path.join(canonicalPath, candidate), "utf8");
+      if (content.trim() !== "") return content;
+    } catch {}
+  }
+  throw new Error("No manifest found");
+}
+
 async function resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId, workScopeTags }) {
   const selection = await resolveProjectSelection({ catalogRoot, projectId, presetId, workScopeTags });
   const plan = await createProjectPlan({ catalogRoot, registryRoot, projectId, presetId, workScopeTags });
@@ -110,6 +124,7 @@ async function resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId
     skills: plan.operations.map((operation) => ({
       registry_skill_id: operation.registry_skill_id,
       skill_name: operation.skill_name,
+      artifact_type: operation.artifact_type ?? "skill",
       source_revision_id: operation.source_revision_id,
       desired_state: operation.desired_state,
       reason: plan.mode === "pristine"
@@ -140,11 +155,10 @@ async function buildSystemPrompt({ catalogRoot, registryRoot, presetId, includeI
   const sections = [];
   for (const skill of skills) {
     try {
-      const skillMarkdown = await fs.readFile(path.join(skill.canonical_path, "SKILL.md"), "utf8");
-      if (skillMarkdown.trim() === "") throw new Error("Empty SKILL.md");
+      const skillMarkdown = await readPrimaryManifest(skill.canonical_path);
       includedSkillIds.push(skill.id);
       const section = [
-        `<!-- registry_skill_id:${skill.id} revision:${skill.source_revision_id} digest:${skill.content_digest} -->`,
+        `<!-- registry_skill_id:${skill.id} artifact_type:${skill.artifact_type ?? "skill"} revision:${skill.source_revision_id} digest:${skill.content_digest} -->`,
         skillMarkdown.trim(),
       ];
       if (includeInjectedNotes) {
@@ -192,12 +206,11 @@ async function buildProjectSystemPrompt({ catalogRoot, registryRoot, projectId, 
   const sections = [];
   for (const skill of skills) {
     try {
-      const skillMarkdown = await fs.readFile(path.join(skill.canonical_path, "SKILL.md"), "utf8");
-      if (skillMarkdown.trim() === "") throw new Error("Empty SKILL.md");
+      const skillMarkdown = await readPrimaryManifest(skill.canonical_path);
       includedSkillIds.push(skill.id);
       const selected = selectedBySkillId.get(skill.id);
       const section = [
-        `<!-- registry_skill_id:${skill.id} revision:${skill.source_revision_id} digest:${skill.content_digest} -->`,
+        `<!-- registry_skill_id:${skill.id} artifact_type:${skill.artifact_type ?? "skill"} revision:${skill.source_revision_id} digest:${skill.content_digest} -->`,
         skillMarkdown.trim(),
       ];
       if (includeInjectedNotes) {

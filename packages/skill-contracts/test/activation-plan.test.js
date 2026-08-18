@@ -72,3 +72,24 @@ test("rejects two operations that would mutate the same delivery path", () => {
   assert.equal(result.valid, false);
   assert.ok(result.issues.some((issue) => issue.message.includes("duplicate")));
 });
+
+test("supports specific artifact types (rule, hook, plugin, mcp_server) and rejects unknown types", () => {
+  const ruleOp = { ...operation(), artifact_type: "rule" };
+  const plan = createActivationPlan({
+    target: { provider_id: "antigravity", scope: "global" },
+    operations: [ruleOp],
+  });
+  assert.equal(plan.operations[0].artifact_type, "rule");
+
+  const invalidResult = validateActivationPlan({
+    plan_id: "plan_invalid_type",
+    schema_version: 1,
+    created_at: "2026-08-14T00:00:00.000Z",
+    mode: "apply",
+    target: { provider_id: "antigravity", scope: "global" },
+    distribution: { method: "symlink" },
+    operations: [{ ...operation(), artifact_type: "invalid_type" }],
+  });
+  assert.equal(invalidResult.valid, false);
+  assert.ok(invalidResult.issues.some((issue) => issue.field === "operations[0].artifact_type"));
+});

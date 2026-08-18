@@ -3,8 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "description": "Versioned contracts for Skills Catalog and delivery adapters.",
+  "main": "./src/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.js"
+    },
+    "./src": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    }
+  },
   "scripts": {
-    "check": "node --check src/index.js",
+    "build": "tsc",
+    "check": "tsc --noEmit",
     "test": "node --test"
   }
 }

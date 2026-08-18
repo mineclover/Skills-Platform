@@ -1,36 +1,53 @@
-const { randomUUID } = require("node:crypto");
-const path = require("node:path");
-const { digestDirectory, listFiles } = require("./digest");
+import { randomUUID } from "node:crypto";
+import path from "node:path";
+import { digestDirectory, listFiles, DEFAULT_IGNORED_DIRECTORIES } from "./digest";
+import {
+  ARTIFACT_TYPES,
+  DELIVERY_METHODS,
+  DELIVERY_SCOPES,
+  DESIRED_STATES,
+  PLAN_MODES,
+  type ActivationOperation,
+  type ActivationPlan,
+  type ActivationPlanDistribution,
+  type ActivationPlanTarget,
+  type ArtifactType,
+  type DeliveryMethod,
+  type DeliveryScope,
+  type DesiredState,
+  type PlanMode,
+  type ValidationIssue,
+  type ValidationResult,
+} from "./types";
 
-const ACTIVATION_PLAN_SCHEMA_VERSION = 1;
-const DELIVERY_METHODS = new Set(["symlink", "copy"]);
-const DELIVERY_SCOPES = new Set(["project", "global"]);
-const DESIRED_STATES = new Set(["enabled", "disabled"]);
-const PLAN_MODES = new Set(["apply", "pristine"]);
-const ARTIFACT_TYPES = new Set(["skill", "rule", "hook", "plugin", "mcp_server"]);
+export * from "./types";
+export * from "./digest";
 
-function requiredString(value, field, issues) {
+export const ACTIVATION_PLAN_SCHEMA_VERSION = 1;
+
+function requiredString(value: unknown, field: string, issues: ValidationIssue[]): void {
   if (typeof value !== "string" || value.trim() === "") {
     issues.push({ field, message: "must be a non-empty string" });
   }
 }
 
-function validateActivationPlan(plan) {
-  const issues = [];
+export function validateActivationPlan(plan: unknown): ValidationResult {
+  const issues: ValidationIssue[] = [];
   if (!plan || typeof plan !== "object" || Array.isArray(plan)) {
     return { valid: false, issues: [{ field: "plan", message: "must be an object" }] };
   }
 
-  requiredString(plan.plan_id, "plan_id", issues);
-  if (plan.schema_version !== ACTIVATION_PLAN_SCHEMA_VERSION) {
+  const p = plan as Record<string, any>;
+  requiredString(p.plan_id, "plan_id", issues);
+  if (p.schema_version !== ACTIVATION_PLAN_SCHEMA_VERSION) {
     issues.push({ field: "schema_version", message: `must equal ${ACTIVATION_PLAN_SCHEMA_VERSION}` });
   }
-  requiredString(plan.created_at, "created_at", issues);
-  if (!PLAN_MODES.has(plan.mode)) {
+  requiredString(p.created_at, "created_at", issues);
+  if (!PLAN_MODES.has(p.mode)) {
     issues.push({ field: "mode", message: "must be apply or pristine" });
   }
 
-  const target = plan.target;
+  const target = p.target;
   if (!target || typeof target !== "object") {
     issues.push({ field: "target", message: "is required" });
   } else {
@@ -45,20 +62,20 @@ function validateActivationPlan(plan) {
     }
   }
 
-  const distribution = plan.distribution;
+  const distribution = p.distribution;
   if (!distribution || typeof distribution !== "object") {
     issues.push({ field: "distribution", message: "is required" });
   } else if (!DELIVERY_METHODS.has(distribution.method)) {
     issues.push({ field: "distribution.method", message: "must be symlink or copy" });
   }
 
-  if (!Array.isArray(plan.operations)) {
+  if (!Array.isArray(p.operations)) {
     issues.push({ field: "operations", message: "must be an array" });
-  } else if (plan.mode === "apply" && plan.operations.length === 0) {
+  } else if (p.mode === "apply" && p.operations.length === 0) {
     issues.push({ field: "operations", message: "must contain at least one operation for apply mode" });
   } else {
-    const deliveryPaths = new Set();
-    plan.operations.forEach((operation, index) => {
+    const deliveryPaths = new Set<string>();
+    p.operations.forEach((operation: any, index: number) => {
       const prefix = `operations[${index}]`;
       requiredString(operation.registry_skill_id, `${prefix}.registry_skill_id`, issues);
       requiredString(operation.source_revision_id, `${prefix}.source_revision_id`, issues);
@@ -66,7 +83,10 @@ function validateActivationPlan(plan) {
       requiredString(operation.canonical_path, `${prefix}.canonical_path`, issues);
       requiredString(operation.delivery_path, `${prefix}.delivery_path`, issues);
       if (operation.artifact_type !== undefined && !ARTIFACT_TYPES.has(operation.artifact_type)) {
-        issues.push({ field: `${prefix}.artifact_type`, message: `must be one of ${[...ARTIFACT_TYPES].join(", ")}` });
+        issues.push({
+          field: `${prefix}.artifact_type`,
+          message: `must be one of ${[...ARTIFACT_TYPES].join(", ")}`,
+        });
       }
       if (!DESIRED_STATES.has(operation.desired_state)) {
         issues.push({ field: `${prefix}.desired_state`, message: "must be enabled or disabled" });
@@ -78,7 +98,7 @@ function validateActivationPlan(plan) {
         }
         deliveryPaths.add(normalizedPath);
       }
-      if (plan.mode === "pristine" && operation.desired_state !== "disabled") {
+      if (p.mode === "pristine" && operation.desired_state !== "disabled") {
         issues.push({ field: `${prefix}.desired_state`, message: "must be disabled for a pristine plan" });
       }
     });
@@ -87,8 +107,22 @@ function validateActivationPlan(plan) {
   return { valid: issues.length === 0, issues };
 }
 
-function createActivationPlan({ target, distribution = {}, operations, mode = "apply", now = new Date() }) {
-  const plan = {
+export interface CreateActivationPlanOptions {
+  target: ActivationPlanTarget;
+  distribution?: Partial<ActivationPlanDistribution>;
+  operations: ActivationOperation[];
+  mode?: PlanMode;
+  now?: Date;
+}
+
+export function createActivationPlan({
+  target,
+  distribution = {},
+  operations,
+  mode = "apply",
+  now = new Date(),
+}: CreateActivationPlanOptions): ActivationPlan {
+  const plan: ActivationPlan = {
     plan_id: randomUUID(),
     schema_version: ACTIVATION_PLAN_SCHEMA_VERSION,
     created_at: now.toISOString(),
@@ -101,23 +135,14 @@ function createActivationPlan({ target, distribution = {}, operations, mode = "a
     },
     operations: (operations ?? []).map((op) => ({
       ...op,
-      artifact_type: op.artifact_type ?? "skill",
+      artifact_type: (op.artifact_type as ArtifactType) ?? "skill",
     })),
   };
   const validation = validateActivationPlan(plan);
   if (!validation.valid) {
-    const error = new Error("Activation plan is invalid");
+    const error: any = new Error("Activation plan is invalid");
     error.issues = validation.issues;
     throw error;
   }
   return plan;
 }
-
-module.exports = {
-  ACTIVATION_PLAN_SCHEMA_VERSION,
-  ARTIFACT_TYPES,
-  createActivationPlan,
-  digestDirectory,
-  listFiles,
-  validateActivationPlan,
-};

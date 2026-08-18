@@ -122,9 +122,13 @@ test("search combines profile metadata and scoped note content without touching 
 
   const byTag = await searchSkills({ catalogRoot, registryRoot, tags: ["design"], providerId: "codex" });
   const byNote = await searchSkills({ catalogRoot, registryRoot, query: "accessibility sign-off" });
+  const byArtifactType = await searchSkills({ catalogRoot, registryRoot, artifactType: "skill" });
+  const emptyType = await searchSkills({ catalogRoot, registryRoot, artifactType: "hook" });
 
   assert.equal(byTag.length, 1);
   assert.equal(byNote[0].lineage.id, lineageId);
+  assert.equal(byArtifactType.length, 1);
+  assert.equal(emptyType.length, 0);
 });
 
 test("prompt export includes only explicitly enabled notes for the requested context", async (context) => {

@@ -1,6 +1,7 @@
 const crypto = require("node:crypto");
 const { getSkillLineage, getSourceRevision, latestSkillsByArtifact, listRegistrySkills, listSkillLineages } = require("./registry");
 const { getPreset, loadCatalog, saveCatalog } = require("./catalog-state");
+const { ARTIFACT_TYPES = new Set(["skill", "rule", "hook", "plugin", "mcp_server"]) } = require("@skills-platform/contracts");
 
 const NOTE_SCOPES = new Set(["global", "project", "revision", "preset", "activation_run"]);
 const NOTE_KINDS = new Set(["usage", "caveat", "decision", "dependency", "migration", "review"]);
@@ -37,6 +38,7 @@ function stringList(value, field) {
 function defaultProfile(lineage, latestSkill) {
   return {
     lineage_id: lineage.id,
+    artifact_type: latestSkill?.artifact_type ?? lineage.artifact_type ?? "skill",
     title: lineage.skill_name,
     summary: latestSkill?.description ?? null,
     purpose: null,
@@ -68,7 +70,7 @@ function normalizeProfilePatch(patch) {
     const value = stringList(patch[field], field);
     if (value !== undefined) normalized[field] = value;
   }
-  for (const [field, accepted] of [["visibility", VISIBILITIES], ["risk_level", RISK_LEVELS], ["review_state", REVIEW_STATES]]) {
+  for (const [field, accepted] of [["visibility", VISIBILITIES], ["risk_level", RISK_LEVELS], ["review_state", REVIEW_STATES], ["artifact_type", ARTIFACT_TYPES]]) {
     if (patch[field] === undefined) continue;
     if (!accepted.has(patch[field])) throw new Error(`${field} is not valid`);
     normalized[field] = patch[field];
@@ -366,7 +368,7 @@ async function getSkillFeedbackSummary({ catalogRoot, registryRoot, lineageId, p
   };
 }
 
-async function searchSkills({ catalogRoot, registryRoot, query = "", tags = [], domains = [], providerId, reviewState }) {
+async function searchSkills({ catalogRoot, registryRoot, query = "", tags = [], domains = [], providerId, reviewState, artifactType }) {
   const [catalog, context] = await Promise.all([loadCatalog(catalogRoot), skillContext(registryRoot)]);
   const queryText = query.trim().toLocaleLowerCase();
   const expectedTags = stringList(tags, "tags") ?? [];
@@ -382,6 +384,7 @@ async function searchSkills({ catalogRoot, registryRoot, query = "", tags = [], 
     const skillNotes = notes.get(lineage.id) ?? [];
     return { lineage, latest_skill: latestSkill ?? null, profile, notes: skillNotes };
   }).filter((entry) => {
+    if (artifactType && entry.profile.artifact_type !== artifactType) return false;
     if (expectedTags.some((tag) => !entry.profile.tags.includes(tag))) return false;
     if (expectedDomains.some((domain) => !entry.profile.domains.includes(domain))) return false;
     if (providerId && !entry.profile.provider_constraints.includes(providerId)) return false;
@@ -389,6 +392,7 @@ async function searchSkills({ catalogRoot, registryRoot, query = "", tags = [], 
     if (!queryText) return true;
     const haystack = [
       entry.lineage.skill_name,
+      entry.profile.artifact_type,
       entry.latest_skill?.description,
       entry.profile.title,
       entry.profile.summary,

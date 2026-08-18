@@ -159,6 +159,46 @@ test("reports newer Git commits as reviewable candidates without changing import
   assert.equal((await require("../src").getSourceRevision(registryRoot, imported.source_revision_id)).resolved_revision, candidates[0].current_resolved_revision);
 });
 
+test("imports and distinguishes multiple artifact types: skill, rule, hook, plugin, and mcp_server", async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-artifact-types-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const sourcePath = path.join(root, "source");
+  const registryRoot = path.join(root, "registry");
+
+  // Rule artifact
+  await fs.mkdir(path.join(sourcePath, "antigravity-rules"), { recursive: true });
+  await fs.writeFile(path.join(sourcePath, "antigravity-rules", "RULE.md"), "---\nname: coding-standards\ndescription: Standard rules for code quality.\nartifact_type: rule\n---\n\n# Rules\n", "utf8");
+
+  // Hook artifact
+  await fs.mkdir(path.join(sourcePath, "git-hooks"), { recursive: true });
+  await fs.writeFile(path.join(sourcePath, "git-hooks", "HOOK.md"), "---\nname: pre-commit-check\ndescription: Run lint before commit.\nartifact_type: hook\n---\n\n# Hook\n", "utf8");
+
+  // Plugin artifact (JSON manifest)
+  await fs.mkdir(path.join(sourcePath, "codex-plugin"), { recursive: true });
+  await fs.writeFile(path.join(sourcePath, "codex-plugin", "plugin.json"), JSON.stringify({ name: "db-tool", description: "Database inspector plugin" }, null, 2), "utf8");
+
+  // MCP server artifact
+  await fs.mkdir(path.join(sourcePath, "mcp-server"), { recursive: true });
+  await fs.writeFile(path.join(sourcePath, "mcp-server", "MCP.md"), "---\nname: github-mcp\ndescription: GitHub MCP integration server.\nartifact_type: mcp_server\n---\n\n# GitHub MCP\n", "utf8");
+
+  const inspection = await inspectLocalSource({ sourcePath });
+  assert.equal(inspection.importable, true);
+  assert.equal(inspection.skill_count, 4);
+
+  const imported = await importLocalSource({ registryRoot, sourcePath });
+  assert.equal(imported.skills.length, 4);
+
+  const rule = imported.skills.find((s) => s.skill_name === "coding-standards");
+  const hook = imported.skills.find((s) => s.skill_name === "pre-commit-check");
+  const plugin = imported.skills.find((s) => s.skill_name === "db-tool");
+  const mcp = imported.skills.find((s) => s.skill_name === "github-mcp");
+
+  assert.equal(rule.artifact_type, "rule");
+  assert.equal(hook.artifact_type, "hook");
+  assert.equal(plugin.artifact_type, "plugin");
+  assert.equal(mcp.artifact_type, "mcp_server");
+});
+
 test("creates a link-first activation plan from pinned registry skills", async (context) => {
   const { root, sourcePath, registryRoot } = await fixture();
   context.after(() => fs.rm(root, { recursive: true, force: true }));

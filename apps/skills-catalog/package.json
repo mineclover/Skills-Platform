@@ -7,7 +7,10 @@
     "skills-catalog": "src/cli.js"
   },
   "scripts": {
-    "check": "node --check src/index.js",
+    "check": "tsc --noEmit && node --check src/index.js",
     "test": "node --test"
+  },
+  "dependencies": {
+    "@skills-platform/contracts": "*"
   }
 }

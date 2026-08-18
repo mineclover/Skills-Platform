@@ -4,7 +4,7 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 const { promisify } = require("node:util");
-const { digestDirectory, listFiles } = require("../../../packages/skill-contracts/src");
+const { digestDirectory, listFiles, ARTIFACT_TYPES = new Set(["skill", "rule", "hook", "plugin", "mcp_server"]) } = require("@skills-platform/contracts");
 
 const REGISTRY_SCHEMA_VERSION = 2;
 const execFileAsync = promisify(execFile);
@@ -14,7 +14,7 @@ function sha256(value) {
 }
 
 function slug(value) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "skill";
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "artifact";
 }
 
 function sourceId(locator) {
@@ -30,10 +30,50 @@ async function pathExists(candidate) {
   }
 }
 
-function parseSkillMarkdown(content, skillPath) {
+function inferArtifactType(filePath) {
+  const base = path.basename(filePath).toLowerCase();
+  if (base === "rule.md" || base.endsWith(".rule.md")) return "rule";
+  if (base === "hook.md" || base.endsWith(".hook.md") || base.endsWith(".hook.sh") || base.endsWith(".hook.js")) return "hook";
+  if (base === "plugin.md" || base === "plugin.json") return "plugin";
+  if (base === "mcp.md" || base === "mcp.json") return "mcp_server";
+  return "skill";
+}
+
+function isArtifactFile(relativePath) {
+  const base = path.basename(relativePath).toLowerCase();
+  return (
+    base === "skill.md" ||
+    base === "rule.md" ||
+    base.endsWith(".rule.md") ||
+    base === "hook.md" ||
+    base.endsWith(".hook.md") ||
+    base.endsWith(".hook.sh") ||
+    base.endsWith(".hook.js") ||
+    base === "plugin.md" ||
+    base === "plugin.json" ||
+    base === "mcp.md" ||
+    base === "mcp.json"
+  );
+}
+
+function parseArtifactManifest(content, artifactPath) {
+  const base = path.basename(artifactPath).toLowerCase();
+  if (base.endsWith(".json")) {
+    const parsed = JSON.parse(content);
+    if (!parsed.name) throw new Error(`Missing name in manifest: ${artifactPath}`);
+    const declaredType = parsed.artifact_type ?? parsed.type;
+    const artifact_type = declaredType && ARTIFACT_TYPES.has(declaredType)
+      ? declaredType
+      : (base === "plugin.json" ? "plugin" : base === "mcp.json" ? "mcp_server" : "skill");
+    return {
+      name: parsed.name,
+      description: parsed.description ?? null,
+      artifact_type,
+    };
+  }
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) {
-    throw new Error(`Missing YAML frontmatter: ${skillPath}`);
+    throw new Error(`Missing YAML frontmatter: ${artifactPath}`);
   }
   const metadata = {};
   for (const line of match[1].split(/\r?\n/)) {
@@ -42,17 +82,29 @@ function parseSkillMarkdown(content, skillPath) {
     metadata[field[1]] = field[2].trim().replace(/^['"]|['"]$/g, "");
   }
   if (!metadata.name) {
-    throw new Error(`Missing skill name in frontmatter: ${skillPath}`);
+    throw new Error(`Missing skill name in frontmatter: ${artifactPath}`);
   }
-  return { name: metadata.name, description: metadata.description ?? null };
+  const declaredType = metadata.artifact_type ?? metadata.type;
+  const artifact_type = declaredType && ARTIFACT_TYPES.has(declaredType)
+    ? declaredType
+    : inferArtifactType(artifactPath);
+  return {
+    name: metadata.name,
+    description: metadata.description ?? null,
+    artifact_type,
+  };
+}
+
+function parseSkillMarkdown(content, skillPath) {
+  return parseArtifactManifest(content, skillPath);
 }
 
 async function discoverSkills(sourcePath) {
   const found = [];
   for (const relativePath of await listFiles(sourcePath)) {
-    if (path.basename(relativePath).toLowerCase() !== "skill.md") continue;
+    if (!isArtifactFile(relativePath)) continue;
     const absolutePath = path.join(sourcePath, relativePath);
-    const metadata = parseSkillMarkdown(await fs.readFile(absolutePath, "utf8"), absolutePath);
+    const metadata = parseArtifactManifest(await fs.readFile(absolutePath, "utf8"), absolutePath);
     found.push({
       ...metadata,
       relative_path: path.dirname(relativePath).replaceAll("\\", "/") || ".",
@@ -66,15 +118,15 @@ async function inspectLocalSource({ sourcePath }) {
   const resolvedSourcePath = path.resolve(sourcePath);
   const sourceStats = await fs.stat(resolvedSourcePath);
   if (!sourceStats.isDirectory()) throw new Error(`Source must be a directory: ${resolvedSourcePath}`);
-  const skillFiles = (await listFiles(resolvedSourcePath))
-    .filter((relativePath) => path.basename(relativePath).toLowerCase() === "skill.md")
+  const artifactFiles = (await listFiles(resolvedSourcePath))
+    .filter(isArtifactFile)
     .sort((left, right) => left.localeCompare(right));
   const skills = [];
   const issues = [];
-  for (const relativePath of skillFiles) {
+  for (const relativePath of artifactFiles) {
     const absolutePath = path.join(resolvedSourcePath, relativePath);
     try {
-      const metadata = parseSkillMarkdown(await fs.readFile(absolutePath, "utf8"), absolutePath);
+      const metadata = parseArtifactManifest(await fs.readFile(absolutePath, "utf8"), absolutePath);
       skills.push({
         ...metadata,
         relative_path: path.dirname(relativePath).replaceAll("\\", "/") || ".",
@@ -84,7 +136,7 @@ async function inspectLocalSource({ sourcePath }) {
       issues.push({ path: relativePath.replaceAll("\\", "/"), message: error.message });
     }
   }
-  if (skillFiles.length === 0) issues.push({ path: ".", message: "No SKILL.md artifacts were found in source" });
+  if (artifactFiles.length === 0) issues.push({ path: ".", message: "No supported artifacts (SKILL.md, RULE.md, HOOK.md, PLUGIN.md, MCP.md) were found in source" });
   return {
     kind: "local",
     locator: resolvedSourcePath,
@@ -120,6 +172,7 @@ function normalizeRegistry(registry) {
   }
   registry.lineages ??= [];
   for (const skill of registry.skills ?? []) {
+    skill.artifact_type ??= "skill";
     skill.artifact_key ??= `${skill.source_id}:${skill.source_relative_path}`;
     skill.lineage_id ??= lineageId(skill.artifact_key);
     if (!registry.lineages.some((lineage) => lineage.id === skill.lineage_id)) {
@@ -127,10 +180,14 @@ function normalizeRegistry(registry) {
         id: skill.lineage_id,
         source_id: skill.source_id,
         artifact_key: skill.artifact_key,
+        artifact_type: skill.artifact_type,
         source_relative_path: skill.source_relative_path,
         skill_name: skill.skill_name,
         created_at: skill.imported_at,
       });
+    } else {
+      const lineage = registry.lineages.find((item) => item.id === skill.lineage_id);
+      if (lineage) lineage.artifact_type ??= skill.artifact_type;
     }
   }
   registry.schema_version = REGISTRY_SCHEMA_VERSION;
@@ -214,6 +271,7 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
       source_id: id,
       source_revision_id: revisionId,
       skill_name: skill.name,
+      artifact_type: skill.artifact_type ?? "skill",
       source_relative_path: skill.relative_path,
       artifact_key: `${id}:${skill.relative_path}`,
       lineage_id: lineageId(`${id}:${skill.relative_path}`),
@@ -228,10 +286,14 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
         id: record.lineage_id,
         source_id: id,
         artifact_key: record.artifact_key,
+        artifact_type: record.artifact_type ?? "skill",
         source_relative_path: skill.relative_path,
         skill_name: skill.name,
         created_at: importedAt,
       });
+    } else {
+      const lineage = registry.lineages.find((item) => item.id === record.lineage_id);
+      if (lineage) lineage.artifact_type ??= record.artifact_type;
     }
     if (!existing) registry.skills.push(record);
     imported.push(record);
@@ -390,6 +452,19 @@ function changedLines(leftContent, rightContent) {
   return { added, removed };
 }
 
+async function readPrimaryManifest(canonicalPath) {
+  const candidates = [
+    "SKILL.md", "RULE.md", "HOOK.md", "PLUGIN.md", "plugin.json", "MCP.md", "mcp.json",
+    "skill.md", "rule.md", "hook.md", "plugin.md", "mcp.md",
+  ];
+  for (const candidate of candidates) {
+    try {
+      return await fs.readFile(path.join(canonicalPath, candidate), "utf8");
+    } catch {}
+  }
+  return "";
+}
+
 async function diffSkillRevisions({ registryRoot, lineageId: lineageIdValue, leftRevisionId, rightRevisionId }) {
   const revisions = await listSkillRevisions({ registryRoot, lineageId: lineageIdValue });
   const left = revisions.find((skill) => skill.source_revision_id === leftRevisionId);
@@ -397,8 +472,8 @@ async function diffSkillRevisions({ registryRoot, lineageId: lineageIdValue, lef
   if (!left) throw new Error(`Skill revision not found for lineage: ${lineageIdValue}@${leftRevisionId}`);
   if (!right) throw new Error(`Skill revision not found for lineage: ${lineageIdValue}@${rightRevisionId}`);
   const [leftContent, rightContent] = await Promise.all([
-    fs.readFile(path.join(left.canonical_path, "SKILL.md"), "utf8"),
-    fs.readFile(path.join(right.canonical_path, "SKILL.md"), "utf8"),
+    readPrimaryManifest(left.canonical_path),
+    readPrimaryManifest(right.canonical_path),
   ]);
   const diff = changedLines(leftContent, rightContent);
   return {

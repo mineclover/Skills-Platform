@@ -8,3 +8,4 @@ coverage/
 # Local Skills Platform catalog state and materialized delivery bindings
 .skills-platform/
 skills/
+*.tsbuildinfo

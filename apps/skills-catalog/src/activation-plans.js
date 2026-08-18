@@ -1,9 +1,9 @@
 const path = require("node:path");
-const { createActivationPlan } = require("../../../packages/skill-contracts/src");
+const { createActivationPlan } = require("@skills-platform/contracts");
 const { getRegistrySkills } = require("./registry");
 
-function deliveryDirectoryName(skillName) {
-  return skillName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "skill";
+function deliveryDirectoryName(skillName, _artifactType = "skill") {
+  return skillName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "artifact";
 }
 
 async function createPlanFromRegistry({
@@ -24,15 +24,19 @@ async function createPlanFromRegistry({
     distribution,
     mode,
     now,
-    operations: skills.map((skill) => ({
-      registry_skill_id: skill.id,
-      skill_name: skill.skill_name,
-      source_revision_id: skill.source_revision_id,
-      content_digest: skill.content_digest,
-      canonical_path: skill.canonical_path,
-      delivery_path: path.join(path.resolve(deliveryRoot), deliveryDirectoryName(skill.skill_name)),
-      desired_state: desiredStateBySkillId[skill.id] ?? desiredState,
-    })),
+    operations: skills.map((skill) => {
+      const artifactType = skill.artifact_type ?? "skill";
+      return {
+        registry_skill_id: skill.id,
+        skill_name: skill.skill_name,
+        artifact_type: artifactType,
+        source_revision_id: skill.source_revision_id,
+        content_digest: skill.content_digest,
+        canonical_path: skill.canonical_path,
+        delivery_path: path.join(path.resolve(deliveryRoot), deliveryDirectoryName(skill.skill_name, artifactType)),
+        desired_state: desiredStateBySkillId[skill.id] ?? desiredState,
+      };
+    }),
   });
 }
 
