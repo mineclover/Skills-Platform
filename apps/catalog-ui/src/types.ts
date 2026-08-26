@@ -1,5 +1,6 @@
 import type {
   ArtifactType,
+  InvocationMode,
   UpstreamStatus,
   UpstreamProvider,
   UpstreamBinding,
@@ -19,6 +20,8 @@ export type SkillRow = {
   overlayEnabled?: boolean;
   defaultReason: string;
   overlayReason?: string;
+  artifact_type?: ArtifactType;
+  invocation_mode?: InvocationMode;
 };
 
 export type DisplaySkill = {
@@ -26,6 +29,8 @@ export type DisplaySkill = {
   source: string;
   enabled: boolean;
   reason: string;
+  artifact_type?: ArtifactType;
+  invocation_mode?: InvocationMode;
 };
 
 export type Assignment = {
@@ -40,6 +45,8 @@ export type RemoteSet = {
   assignments: Assignment[];
   skills: Array<{
     skill_name: string;
+    artifact_type?: ArtifactType;
+    invocation_mode?: InvocationMode;
     desired_state: "enabled" | "disabled";
     reason: string;
     selected_by: { preset_id?: string } | null;
@@ -115,12 +122,13 @@ export type SourceAdoptionCandidate = {
 };
 
 export type CatalogSkill = {
-  lineage: { id: string; skill_name: string; artifact_type?: ArtifactType };
+  lineage: { id: string; skill_name: string; artifact_type?: ArtifactType; invocation_mode?: InvocationMode };
   latest_skill: {
     id: string;
     source_revision_id: string;
     description: string | null;
     artifact_type?: ArtifactType;
+    invocation_mode?: InvocationMode;
   } | null;
   profile: SkillProfile;
   notes: Array<{ id: string }>;
@@ -155,6 +163,7 @@ export type ApplyResult = {
 
 export type {
   ArtifactType,
+  InvocationMode,
   UpstreamStatus,
   UpstreamProvider,
   UpstreamBinding,
@@ -164,3 +173,4 @@ export type {
   SkillNote,
   SkillProfile,
 };
+

@@ -67,53 +67,65 @@ available through the `evaluation` CLI group.
 
 ## 1. Import and review a skill revision
 
-Inspect before importing; import preserves a canonical immutable copy. A newer
-source revision is a review candidate until an operator approves it.
+Inspect before importing; import preserves a canonical immutable copy. You can import from a local folder or directly from a Git repository (such as [Paperthin](https://github.com/LilMGenius/paperthin)).
 
 ```bash
+# Local directory import
 node apps/skills-catalog/src/cli.js source inspect <source-directory>
 node apps/skills-catalog/src/cli.js import-local <source-directory> \
   --registry ./.skills-platform/registry
+
+# Remote Git repository import
+node apps/skills-catalog/src/cli.js import-git https://github.com/LilMGenius/paperthin \
+  --registry ./.skills-platform/registry
+
+# Approve an imported revision
 node apps/skills-catalog/src/cli.js source review approve <revision-id> \
   --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
   --summary "Reviewed provenance, instructions, and intended use."
 ```
 
-Use a skill profile and notes to describe when it should be used without
-altering its canonical `SKILL.md`:
+Use a skill profile and notes to describe when it should be used and whether it is a model reflex or user command, without altering its canonical `SKILL.md`:
 
 ```bash
 node apps/skills-catalog/src/cli.js skill profile set <lineage-id> \
   --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
   --purpose "Review UI implementation" --use-when "Before merge" \
-  --tag ui --tag review --provider codex --review-state reviewed
+  --invoker user_invoked --tag ui --tag review --provider codex --review-state reviewed
+
+# Search skills by invocation mode
+node apps/skills-catalog/src/cli.js skill search --invoker user_invoked
+node apps/skills-catalog/src/cli.js skill search --invoker model_invoked
 ```
 
-## 2. Compose project skill sets
+## 2. Compose and activate project skill sets (Multi-Provider)
 
-Create a versioned preset from registry IDs and explicitly assign it to a
-project. The `Pristine` preset is the baseline with no managed skills; use it
-to define or return to a clean policy state.
+Register project targets for different assistant providers (**Codex**, **Antigravity / AGY**, **Claude**), assign templates, and activate them:
 
 ```bash
-node apps/skills-catalog/src/cli.js project add demo \
-  --catalog ./.skills-platform/catalog --name Demo --path C:/work/demo \
-  --provider codex --delivery-root C:/work/demo/.codex/skills \
-  --upstream-project-id <skills-manager-project-id>
-node apps/skills-catalog/src/cli.js preset create demo-review \
-  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
-  --name "Demo review" --skill <registry-skill-id>
-node apps/skills-catalog/src/cli.js preset assign demo demo-review \
-  --catalog ./.skills-platform/catalog
+# Register a Codex project (defaults delivery-root to <path>/skills)
+node apps/skills-catalog/src/cli.js project add my-project \
+  --name "My Project" --path C:/work/my-project --provider codex
+
+# Register an Antigravity project (defaults delivery-root to <path>/.agents/skills)
+node apps/skills-catalog/src/cli.js project add my-project-agy \
+  --name "My Project AGY" --path C:/work/my-project --provider antigravity
+
+# Assign a template (e.g. paperthin-reflexes)
+node apps/skills-catalog/src/cli.js preset assign my-project-agy paperthin-reflexes --version 2
+
+# Preview and apply in one step
+node apps/skills-catalog/src/cli.js project apply my-project-agy              # Preview
+node apps/skills-catalog/src/cli.js project apply my-project-agy --confirm    # Confirmed apply
 ```
 
 Use a work-scope overlay for a temporary or task-specific addition. An overlay
-does not rewrite the pinned default preset.
+does not rewrite the pinned default preset:
 
 ```bash
-node apps/skills-catalog/src/cli.js preset assign demo <overlay-preset-id> \
+node apps/skills-catalog/src/cli.js preset assign my-project <overlay-preset-id> \
   --catalog ./.skills-platform/catalog --role work_scope_overlay \
-  --work-scope implementation --priority 10
+  --work-scope review --priority 10
 ```
 
 ## 3. Inspect the upstream delivery state

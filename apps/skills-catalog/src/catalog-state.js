@@ -177,13 +177,26 @@ function requireIdentifier(value, label) {
   return value.trim();
 }
 
+function defaultDeliveryRoot(providerId, projectPath) {
+  if (!projectPath) return path.resolve("skills");
+  const base = path.resolve(projectPath);
+  const normalized = (providerId ?? "").toLowerCase();
+  if (normalized === "antigravity" || normalized === "agy" || normalized === "gemini") {
+    return path.join(base, ".agents", "skills");
+  }
+  if (normalized === "claude") {
+    return path.join(base, ".claude", "skills");
+  }
+  return path.join(base, "skills");
+}
+
 async function createProject({ catalogRoot, id, name, projectPath, providerId, deliveryRoot, scope = "project", upstreamProjectId = id }) {
   id = requireIdentifier(id, "Project id");
   name = requireIdentifier(name, "Project name");
   providerId = requireIdentifier(providerId, "Provider id");
-  deliveryRoot = requireIdentifier(deliveryRoot, "Delivery root");
   if (scope !== "project" && scope !== "global") throw new Error("Project scope must be project or global");
   if (scope === "project") projectPath = requireIdentifier(projectPath, "Project path");
+  const resolvedDeliveryRoot = deliveryRoot ? requireIdentifier(deliveryRoot, "Delivery root") : defaultDeliveryRoot(providerId, projectPath);
 
   const catalog = await loadCatalog(catalogRoot);
   if (catalog.projects.some((project) => project.id === id)) throw new Error(`Project already exists: ${id}`);
@@ -193,7 +206,7 @@ async function createProject({ catalogRoot, id, name, projectPath, providerId, d
     upstream_project_id: requireIdentifier(upstreamProjectId, "Upstream Skills Manager project id"),
     project_path: scope === "project" ? path.resolve(projectPath) : null,
     provider_id: providerId,
-    delivery_root: path.resolve(deliveryRoot),
+    delivery_root: path.resolve(resolvedDeliveryRoot),
     scope,
     default_preset_id: PRISTINE_PRESET_ID,
     default_preset_version: 1,

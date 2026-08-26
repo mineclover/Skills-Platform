@@ -145,7 +145,14 @@ export function TemplateWorkspace({
                     onChange={() => toggleSkill(skill.id)}
                   />
                   <div>
-                    <strong>{skill.skill_name}</strong>
+                    <div className="template-skill-title">
+                      <strong>{skill.skill_name}</strong>
+                      {skill.invocation_mode && skill.invocation_mode !== "unspecified" ? (
+                        <span className={`invocation-pill ${skill.invocation_mode === "user_invoked" ? "user" : skill.invocation_mode === "model_invoked" ? "model" : "hybrid"}`}>
+                          {skill.invocation_mode === "user_invoked" ? "👤 User" : skill.invocation_mode === "model_invoked" ? "🤖 Model" : "🔀 Hybrid"}
+                        </span>
+                      ) : null}
+                    </div>
                     <small>
                       {skill.description ?? `Revision ${skill.source_revision_id.slice(0, 12)}`}
                     </small>

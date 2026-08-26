@@ -117,17 +117,21 @@ test("scoped notes require their target, retain history, and can be queried", as
 test("search combines profile metadata and scoped note content without touching skill source", async (context) => {
   const { catalogRoot, imported, registryRoot } = await fixture(context);
   const lineageId = imported.skills[0].lineage_id;
-  await updateSkillProfile({ catalogRoot, registryRoot, lineageId, patch: { tags: ["design"], domains: ["frontend"], provider_constraints: ["codex"] } });
+  await updateSkillProfile({ catalogRoot, registryRoot, lineageId, patch: { tags: ["design"], domains: ["frontend"], provider_constraints: ["codex"], invocation_mode: "user_invoked" } });
   await addSkillNote({ catalogRoot, registryRoot, lineageId, kind: "usage", body: "Useful during accessibility sign-off." });
 
   const byTag = await searchSkills({ catalogRoot, registryRoot, tags: ["design"], providerId: "codex" });
   const byNote = await searchSkills({ catalogRoot, registryRoot, query: "accessibility sign-off" });
   const byArtifactType = await searchSkills({ catalogRoot, registryRoot, artifactType: "skill" });
+  const byInvocationMode = await searchSkills({ catalogRoot, registryRoot, invocationMode: "user_invoked" });
+  const emptyInvocationMode = await searchSkills({ catalogRoot, registryRoot, invocationMode: "model_invoked" });
   const emptyType = await searchSkills({ catalogRoot, registryRoot, artifactType: "hook" });
 
   assert.equal(byTag.length, 1);
   assert.equal(byNote[0].lineage.id, lineageId);
   assert.equal(byArtifactType.length, 1);
+  assert.equal(byInvocationMode.length, 1);
+  assert.equal(emptyInvocationMode.length, 0);
   assert.equal(emptyType.length, 0);
 });
 

@@ -9,6 +9,7 @@
     "packages/*"
   ],
   "scripts": {
+    "build": "npm run --workspaces --if-present build",
     "check": "npm run --workspaces --if-present check",
     "test": "npm run --workspaces --if-present test"
   },

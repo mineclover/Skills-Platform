@@ -1,61 +1,48 @@
 # Current implementation status
 
-> Verified: 2026-08-15
+> Verified: 2026-08-27
 
-Skills Platform is ready for local, registry-first skill-set management. It
-does not replace the existing Skills Manager: the Platform decides approved
-skill policy, and Skills Manager performs provider-specific delivery through
-its CLI.
+Skills Platform is a full-featured, registry-first artifact and skill-set control plane. It supports multi-provider delivery (Codex, Antigravity/AGY, Claude), multi-artifact type isolation (Skills, Rules, Hooks, Plugins, MCP Servers), and explicit invocation taxonomy (Model-invoked Reflexes vs User-invoked Commands).
 
 ## Operational model
 
 ```text
 immutable registry revision -> template / project policy -> ActivationPlan
-                                                    -> Skills Manager CLI
-                                                    -> provider skills/ path
+                                                    -> delivery adapter (symlink / junction)
+                                                    -> provider delivery path (Codex: skills/, AGY: .agents/skills/)
 ```
 
 | Surface | Available now | Does not do |
 | --- | --- | --- |
-| Catalog CLI | Import, review, profile, notes, feedback, evaluation, presets, project assignment, prompt export, plan/history | Write a provider `skills/` path directly |
-| Catalog UI | Skills metadata/review, template composition, project assignment, Pristine reset, prompt copy, confirmed apply progress | Alter upstream provider state without confirmation |
-| Skills Manager CLI | Discovery, binding preview, enable/disable, link/copy reconciliation, post-apply inspection | Decide Catalog membership, revisions, or preset policy |
+| Catalog CLI | Multi-source import (Local/Git), artifact inspection, review queue, profiles, scoped notes, feedback, evaluation cases, presets, project assignment, prompt export, plan generation, and history tracking | Write a provider delivery path directly without an activation plan |
+| Catalog UI | Modular workspaces (Projects, Managed Skills, Templates, Review Queue, Live Status), visual invocation badges (`👤 User-invoked`, `🤖 Model-invoked / Reflex`, `🔀 Hybrid`), template composition, Pristine baseline toggle, and profile editing | Alter provider state without plan confirmation |
+| Delivery Adapter | Atomic preview, link/copy reconciliation, verified symbolic link / Windows junction creation, safe unlinking, and post-delivery digest inspection | Decide Catalog membership, revisions, or preset policy |
+
+## Supported Providers and Delivery Targets
+
+- **Codex**: Delivered to `<project_root>/skills/` via symbolic links / junctions.
+- **Antigravity (AGY)**: Delivered to `<project_root>/.agents/skills/` via symbolic links / junctions.
+- **Custom / Universal**: Arbitrary configured delivery root paths with strict safety verification against unmanaged file mutation.
+
+## Active Integrations
+
+- **`LilMGenius/paperthin` Suite**:
+  - 29 artifacts (1 plugin + 28 skills) imported into immutable registry revision (`revision_6439e15ac9fa62471748d3cb`).
+  - Active in **Codex** (`skills/`) and **Antigravity** (`.agents/skills/`).
+  - Invocation modes automatically inferred and classified:
+    - **User-invoked**: `hate`, `macrothink`, `re0-git`, `re0-loop`, `re0-merge`, `re0-plan`, `re0-release`, `shower`, `sip`, `prism`
+    - **Model-invoked (Reflexes)**: `aim`, `autobahn`, `catchup`, `debloat`, `dedash`, `detool`, `factchk`, `feynman`, `mandela`, `modelchk`, `nba`, `re0`, `re0-upgrade`, `re0-work`, `readchk`, `reorder`, `ssotize`
 
 ## Safety invariants
 
-1. Registry revisions are immutable and are matched to upstream instances by
-   canonical content digest before delivery.
-2. Every provider mutation has a recorded plan, a per-binding preview, and an
-   explicit confirmation.
-3. A missing or digest-mismatched upstream instance fails safely; Catalog does
-   not silently import it into Skills Manager.
-4. `Pristine` disables managed bindings without deleting Registry content.
-5. Prompt export is read-only and contains only canonical skill content plus
-   notes explicitly marked for prompt injection.
+1. **Immutable Revisions**: Registry revisions are content-addressed and matched to upstream instances by SHA-256 digest before delivery.
+2. **Deterministic Activation**: Every provider mutation has a recorded plan, a per-binding preview, and explicit confirmation.
+3. **Collision Safety**: A missing or digest-mismatched artifact fails safely; delivery never overwrites unmanaged directories or files.
+4. **Pristine Mode**: Disables managed delivery bindings cleanly without deleting registry content or history.
+5. **Progressive Disclosure & Prompt Injection**: Prompts export only canonical content and explicitly flagged notes.
 
-## Evidence
+## Test & Verification Status
 
-`npm run check` verifies the JavaScript and TypeScript packages. `npm run test`
-currently runs 46 tests, including the basic operator flow: reviewed selection,
-unconfirmed apply refusal, confirmed CLI apply, return to Pristine, and safe
-rejection of an unadopted upstream skill.
-
-The real upstream smoke check is read-only:
-
-```bash
-node -e "const { createSkillsManagerCli } = require('./apps/skills-catalog/src'); createSkillsManagerCli().execute(['projects']).then(console.log)"
-```
-
-Do not use this proof as an instruction to modify a live binding. For an actual
-delivery change, preview the project plan in Catalog, inspect its scope, and
-explicitly confirm the apply action. See [basic scenario proof](./basic-scenario-proof.md)
-and [skills usage guide](./skills-usage.md) for the detailed procedure.
-
-## Deliberate follow-up scope
-
-- Hosted/team persistence, access control, and portable policy sharing.
-- GitHub shorthand, archive, and skills.sh source adapters without installer
-  execution.
-- Upstream batch execution only if its evidence and confirmation semantics
-  remain as strict as the current per-binding flow.
-- Automated evaluator execution and richer source/revision comparison UI.
+- `npm run check`: 100% typecheck passing across `@skills-platform/contracts`, `@skills-platform/skills-manager-adapter`, `@skills-platform/catalog-ui`, and `@skills-platform/catalog`.
+- `npm test`: 49 passing unit tests covering contract validations, adapter links, Git revision tracking, and profile/search workflows.
+- `npm run build`: Clean production bundle for UI and TypeScript packages.

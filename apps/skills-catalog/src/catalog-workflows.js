@@ -125,6 +125,7 @@ async function resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId
       registry_skill_id: operation.registry_skill_id,
       skill_name: operation.skill_name,
       artifact_type: operation.artifact_type ?? "skill",
+      invocation_mode: operation.invocation_mode ?? "unspecified",
       source_revision_id: operation.source_revision_id,
       desired_state: operation.desired_state,
       reason: plan.mode === "pristine"

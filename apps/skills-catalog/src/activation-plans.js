@@ -30,6 +30,7 @@ async function createPlanFromRegistry({
         registry_skill_id: skill.id,
         skill_name: skill.skill_name,
         artifact_type: artifactType,
+        invocation_mode: skill.invocation_mode ?? "unspecified",
         source_revision_id: skill.source_revision_id,
         content_digest: skill.content_digest,
         canonical_path: skill.canonical_path,

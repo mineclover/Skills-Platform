@@ -6,6 +6,7 @@ import {
   DELIVERY_METHODS,
   DELIVERY_SCOPES,
   DESIRED_STATES,
+  INVOCATION_MODES,
   PLAN_MODES,
   type ActivationOperation,
   type ActivationPlan,
@@ -15,6 +16,7 @@ import {
   type DeliveryMethod,
   type DeliveryScope,
   type DesiredState,
+  type InvocationMode,
   type PlanMode,
   type ValidationIssue,
   type ValidationResult,
@@ -86,6 +88,12 @@ export function validateActivationPlan(plan: unknown): ValidationResult {
         issues.push({
           field: `${prefix}.artifact_type`,
           message: `must be one of ${[...ARTIFACT_TYPES].join(", ")}`,
+        });
+      }
+      if (operation.invocation_mode !== undefined && !INVOCATION_MODES.has(operation.invocation_mode)) {
+        issues.push({
+          field: `${prefix}.invocation_mode`,
+          message: `must be one of ${[...INVOCATION_MODES].join(", ")}`,
         });
       }
       if (!DESIRED_STATES.has(operation.desired_state)) {

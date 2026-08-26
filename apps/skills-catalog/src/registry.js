@@ -4,7 +4,7 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 const { promisify } = require("node:util");
-const { digestDirectory, listFiles, ARTIFACT_TYPES = new Set(["skill", "rule", "hook", "plugin", "mcp_server"]) } = require("@skills-platform/contracts");
+const { digestDirectory, listFiles, ARTIFACT_TYPES = new Set(["skill", "rule", "hook", "plugin", "mcp_server"]), INVOCATION_MODES = new Set(["model_invoked", "user_invoked", "hybrid", "unspecified"]) } = require("@skills-platform/contracts");
 
 const REGISTRY_SCHEMA_VERSION = 2;
 const execFileAsync = promisify(execFile);
@@ -39,6 +39,29 @@ function inferArtifactType(filePath) {
   return "skill";
 }
 
+function normalizeInvocationMode(value) {
+  if (!value || typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase().replace(/-/g, "_");
+  if (normalized === "user" || normalized === "user_invoked" || normalized === "human") return "user_invoked";
+  if (normalized === "model" || normalized === "model_invoked" || normalized === "agent" || normalized === "reflex" || normalized === "reflexive") return "model_invoked";
+  if (normalized === "hybrid" || normalized === "both") return "hybrid";
+  if (normalized === "unspecified") return "unspecified";
+  return undefined;
+}
+
+function inferInvocationMode({ declaredMode, description, content }) {
+  const normalized = normalizeInvocationMode(declaredMode);
+  if (normalized) return normalized;
+  const text = `${description ?? ""} ${content ?? ""}`;
+  if (/\b(?:user[- ]invoked|invoked by user|human[- ]invoked)\b/i.test(text)) {
+    return "user_invoked";
+  }
+  if (/\b(?:model[- ]invoked|invoked by model|agent[- ]invoked|reflexes?|reflexive)\b/i.test(text)) {
+    return "model_invoked";
+  }
+  return "unspecified";
+}
+
 function isArtifactFile(relativePath) {
   const base = path.basename(relativePath).toLowerCase();
   return (
@@ -65,10 +88,13 @@ function parseArtifactManifest(content, artifactPath) {
     const artifact_type = declaredType && ARTIFACT_TYPES.has(declaredType)
       ? declaredType
       : (base === "plugin.json" ? "plugin" : base === "mcp.json" ? "mcp_server" : "skill");
+    const declaredMode = parsed.invocation_mode ?? parsed.invoker ?? parsed.invoked_by;
+    const invocation_mode = inferInvocationMode({ declaredMode, description: parsed.description, content });
     return {
       name: parsed.name,
       description: parsed.description ?? null,
       artifact_type,
+      invocation_mode,
     };
   }
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
@@ -88,10 +114,13 @@ function parseArtifactManifest(content, artifactPath) {
   const artifact_type = declaredType && ARTIFACT_TYPES.has(declaredType)
     ? declaredType
     : inferArtifactType(artifactPath);
+  const declaredMode = metadata.invocation_mode ?? metadata.invoker ?? metadata.invoked_by;
+  const invocation_mode = inferInvocationMode({ declaredMode, description: metadata.description, content });
   return {
     name: metadata.name,
     description: metadata.description ?? null,
     artifact_type,
+    invocation_mode,
   };
 }
 
@@ -266,12 +295,16 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
       await fs.cp(skill.root_path, artifactPath, { recursive: true, force: false, errorOnExist: true });
     }
     const existing = registry.skills.find((record) => record.id === artifactId && record.source_revision_id === revisionId);
-    const record = existing ?? {
+    const record = existing ? Object.assign(existing, {
+      invocation_mode: skill.invocation_mode ?? existing.invocation_mode ?? "unspecified",
+      artifact_type: skill.artifact_type ?? existing.artifact_type ?? "skill",
+    }) : {
       id: artifactId,
       source_id: id,
       source_revision_id: revisionId,
       skill_name: skill.name,
       artifact_type: skill.artifact_type ?? "skill",
+      invocation_mode: skill.invocation_mode ?? "unspecified",
       source_relative_path: skill.relative_path,
       artifact_key: `${id}:${skill.relative_path}`,
       lineage_id: lineageId(`${id}:${skill.relative_path}`),
@@ -287,13 +320,17 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
         source_id: id,
         artifact_key: record.artifact_key,
         artifact_type: record.artifact_type ?? "skill",
+        invocation_mode: record.invocation_mode ?? "unspecified",
         source_relative_path: skill.relative_path,
         skill_name: skill.name,
         created_at: importedAt,
       });
     } else {
       const lineage = registry.lineages.find((item) => item.id === record.lineage_id);
-      if (lineage) lineage.artifact_type ??= record.artifact_type;
+      if (lineage) {
+        lineage.artifact_type = record.artifact_type ?? lineage.artifact_type;
+        lineage.invocation_mode = record.invocation_mode ?? lineage.invocation_mode;
+      }
     }
     if (!existing) registry.skills.push(record);
     imported.push(record);

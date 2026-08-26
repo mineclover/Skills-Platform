@@ -93,3 +93,24 @@ test("supports specific artifact types (rule, hook, plugin, mcp_server) and reje
   assert.equal(invalidResult.valid, false);
   assert.ok(invalidResult.issues.some((issue) => issue.field === "operations[0].artifact_type"));
 });
+
+test("supports invocation modes (model_invoked, user_invoked, hybrid, unspecified) and rejects unknown modes", () => {
+  const userOp = { ...operation(), invocation_mode: "user_invoked" };
+  const plan = createActivationPlan({
+    target: { provider_id: "codex", scope: "global" },
+    operations: [userOp],
+  });
+  assert.equal(plan.operations[0].invocation_mode, "user_invoked");
+
+  const invalidResult = validateActivationPlan({
+    plan_id: "plan_invalid_mode",
+    schema_version: 1,
+    created_at: "2026-08-14T00:00:00.000Z",
+    mode: "apply",
+    target: { provider_id: "codex", scope: "global" },
+    distribution: { method: "symlink" },
+    operations: [{ ...operation(), invocation_mode: "magic_invoked" }],
+  });
+  assert.equal(invalidResult.valid, false);
+  assert.ok(invalidResult.issues.some((issue) => issue.field === "operations[0].invocation_mode"));
+});

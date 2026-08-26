@@ -8,6 +8,15 @@ export const ARTIFACT_TYPES: ReadonlySet<ArtifactType> = new Set([
   "mcp_server",
 ]);
 
+export type InvocationMode = "model_invoked" | "user_invoked" | "hybrid" | "unspecified";
+
+export const INVOCATION_MODES: ReadonlySet<InvocationMode> = new Set([
+  "model_invoked",
+  "user_invoked",
+  "hybrid",
+  "unspecified",
+]);
+
 export type DeliveryMethod = "symlink" | "copy";
 export const DELIVERY_METHODS: ReadonlySet<DeliveryMethod> = new Set(["symlink", "copy"]);
 
@@ -37,6 +46,7 @@ export interface ActivationOperation {
   registry_skill_id: string;
   skill_name: string;
   artifact_type?: ArtifactType;
+  invocation_mode?: InvocationMode;
   source_revision_id: string;
   content_digest: string;
   canonical_path: string;
@@ -115,6 +125,7 @@ export interface SkillLineage {
   source_id: string;
   artifact_key: string;
   artifact_type?: ArtifactType;
+  invocation_mode?: InvocationMode;
   source_relative_path: string;
   skill_name: string;
   created_at: string;
@@ -126,6 +137,7 @@ export interface RegistrySkill {
   source_revision_id: string;
   skill_name: string;
   artifact_type?: ArtifactType;
+  invocation_mode?: InvocationMode;
   source_relative_path: string;
   artifact_key?: string;
   lineage_id: string;
@@ -144,6 +156,7 @@ export type ReviewState = "unreviewed" | "reviewed" | "deprecated";
 export interface SkillProfile {
   lineage_id: string;
   artifact_type?: ArtifactType;
+  invocation_mode?: InvocationMode;
   title: string;
   summary: string | null;
   purpose: string | null;

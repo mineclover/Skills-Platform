@@ -34,7 +34,14 @@ export function SkillTable({ skills }: { skills: DisplaySkill[] }) {
             <span className={skill.enabled ? "checkbox checked" : "checkbox"}>
               {skill.enabled ? <Check size={16} /> : null}
             </span>
-            <strong>{skill.name}</strong>
+            <div className="skill-name-cell">
+              <strong>{skill.name}</strong>
+              {skill.invocation_mode && skill.invocation_mode !== "unspecified" ? (
+                <span className={`invocation-pill ${skill.invocation_mode === "user_invoked" ? "user" : skill.invocation_mode === "model_invoked" ? "model" : "hybrid"}`}>
+                  {skill.invocation_mode === "user_invoked" ? "👤 User" : skill.invocation_mode === "model_invoked" ? "🤖 Model" : "🔀 Hybrid"}
+                </span>
+              ) : null}
+            </div>
           </div>
           <span className={skill.enabled ? "status enabled" : "status"}>
             {skill.enabled ? "Selected" : "Disabled"}

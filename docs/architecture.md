@@ -31,9 +31,25 @@ source -> inspect -> registry revision -> review / release / project policy
 
 | Path | Owner | Responsibility |
 | --- | --- | --- |
-| `apps/skills-catalog` | Skills Platform | Registry, catalog, evaluation, release, project assignments, activation plans. |
-| `apps/skills-manager` | Existing Skills Manager repository | Upstream compatibility and safe provider delivery operations. |
-| `packages/skill-contracts` | Skills Platform | Versioned cross-process/domain contracts. |
+| `apps/skills-catalog` | Skills Platform | Registry, catalog, evaluation, release, project assignments, REST API, CLI. |
+| `apps/catalog-ui` | Skills Platform | Web UI (React 19, TypeScript, Vite) with modular workspaces (`ProjectWorkspace`, `SkillWorkspace`, `TemplateWorkspace`, `ReviewQueue`, `LiveActivationStatus`). |
+| `packages/skill-contracts` | Skills Platform | Versioned TypeScript contracts, schemas, artifact taxonomy (`ArtifactType`, `InvocationMode`), and directory digests. |
+| `packages/skills-manager-adapter` | Skills Platform | Reference delivery adapter (TypeScript) providing atomic preview, verified Windows junctions / symlinks, safe unlinking, and rollback. |
+
+## Supported Artifact Types & Invocation Taxonomy
+
+### 1. Platform Artifact Types (`ArtifactType`)
+- **`skill`**: Standard procedural runbooks and progressive disclosure agent skills (`SKILL.md`).
+- **`rule`**: Contextual guidelines and coding standards (`GEMINI.md`, `AGENTS.md`, `*.rule.md`).
+- **`hook`**: Event lifecycle triggers (`hook.md`, `*.hook.sh`, `*.hook.js`).
+- **`plugin`**: Composite bundles containing skills, rules, and configurations (`plugin.json`, `plugin.md`).
+- **`mcp_server`**: Model Context Protocol integration declarations (`mcp.json`, `mcp.md`).
+
+### 2. Invocation Taxonomy (`InvocationMode`)
+- **`model_invoked`** (Reflexes): Autonomous engineering reflexes reached for by the agent during coding, refactoring, verification, or design.
+- **`user_invoked`** (Commands): Explicitly executed by humans for high-impact or destructive operations to avoid agent bias (e.g. `hate`, `macrothink`, `re0-release`).
+- **`hybrid`**: Can be used both as an autonomous reflex and an explicit human command.
+- **`unspecified`**: Unclassified baseline.
 
 ## CLI adapter contract
 

@@ -17,6 +17,7 @@ import type {
   DisplaySkill,
   EvaluationSummary,
   FeedbackSummary,
+  InvocationMode,
   RegistrySkill,
   RemoteAssignment,
   RemoteComparison,
@@ -435,6 +436,8 @@ export function CatalogApp() {
               source: assignment?.name ?? (pristine ? "Pristine" : "Catalog"),
               enabled: skill.desired_state === "enabled",
               reason: skill.reason.replaceAll("_", " "),
+              artifact_type: skill.artifact_type,
+              invocation_mode: skill.invocation_mode,
             };
           })
         : sampleSkills(scope, pristine),
@@ -586,6 +589,7 @@ export function CatalogApp() {
         purpose: string | null;
         use_when: string[];
         review_state: "unreviewed" | "reviewed" | "deprecated";
+        invocation_mode?: InvocationMode;
       },
     ) => {
       if (!catalogApi) return;

@@ -4,6 +4,7 @@ import type {
   CatalogSkill,
   EvaluationSummary,
   FeedbackSummary,
+  InvocationMode,
   SkillFeedback,
   SkillNote,
 } from "../types";
@@ -33,6 +34,7 @@ export function SkillWorkspace({
       purpose: string | null;
       use_when: string[];
       review_state: "unreviewed" | "reviewed" | "deprecated";
+      invocation_mode?: InvocationMode;
     },
   ) => void;
   saving: boolean;
@@ -57,6 +59,7 @@ export function SkillWorkspace({
   const [purpose, setPurpose] = useState("");
   const [useWhen, setUseWhen] = useState("");
   const [reviewState, setReviewState] = useState<"unreviewed" | "reviewed" | "deprecated">("unreviewed");
+  const [invocationMode, setInvocationMode] = useState<InvocationMode>("unspecified");
   const [feedbackOutcome, setFeedbackOutcome] = useState("success");
   const [feedbackEvidence, setFeedbackEvidence] = useState("manual");
   const [feedbackText, setFeedbackText] = useState("");
@@ -68,7 +71,15 @@ export function SkillWorkspace({
     setPurpose(selected?.profile.purpose ?? "");
     setUseWhen(selected?.profile.use_when.join(", ") ?? "");
     setReviewState(selected?.profile.review_state ?? "unreviewed");
-  }, [selected?.lineage.id, selected?.profile.purpose, selected?.profile.review_state, selected?.profile.use_when]);
+    setInvocationMode(selected?.profile.invocation_mode ?? selected?.latest_skill?.invocation_mode ?? "unspecified");
+  }, [
+    selected?.lineage.id,
+    selected?.profile.purpose,
+    selected?.profile.review_state,
+    selected?.profile.use_when,
+    selected?.profile.invocation_mode,
+    selected?.latest_skill?.invocation_mode,
+  ]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -128,7 +139,14 @@ export function SkillWorkspace({
                   }
                 />
                 <span>
-                  <strong>{skill.profile.title || skill.lineage.skill_name}</strong>
+                  <span className="managed-skill-title-row">
+                    <strong>{skill.profile.title || skill.lineage.skill_name}</strong>
+                    {skill.profile.invocation_mode && skill.profile.invocation_mode !== "unspecified" ? (
+                      <span className={`invocation-pill ${skill.profile.invocation_mode === "user_invoked" ? "user" : skill.profile.invocation_mode === "model_invoked" ? "model" : "hybrid"}`}>
+                        {skill.profile.invocation_mode === "user_invoked" ? "👤 User" : skill.profile.invocation_mode === "model_invoked" ? "🤖 Model" : "🔀 Hybrid"}
+                      </span>
+                    ) : null}
+                  </span>
                   <small>{skill.latest_skill?.description ?? "No current revision description"}</small>
                 </span>
                 <em>{skill.profile.review_state.replaceAll("_", " ")}</em>
@@ -148,13 +166,21 @@ export function SkillWorkspace({
                       .map((item) => item.trim())
                       .filter(Boolean),
                     review_state: reviewState,
+                    invocation_mode: invocationMode,
                   });
                 }}
               >
                 <div className="skill-detail-heading">
                   <div>
                     <p className="section-label">Immutable skill</p>
-                    <h2>{selected.profile.title || selected.lineage.skill_name}</h2>
+                    <div className="skill-heading-row">
+                      <h2>{selected.profile.title || selected.lineage.skill_name}</h2>
+                      {selected.profile.invocation_mode && selected.profile.invocation_mode !== "unspecified" ? (
+                        <span className={`invocation-pill ${selected.profile.invocation_mode === "user_invoked" ? "user" : selected.profile.invocation_mode === "model_invoked" ? "model" : "hybrid"}`}>
+                          {selected.profile.invocation_mode === "user_invoked" ? "👤 User-invoked" : selected.profile.invocation_mode === "model_invoked" ? "🤖 Model-invoked (Reflex)" : "🔀 Hybrid"}
+                        </span>
+                      ) : null}
+                    </div>
                     <p>
                       {selected.latest_skill?.description ??
                         "No description is available for the latest revision."}
@@ -172,8 +198,8 @@ export function SkillWorkspace({
                     <dd>{selected.latest_skill?.source_revision_id.slice(0, 12) ?? "Unavailable"}</dd>
                   </div>
                   <div>
-                    <dt>Notes</dt>
-                    <dd>{selected.notes.length}</dd>
+                    <dt>Invoker</dt>
+                    <dd>{selected.profile.invocation_mode?.replaceAll("_", " ") ?? "unspecified"}</dd>
                   </div>
                   <div>
                     <dt>Risk</dt>
@@ -196,6 +222,20 @@ export function SkillWorkspace({
                     placeholder="Before implementation, during review"
                   />
                   <small>Separate conditions with commas.</small>
+                </label>
+                <label className="template-field">
+                  Invocation mode
+                  <select
+                    value={invocationMode}
+                    onChange={(event) =>
+                      setInvocationMode(event.target.value as typeof invocationMode)
+                    }
+                  >
+                    <option value="model_invoked">🤖 Model-invoked (Agent Reflex)</option>
+                    <option value="user_invoked">👤 User-invoked (Explicit Command)</option>
+                    <option value="hybrid">🔀 Hybrid (Both Model & User)</option>
+                    <option value="unspecified">Unspecified</option>
+                  </select>
                 </label>
                 <label className="template-field">
                   Review state

@@ -95,8 +95,9 @@ function usage() {
     "  skills-catalog source review approve|reject <source-revision-id> --summary <text>",
     "  skills-catalog serve [--catalog <path>] [--registry <path>] [--host <host>] [--port <n>]",
     "  skills-catalog list [--registry <path>]",
-    "  skills-catalog project add <id> --name <name> --path <path> --provider <id> --delivery-root <path> [--upstream-project-id <id>]",
+    "  skills-catalog project add <id> --name <name> --path <path> --provider <id> [--delivery-root <path>] [--upstream-project-id <id>]",
     "  skills-catalog project list | project resolve <id> [--preset <id>] [--work-scope <tag>]...",
+    "  skills-catalog project apply <id> [--confirm] [--preset <id>] [--work-scope <tag>]... [--copy]",
     "  skills-catalog preset create <id> --name <name> --skill <registry-skill-id>...",
     "  skills-catalog preset show <id> [--version <n>] | preset update <id> [--skill <id>]...",
     "  skills-catalog preset clone <source-id> <new-id> --name <name> | preset compare <id> <left> <right>",
@@ -181,7 +182,12 @@ async function run(argv) {
 
   if (command === "skill") {
     const [area, action, subject] = positional.slice(1);
-    if (area === "list") return searchSkills({ catalogRoot, registryRoot, artifactType: flags.type ?? flags["artifact-type"] });
+    if (area === "list") return searchSkills({
+      catalogRoot,
+      registryRoot,
+      artifactType: flags.type ?? flags["artifact-type"],
+      invocationMode: flags.invoker ?? flags["invocation-mode"],
+    });
     if (area === "search") {
       return searchSkills({
         catalogRoot,
@@ -192,6 +198,7 @@ async function run(argv) {
         providerId: flags.provider?.[0],
         reviewState: flags["review-state"],
         artifactType: flags.type ?? flags["artifact-type"],
+        invocationMode: flags.invoker ?? flags["invocation-mode"],
       });
     }
     if (area === "revisions") return listSkillRevisions({ registryRoot, lineageId: action });
@@ -225,6 +232,7 @@ async function run(argv) {
             risk_level: flags["risk-level"],
             review_state: flags["review-state"],
             artifact_type: flags.type ?? flags["artifact-type"],
+            invocation_mode: flags.invoker ?? flags["invocation-mode"],
           },
         });
       }
@@ -432,6 +440,29 @@ async function run(argv) {
     if (action === "list") return listProjects(catalogRoot);
     if (action === "resolve") {
       return resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [] });
+    }
+    if (action === "apply") {
+      const plan = await createProjectPlan({
+        catalogRoot,
+        registryRoot,
+        projectId,
+        presetId: flags.preset,
+        workScopeTags: flags["work-scope"] ?? [],
+        distribution: { method: flags.copy === true ? "copy" : "symlink" },
+      });
+      const adapter = require("@skills-platform/skills-manager-adapter");
+      const confirmed = flags.confirm === true;
+      if (!confirmed) {
+        const preview = await adapter.previewActivationPlan(plan);
+        return { plan, preview, message: "Preview only. Pass --confirm to apply." };
+      }
+      const report = await adapter.applyActivationPlan(plan, { confirm: true });
+      const selection = await resolveProjectSelection({
+        catalogRoot, projectId, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [],
+      });
+      await recordActivationPlan({ catalogRoot, plan, projectId, assignments: selection.assignments });
+      await recordActivationReport({ catalogRoot, planId: plan.plan_id, report });
+      return { plan, report };
     }
   }
 
