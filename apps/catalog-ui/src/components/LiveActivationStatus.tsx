@@ -1,4 +1,4 @@
-import { LoaderCircle, RefreshCcw } from "lucide-react";
+import { Eye, LoaderCircle, RefreshCcw, Sparkles } from "lucide-react";
 import type { UpstreamStatus } from "../types";
 
 function statusCopy(status: UpstreamStatus | null, loading: boolean, error: string | null) {
@@ -13,11 +13,13 @@ export function LiveStatusCard({
   status,
   loading,
   error,
+  onOpenDrawer,
 }: {
   label: string;
   status: UpstreamStatus | null;
   loading: boolean;
   error: string | null;
+  onOpenDrawer?: () => void;
 }) {
   const detectedProviders =
     status?.inventory.providers.filter((provider) => provider.detected) ?? [];
@@ -98,9 +100,21 @@ export function LiveStatusCard({
               ))
             )}
           </div>
-          <small className="live-checked">
-            Read-only check · {new Date(status.checked_at).toLocaleString()}
-          </small>
+          <div className="live-card-footer">
+            <small className="live-checked">
+              Read-only check · {new Date(status.checked_at).toLocaleString()}
+            </small>
+            {onOpenDrawer && (
+              <button
+                type="button"
+                className="live-card-inspect-btn"
+                onClick={onOpenDrawer}
+                aria-label={`Inspect ${label} in diagnostics drawer`}
+              >
+                <Eye size={13} /> Inspect
+              </button>
+            )}
+          </div>
         </>
       ) : (
         <p className="live-empty">
@@ -117,12 +131,14 @@ export function LiveActivationStatus({
   loading,
   error,
   onRefresh,
+  onOpenDrawer,
 }: {
   globalStatus: UpstreamStatus | null;
   projectStatus: UpstreamStatus | null;
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
+  onOpenDrawer?: () => void;
 }) {
   const projectLabel = projectStatus?.manager_project_id
     ? `Selected project · ${projectStatus.manager_project_id}`
@@ -134,15 +150,40 @@ export function LiveActivationStatus({
           <h2 id="live-status-title">Live Skills Manager status</h2>
           <p>Read-only provider and binding inspection. Catalog policy is not changed.</p>
         </div>
-        <button className="live-refresh" type="button" onClick={onRefresh} disabled={loading}>
-          {loading ? <LoaderCircle size={16} className="spin" /> : <RefreshCcw size={16} />}{" "}
-          {loading ? "Checking…" : "Refresh"}
-        </button>
+        <div className="live-status-actions">
+          {onOpenDrawer && (
+            <button
+              className="live-drawer-trigger"
+              type="button"
+              onClick={onOpenDrawer}
+              title="Open full slide-over diagnostics drawer with drift reconciliation"
+            >
+              <Sparkles size={15} className="mint" /> Inspect Diagnostics
+            </button>
+          )}
+          <button className="live-refresh" type="button" onClick={onRefresh} disabled={loading}>
+            {loading ? <LoaderCircle size={16} className="spin" /> : <RefreshCcw size={16} />}{" "}
+            {loading ? "Checking…" : "Refresh"}
+          </button>
+        </div>
       </div>
       <div className="live-status-grid">
-        <LiveStatusCard label="Global activation" status={globalStatus} loading={loading} error={error} />
-        <LiveStatusCard label={projectLabel} status={projectStatus} loading={loading} error={error} />
+        <LiveStatusCard
+          label="Global activation"
+          status={globalStatus}
+          loading={loading}
+          error={error}
+          onOpenDrawer={onOpenDrawer}
+        />
+        <LiveStatusCard
+          label={projectLabel}
+          status={projectStatus}
+          loading={loading}
+          error={error}
+          onOpenDrawer={onOpenDrawer}
+        />
       </div>
     </section>
   );
 }
+

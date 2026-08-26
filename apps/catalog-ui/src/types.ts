@@ -9,6 +9,11 @@ import type {
   SkillFeedback,
   SkillNote,
   SkillProfile,
+  SkillRecipe,
+  RecipeSource,
+  RecipeSkill,
+  RecipePreset,
+  RecipeProjectBinding,
 } from "@skills-platform/contracts";
 
 export type Scope = "planning" | "implementation" | "review";
@@ -53,7 +58,16 @@ export type RemoteSet = {
   }>;
 };
 
-export type RemoteProject = { id: string; name: string };
+export type RemoteProject = {
+  id: string;
+  name: string;
+  provider_id?: string;
+  delivery_root?: string;
+  project_path?: string | null;
+  scope?: string;
+  default_preset_id?: string;
+  default_preset_version?: number;
+};
 export type RemotePreset = {
   id: string;
   name: string;
@@ -142,6 +156,33 @@ export type EvaluationSummary = {
   latest_outcome: string | null;
 };
 
+export type DiagnosticStage =
+  | "plan"
+  | "inspect"
+  | "preview"
+  | "materialize"
+  | "verify";
+
+export type StepStatus = "pending" | "active" | "completed" | "failed";
+
+export interface DiagnosticStepInfo {
+  id: DiagnosticStage;
+  label: string;
+  shortLabel: string;
+  description: string;
+  stageBasePercent: number;
+  stageMaxPercent: number;
+}
+
+export interface DriftSummary {
+  hasDrift: boolean;
+  totalDriftCount: number;
+  driftBreakdown: Record<string, number>;
+  matchedCount: number;
+  providerId: string;
+  message: string;
+}
+
 export type ApplyProgress = {
   stage: string;
   completed: number;
@@ -161,6 +202,64 @@ export type ApplyResult = {
   error?: string;
 };
 
+export interface RecipeInspectionSummary {
+  sources_count: number;
+  skills_count: number;
+  presets_count: number;
+  projects_count: number;
+  by_invocation_mode: {
+    model_invoked: number;
+    user_invoked: number;
+    hybrid: number;
+    unspecified: number;
+  };
+  by_artifact_type: Record<string, number>;
+}
+
+export interface RecipeInspectionResult {
+  valid: boolean;
+  recipe_id?: string;
+  name?: string;
+  description?: string | null;
+  created_at?: string;
+  issues?: Array<{ field: string; message: string }>;
+  summary?: RecipeInspectionSummary;
+  sources?: Array<{
+    source_id: string;
+    type: "git" | "local";
+    locator: string;
+    resolved_commit?: string;
+  }>;
+  presets?: Array<{
+    id: string;
+    name: string;
+    version: number;
+    skills_count: number;
+  }>;
+  projects?: RecipeProjectBinding[];
+}
+
+export interface RecipeApplyOptions {
+  recipe: SkillRecipe | string;
+  project_path?: string;
+  provider_id?: "codex" | "antigravity" | "claude" | string;
+  confirm?: boolean;
+}
+
+export interface RecipeApplyResult {
+  recipe_id: string;
+  name: string;
+  sources_imported: Array<{ source_id: string; locator: string; imported_skills: number }>;
+  presets_reconciled: Array<{ id: string; matched_skills: number }>;
+  delivery?: {
+    project_id: string;
+    preview?: any;
+    report?: any;
+    applied: boolean;
+    message?: string;
+  } | null;
+}
+
 export type {
   ArtifactType,
   InvocationMode,
@@ -172,5 +271,10 @@ export type {
   SkillFeedback,
   SkillNote,
   SkillProfile,
+  SkillRecipe,
+  RecipeSource,
+  RecipeSkill,
+  RecipePreset,
+  RecipeProjectBinding,
 };
 

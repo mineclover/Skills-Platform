@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -9,6 +10,16 @@ import {
   LoaderCircle,
   RefreshCcw,
 } from "lucide-react";
+import { FilterToolbar, type InvocationFilterMode, type ViewMode } from "./FilterToolbar";
+import {
+  DeliveryPathIndicator,
+  InvocationBadge,
+  ProjectStatusPill,
+  ProviderBadge,
+  calculateProjectStatus,
+  getProviderInfo,
+  resolveDeliveryPath,
+} from "../visual-identity";
 import type {
   ApplyProgress,
   DisplaySkill,
@@ -18,43 +29,171 @@ import type {
   Scope,
 } from "../types";
 
-export function SkillTable({ skills }: { skills: DisplaySkill[] }) {
-  return (
-    <section className="skill-table" aria-labelledby="effective-set-title">
-      <div className="table-head">
-        <span>Skill</span>
-        <span>Status</span>
-        <span>Source</span>
-        <span>Reason</span>
-        <span aria-hidden="true" />
+export function ProjectSkillGrid({
+  skills,
+  providerId = "antigravity",
+}: {
+  skills: DisplaySkill[];
+  providerId?: string;
+}) {
+  if (skills.length === 0) {
+    return (
+      <div className="review-empty">
+        <span>No effective skills match the filter criteria.</span>
       </div>
-      {skills.map((skill) => (
-        <article className="skill-row" key={skill.name}>
-          <div className="skill-name">
-            <span className={skill.enabled ? "checkbox checked" : "checkbox"}>
-              {skill.enabled ? <Check size={16} /> : null}
-            </span>
-            <div className="skill-name-cell">
-              <strong>{skill.name}</strong>
-              {skill.invocation_mode && skill.invocation_mode !== "unspecified" ? (
-                <span className={`invocation-pill ${skill.invocation_mode === "user_invoked" ? "user" : skill.invocation_mode === "model_invoked" ? "model" : "hybrid"}`}>
-                  {skill.invocation_mode === "user_invoked" ? "👤 User" : skill.invocation_mode === "model_invoked" ? "🤖 Model" : "🔀 Hybrid"}
+    );
+  }
+
+  return (
+    <div
+      className="project-skill-grid skill-card-grid"
+      role="list"
+      aria-label="Effective skills card grid"
+    >
+      {skills.map((skill) => {
+        const invMode = skill.invocation_mode ?? "unspecified";
+        return (
+          <div
+            key={skill.name}
+            className={`skill-card project-skill-card ${skill.enabled ? "enabled" : "disabled"}`}
+          >
+            <div className="skill-card-header">
+              <div className="skill-card-title-group">
+                <span className={skill.enabled ? "checkbox checked" : "checkbox"}>
+                  {skill.enabled ? <Check size={14} /> : null}
                 </span>
-              ) : null}
+                <h3 className="skill-card-title">{skill.name}</h3>
+              </div>
+              <span className={skill.enabled ? "status enabled" : "status"}>
+                {skill.enabled ? "Selected" : "Disabled"}
+              </span>
+            </div>
+
+            <div className="skill-card-meta">
+              <InvocationBadge mode={invMode} showTooltip={true} />
+              <ProviderBadge providerId={providerId} showDeliveryPath={false} showTooltip={true} />
+              <span className="source-badge">{skill.source}</span>
+            </div>
+
+            <div className="skill-card-path-row">
+              <span className="path-label">Active Binding:</span>
+              <DeliveryPathIndicator providerId={providerId} skillName={skill.name} showTooltip={true} />
+            </div>
+
+            <p className="project-skill-reason">{skill.reason}</p>
+
+            <div className="skill-card-footer">
+              <span className="source-detail">
+                {skill.source === "Pristine" ? "Managed baseline" : "Pinned template"}
+              </span>
             </div>
           </div>
-          <span className={skill.enabled ? "status enabled" : "status"}>
-            {skill.enabled ? "Selected" : "Disabled"}
-          </span>
-          <div className="source">
-            <strong>{skill.source}</strong>
-            <small>{skill.source === "Pristine" ? "Managed baseline" : "Pinned template"}</small>
+        );
+      })}
+    </div>
+  );
+}
+
+export function SkillTable({
+  skills,
+  providerId = "antigravity",
+}: {
+  skills: DisplaySkill[];
+  providerId?: string;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [invocationFilter, setInvocationFilter] = useState<InvocationFilterMode>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
+
+  const filteredSkills = useMemo(() => {
+    return skills.filter((skill) => {
+      // 1. Invocation mode filter
+      if (invocationFilter !== "all") {
+        const mode = skill.invocation_mode ?? "unspecified";
+        if (mode !== invocationFilter) return false;
+      }
+
+      // 2. Keyword search
+      const needle = searchQuery.trim().toLowerCase();
+      if (!needle) return true;
+
+      const bindingPath = resolveDeliveryPath(providerId, skill.name).toLowerCase();
+
+      return (
+        skill.name.toLowerCase().includes(needle) ||
+        skill.source.toLowerCase().includes(needle) ||
+        skill.reason.toLowerCase().includes(needle) ||
+        bindingPath.includes(needle)
+      );
+    });
+  }, [skills, invocationFilter, searchQuery, providerId]);
+
+  return (
+    <div className="effective-skills-container">
+      <FilterToolbar
+        invocationMode={invocationFilter}
+        onInvocationModeChange={setInvocationFilter}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        totalCount={skills.length}
+        filteredCount={filteredSkills.length}
+        entityName="effective skills"
+        showInvocationChips={true}
+        showProviderFilter={false}
+        showViewToggle={true}
+        searchPlaceholder="Filter effective skills or delivery paths..."
+      />
+
+      {viewMode === "grid" ? (
+        <ProjectSkillGrid skills={filteredSkills} providerId={providerId} />
+      ) : (
+        <section className="skill-table" aria-labelledby="effective-set-title">
+          <div className="table-head">
+            <span>Skill</span>
+            <span>Status</span>
+            <span>Delivery Path</span>
+            <span>Source</span>
+            <span>Reason</span>
+            <span aria-hidden="true" />
           </div>
-          <span className="reason">{skill.reason}</span>
-          <ChevronDown size={20} className="row-chevron" aria-hidden="true" />
-        </article>
-      ))}
-    </section>
+          {filteredSkills.length === 0 ? (
+            <div className="review-empty">
+              <span>No effective skills match the filter criteria.</span>
+            </div>
+          ) : (
+            filteredSkills.map((skill) => (
+              <article className="skill-row" key={skill.name}>
+                <div className="skill-name">
+                  <span className={skill.enabled ? "checkbox checked" : "checkbox"}>
+                    {skill.enabled ? <Check size={16} /> : null}
+                  </span>
+                  <div className="skill-name-cell">
+                    <strong>{skill.name}</strong>
+                    <InvocationBadge mode={skill.invocation_mode} showTooltip={true} />
+                  </div>
+                </div>
+                <span className={skill.enabled ? "status enabled" : "status"}>
+                  {skill.enabled ? "Selected" : "Disabled"}
+                </span>
+                <div className="delivery-cell">
+                  <DeliveryPathIndicator providerId={providerId} skillName={skill.name} showTooltip={true} />
+                </div>
+                <div className="source">
+                  <strong>{skill.source}</strong>
+                  <small>
+                    {skill.source === "Pristine" ? "Managed baseline" : "Pinned template"}
+                  </small>
+                </div>
+                <span className="reason">{skill.reason}</span>
+                <ChevronDown size={20} className="row-chevron" aria-hidden="true" />
+              </article>
+            ))
+          )}
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -103,6 +242,7 @@ export function TemplateInspector({
   overlayTemplate,
   overlayPresetId,
   overlayActive,
+  providerId = "antigravity",
   onPristine,
   onDefaultTemplate,
   onOverlayTemplate,
@@ -124,6 +264,7 @@ export function TemplateInspector({
   overlayTemplate: string;
   overlayPresetId: string | null;
   overlayActive: boolean;
+  providerId?: string;
   onPristine: () => void;
   onDefaultTemplate: (presetId: string) => void;
   onOverlayTemplate: (presetId: string) => void;
@@ -138,10 +279,15 @@ export function TemplateInspector({
   updatingOverlay: boolean;
 }) {
   const overlayShown = overlayActive && !pristine;
+  const providerMeta = getProviderInfo(providerId);
+
   return (
     <aside className="inspector" aria-label="Project policy">
       <div className="inspector-section">
-        <p className="section-label">Pinned default template</p>
+        <div className="section-label-row">
+          <p className="section-label">Pinned default template</p>
+          <ProviderBadge providerId={providerId} showDeliveryPath={false} showTooltip={true} />
+        </div>
         <div className="template-tile">
           <FileText size={30} strokeWidth={1.4} />
           <div>
@@ -211,7 +357,15 @@ export function TemplateInspector({
         ) : null}
       </div>
       <div className="provenance">
-        <p className="section-label">Resolution</p>
+        <p className="section-label">Resolution & Delivery Target</p>
+        <div>
+          <span>Provider</span>
+          <strong>{providerMeta.displayName} ({providerMeta.alias})</strong>
+        </div>
+        <div>
+          <span>Delivery root</span>
+          <code className="delivery-root-code">{providerMeta.deliveryRootRelative}/</code>
+        </div>
         <div>
           <span>Default source</span>
           <strong>{pristine ? "Pristine" : defaultTemplate}</strong>
@@ -271,6 +425,8 @@ export function PlanHistory({
   remote,
   history,
   comparison,
+  providerId = "antigravity",
+  onViewDetails,
 }: {
   scope: Scope;
   pristine: boolean;
@@ -280,32 +436,50 @@ export function PlanHistory({
   remote: boolean;
   history: RemoteHistory | null;
   comparison: RemoteComparison | null;
+  providerId?: string;
+  onViewDetails?: () => void;
 }) {
   const enabledCount = skills.filter((skill) => skill.enabled).length;
   const report = history?.reports.at(-1);
   const applied = report?.report.summary?.applied ?? enabledCount;
+
+  const statusState = calculateProjectStatus({
+    pristine,
+    pinnedPresetId: pristine ? "builtin-pristine" : undefined,
+    comparison,
+    history,
+  });
+
   const progress = previewing
     ? "2 / 3 resolving"
-    : comparison
-      ? comparison.in_sync
+    : statusState.state === "drift"
+      ? `Observed drift (${statusState.driftCount})`
+      : statusState.state === "insync"
         ? "Observed in sync"
-        : "Observed drift"
-      : report
-        ? `${applied} applied`
-        : "3 / 3 resolved";
+        : statusState.state === "pristine"
+          ? "Pristine baseline"
+          : report
+            ? `${applied} applied`
+            : "3 / 3 resolved";
+
   const observationDetail = comparison
     ? comparison.in_sync
-      ? `Provider ${comparison.provider_id} matches the pinned plan`
+      ? `Provider ${comparison.provider_id || providerId} matches the pinned plan`
       : Object.entries(comparison.summary)
           .filter(([status]) => status !== "matched")
           .map(([status, count]) => `${count} ${status}`)
           .join(" · ")
     : null;
+
   return (
     <section className="history-strip" aria-labelledby="history-title">
       <div className="history-title">
         <h2 id="history-title">Recent activation plans</h2>
-        <span>{remote ? "Catalog bridge connected" : "Demo data"}</span>
+        <div className="history-badges-group">
+          <ProviderBadge providerId={providerId} showDeliveryPath={false} showTooltip={true} />
+          <ProjectStatusPill status={statusState} showTooltip={true} />
+          <span>{remote ? "Catalog bridge connected" : "Demo data"}</span>
+        </div>
       </div>
       <div className="history-row">
         <CircleCheck size={30} className="mint" />
@@ -325,24 +499,29 @@ export function PlanHistory({
           </small>
         </div>
         <div className="history-progress">
-          <strong className={comparison && !comparison.in_sync ? "drift" : ""}>{progress}</strong>
+          <strong className={statusState.state === "drift" ? "drift" : ""}>{progress}</strong>
           <small>
             {enabledCount} enabled · {skills.length - enabledCount} disabled
           </small>
         </div>
         <div className="progress-track" aria-label={progress}>
           <div
-            className={comparison && !comparison.in_sync ? "progress-fill drift" : "progress-fill"}
+            className={statusState.state === "drift" ? "progress-fill drift" : "progress-fill"}
             style={{
               width: previewing
                 ? "54%"
-                : comparison && !comparison.in_sync
+                : statusState.state === "drift"
                   ? "68%"
                   : "100%",
             }}
           />
         </div>
-        <button className="details-button" type="button">
+        <button
+          className="details-button"
+          type="button"
+          onClick={onViewDetails}
+          aria-label="View plan details and diagnostics"
+        >
           View details
         </button>
         <ChevronDown size={20} className="row-chevron" aria-hidden="true" />
@@ -350,3 +529,4 @@ export function PlanHistory({
     </section>
   );
 }
+

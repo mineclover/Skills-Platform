@@ -1,18 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, RefreshCcw, X } from "lucide-react";
 import { catalogApi, copyText, readApplyStream } from "./api/catalog-api";
+import { ActivationProgressModal } from "./components/ActivationProgressModal";
+import { LiveActivationDrawer } from "./components/LiveActivationDrawer";
 import { LiveActivationStatus } from "./components/LiveActivationStatus";
 import {
   PlanHistory,
   SkillTable,
   TemplateInspector,
 } from "./components/ProjectWorkspace";
+import { RecipeWorkspace } from "./components/RecipeWorkspace";
 import { ReviewQueue, SourceChangeQueue } from "./components/ReviewQueue";
 import { SideNavigation } from "./components/SideNavigation";
 import { SkillWorkspace } from "./components/SkillWorkspace";
 import { TemplateWorkspace } from "./components/TemplateWorkspace";
+import {
+  calculateProjectStatus,
+  ProjectStatusPill,
+  ProviderBadge,
+} from "./visual-identity";
 import type {
   ApplyProgress,
+  ApplyResult,
   CatalogSkill,
   DisplaySkill,
   EvaluationSummary,
@@ -133,6 +142,15 @@ export function CatalogApp() {
   const [liveStatusError, setLiveStatusError] = useState<string | null>(null);
   const [applyingPlan, setApplyingPlan] = useState(false);
   const [applyProgress, setApplyProgress] = useState<ApplyProgress | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+  const [progressModalTitle, setProgressModalTitle] = useState("Real-Time Activation Diagnostics");
+  const [progressModalSubtitle, setProgressModalSubtitle] = useState("Executing multi-provider activation pipeline");
+  const [modalProgress, setModalProgress] = useState<ApplyProgress | null>(null);
+  const [modalResult, setModalResult] = useState<ApplyResult | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [isModalStreaming, setIsModalStreaming] = useState(false);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
 
   const refreshSourceCandidates = useCallback(() => {
     if (!catalogApi) return Promise.resolve();
@@ -464,6 +482,28 @@ export function CatalogApp() {
   const overlayPresetId = configuredOverlay?.preset_id ?? null;
   const overlayActive = remoteSet ? overlayTemplate !== "None" : scope === "implementation";
 
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId],
+  );
+
+  const activeProviderId = useMemo(() => {
+    return (
+      selectedProject?.provider_id ||
+      globalStatus?.inventory.providers.find((p) => p.detected)?.provider_id ||
+      "antigravity"
+    );
+  }, [selectedProject, globalStatus]);
+
+  const projectStatusState = useMemo(() => {
+    return calculateProjectStatus({
+      pristine,
+      pinnedPresetId: defaultPresetId,
+      comparison,
+      history,
+    });
+  }, [pristine, defaultPresetId, comparison, history]);
+
   const togglePristine = useCallback(() => {
     setPristine((current) => !current);
     setNotice(null);
@@ -672,7 +712,29 @@ export function CatalogApp() {
   const previewPlan = useCallback(() => {
     setPreviewing(true);
     setNotice(null);
+    setIsProgressModalOpen(true);
+    setProgressModalTitle("Activation Plan Preview");
+    setProgressModalSubtitle(`Inspecting and resolving effective skills for ${scope} scope`);
+    setModalError(null);
+    setModalResult(null);
+    setIsModalStreaming(true);
+    setModalProgress({
+      stage: "plan",
+      completed: 1,
+      total: 3,
+      message: "Resolving effective skill dependencies and template lineage",
+    });
+
     if (catalogApi && selectedProjectId) {
+      setTimeout(() => {
+        setModalProgress({
+          stage: "inspect",
+          completed: 2,
+          total: 3,
+          message: "Preflighting upstream provider bindings and paths",
+        });
+      }, 180);
+
       fetch(
         `${catalogApi}/api/projects/${encodeURIComponent(
           selectedProjectId,
@@ -689,23 +751,79 @@ export function CatalogApp() {
         .then((response) =>
           response.ok ? response.json() : Promise.reject(new Error("Preview request was rejected")),
         )
-        .then((body: { plan: { operations: unknown[] } }) =>
+        .then((body: { plan: { operations: unknown[]; plan_id?: string } }) => {
+          const count = body.plan.operations.length;
+          setActivePlanId(body.plan.plan_id ?? null);
+          setModalProgress({
+            stage: "completed",
+            completed: count,
+            total: count,
+            message: `${count} operations validated across providers. Ready for delivery.`,
+          });
+          setModalResult({
+            status: "succeeded",
+            report: {
+              summary: { applied: count, skipped: 0, failed: 0 },
+            },
+          });
           setNotice(
-            `${body.plan.operations.length} operations were validated. Ready for Skills Manager delivery.`,
-          ),
-        )
-        .catch((error: Error) => setNotice(error.message))
-        .finally(() => setPreviewing(false));
+            `${count} operations were validated. Ready for Skills Manager delivery.`,
+          );
+        })
+        .catch((error: Error) => {
+          setModalError(error.message);
+          setModalProgress({ stage: "failed", completed: 0, total: 0, message: error.message });
+          setNotice(error.message);
+        })
+        .finally(() => {
+          setPreviewing(false);
+          setIsModalStreaming(false);
+        });
       return;
     }
+
+    // Demo/offline preview simulation with realistic 5-step stages
+    window.setTimeout(() => {
+      setModalProgress({
+        stage: "inspect",
+        completed: 1,
+        total: 3,
+        message: "Inspecting mock provider filesystem bindings",
+      });
+    }, 150);
+
+    window.setTimeout(() => {
+      setModalProgress({
+        stage: "preview",
+        completed: 2,
+        total: 3,
+        message: "Validating effective skill set operations",
+      });
+    }, 350);
+
     window.setTimeout(() => {
       setPreviewing(false);
+      setIsModalStreaming(false);
+      setModalProgress({
+        stage: "completed",
+        completed: 3,
+        total: 3,
+        message: `${enabledCount} enabled and ${
+          3 - enabledCount
+        } disabled operations are ready for preview.`,
+      });
+      setModalResult({
+        status: "succeeded",
+        report: {
+          summary: { applied: enabledCount, skipped: 3 - enabledCount, failed: 0 },
+        },
+      });
       setNotice(
         `${enabledCount} enabled and ${
           3 - enabledCount
         } disabled operations are ready for preview.`,
       );
-    }, 620);
+    }, 600);
   }, [enabledCount, pristine, scope, selectedProjectId]);
 
   const applyPlan = useCallback(() => {
@@ -722,12 +840,22 @@ export function CatalogApp() {
     }
     setApplyingPlan(true);
     setNotice(null);
-    setApplyProgress({
+    setIsProgressModalOpen(true);
+    setProgressModalTitle("Materializing Activation Plan");
+    setProgressModalSubtitle("Executing live filesystem symlink materialization through Skills Manager CLI");
+    setModalError(null);
+    setModalResult(null);
+    setIsModalStreaming(true);
+
+    const initialProg: ApplyProgress = {
       stage: "record",
       completed: 0,
       total: 1,
       message: "Recording the immutable activation plan",
-    });
+    };
+    setApplyProgress(initialProg);
+    setModalProgress(initialProg);
+
     fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/activation-plan`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -742,12 +870,16 @@ export function CatalogApp() {
           : Promise.reject(new Error("Activation plan could not be recorded")),
       )
       .then(async (body: { plan: { plan_id: string; operations: unknown[] } }) => {
-        setApplyProgress({
+        setActivePlanId(body.plan.plan_id);
+        const inspectProg: ApplyProgress = {
           stage: "inspect",
           completed: 0,
           total: body.plan.operations.length,
           message: "Starting Skills Manager preflight",
-        });
+        };
+        setApplyProgress(inspectProg);
+        setModalProgress(inspectProg);
+
         const response = await fetch(
           `${catalogApi}/api/activation-plans/${encodeURIComponent(
             body.plan.plan_id,
@@ -758,9 +890,13 @@ export function CatalogApp() {
             body: JSON.stringify({ confirmed: true }),
           },
         );
-        return readApplyStream(response, setApplyProgress);
+        return readApplyStream(response, (p) => {
+          setApplyProgress(p);
+          setModalProgress(p);
+        });
       })
       .then((body) => {
+        setModalResult(body);
         const summary = body.report.summary;
         setNotice(
           `Skills Manager CLI ${body.status}: ${summary.applied} applied · ${summary.skipped} skipped · ${summary.failed} failed.`,
@@ -768,10 +904,21 @@ export function CatalogApp() {
         void refreshLiveStatus();
       })
       .catch((error: Error) => {
-        setApplyProgress({ stage: "failed", completed: 0, total: 0, message: error.message });
+        const failProg: ApplyProgress = {
+          stage: "failed",
+          completed: 0,
+          total: 0,
+          message: error.message,
+        };
+        setApplyProgress(failProg);
+        setModalProgress(failProg);
+        setModalError(error.message);
         setNotice(error.message);
       })
-      .finally(() => setApplyingPlan(false));
+      .finally(() => {
+        setApplyingPlan(false);
+        setIsModalStreaming(false);
+      });
   }, [pristine, refreshLiveStatus, scope, selectedProjectId]);
 
   const copySystemPrompt = useCallback(() => {
@@ -894,6 +1041,7 @@ export function CatalogApp() {
               recordingNote={recordingNote}
               onRecordFeedback={recordSkillFeedback}
               onAddNote={addSkillUsageNote}
+              providerId={activeProviderId}
             />
             <ReviewQueue items={reviewItems} remote={catalogApi !== ""} />
             {catalogApi ? (
@@ -916,6 +1064,15 @@ export function CatalogApp() {
             onSave={saveTemplateMembership}
             onCreate={createTemplate}
             saving={savingTemplate}
+            providerId={activeProviderId}
+          />
+        ) : activePage === "Recipes" ? (
+          <RecipeWorkspace
+            projects={projects}
+            presets={presets}
+            catalogSkills={catalogSkills}
+            selectedProjectId={selectedProjectId}
+            onSelectProject={setSelectedProjectId}
           />
         ) : (
           <>
@@ -945,6 +1102,14 @@ export function CatalogApp() {
               ) : (
                 <h1>Acme Web</h1>
               )}
+              <div className="topbar-status-badges">
+                <ProviderBadge
+                  providerId={activeProviderId}
+                  showDeliveryPath={true}
+                  showTooltip={true}
+                />
+                <ProjectStatusPill status={projectStatusState} showTooltip={true} />
+              </div>
               <label className="scope-select">
                 Work scope
                 <select
@@ -973,13 +1138,14 @@ export function CatalogApp() {
                     <RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}
                   </button>
                 </div>
-                <SkillTable skills={skills} />
+                <SkillTable skills={skills} providerId={activeProviderId} />
                 <LiveActivationStatus
                   globalStatus={globalStatus}
                   projectStatus={projectStatus}
                   loading={loadingLiveStatus}
                   error={liveStatusError}
                   onRefresh={() => void refreshLiveStatus()}
+                  onOpenDrawer={() => setIsDrawerOpen(true)}
                 />
                 {remoteError ? (
                   <div className="plan-notice error">
@@ -1004,6 +1170,7 @@ export function CatalogApp() {
                 overlayTemplate={overlayTemplate}
                 overlayPresetId={overlayPresetId}
                 overlayActive={overlayActive}
+                providerId={activeProviderId}
                 onPristine={togglePristine}
                 onDefaultTemplate={updateDefaultTemplate}
                 onOverlayTemplate={updateWorkScopeOverlay}
@@ -1027,10 +1194,48 @@ export function CatalogApp() {
               remote={remoteSet !== null}
               history={history}
               comparison={comparison}
+              providerId={activeProviderId}
+              onViewDetails={() => setIsDrawerOpen(true)}
             />
           </>
         )}
       </div>
+
+      <ActivationProgressModal
+        isOpen={isProgressModalOpen}
+        onClose={() => setIsProgressModalOpen(false)}
+        title={progressModalTitle}
+        subtitle={progressModalSubtitle}
+        progress={modalProgress}
+        result={modalResult}
+        error={modalError}
+        isStreaming={isModalStreaming}
+        planId={activePlanId}
+        providerId={activeProviderId}
+        onRetry={applyPlan}
+      />
+
+      <LiveActivationDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        globalStatus={globalStatus}
+        projectStatus={projectStatus}
+        comparison={comparison}
+        history={history}
+        loading={loadingLiveStatus}
+        error={liveStatusError}
+        selectedProjectId={selectedProjectId}
+        providerId={activeProviderId}
+        onRefresh={() => void refreshLiveStatus()}
+        onReconcileDrift={() => {
+          setIsDrawerOpen(false);
+          applyPlan();
+        }}
+        onReapplyPlan={() => {
+          setIsDrawerOpen(false);
+          applyPlan();
+        }}
+      />
     </main>
   );
 }
