@@ -20,6 +20,11 @@ import {
   type PlanMode,
   type ValidationIssue,
   type ValidationResult,
+  type RecipeSource,
+  type RecipeSkill,
+  type RecipePreset,
+  type RecipeProjectBinding,
+  type SkillRecipe,
 } from "./types";
 
 export * from "./types";
@@ -154,3 +159,90 @@ export function createActivationPlan({
   }
   return plan;
 }
+
+export function validateSkillRecipe(recipe: unknown): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  if (!recipe || typeof recipe !== "object" || Array.isArray(recipe)) {
+    return { valid: false, issues: [{ field: "recipe", message: "must be an object" }] };
+  }
+
+  const r = recipe as Record<string, any>;
+  if (r.schema_version !== 1) {
+    issues.push({ field: "schema_version", message: "must equal 1" });
+  }
+  requiredString(r.recipe_id, "recipe_id", issues);
+  requiredString(r.name, "name", issues);
+  requiredString(r.created_at, "created_at", issues);
+
+  if (!Array.isArray(r.sources)) {
+    issues.push({ field: "sources", message: "must be an array" });
+  } else {
+    r.sources.forEach((src: any, index: number) => {
+      const prefix = `sources[${index}]`;
+      requiredString(src.source_id, `${prefix}.source_id`, issues);
+      requiredString(src.locator, `${prefix}.locator`, issues);
+      if (!["git", "local"].includes(src.type)) {
+        issues.push({ field: `${prefix}.type`, message: "must be git or local" });
+      }
+    });
+  }
+
+  if (!Array.isArray(r.skills)) {
+    issues.push({ field: "skills", message: "must be an array" });
+  } else {
+    r.skills.forEach((skill: any, index: number) => {
+      const prefix = `skills[${index}]`;
+      requiredString(skill.name, `${prefix}.name`, issues);
+      requiredString(skill.source_id, `${prefix}.source_id`, issues);
+      requiredString(skill.source_relative_path, `${prefix}.source_relative_path`, issues);
+      requiredString(skill.content_digest, `${prefix}.content_digest`, issues);
+      if (skill.artifact_type && !ARTIFACT_TYPES.has(skill.artifact_type)) {
+        issues.push({ field: `${prefix}.artifact_type`, message: `must be one of ${[...ARTIFACT_TYPES].join(", ")}` });
+      }
+      if (skill.invocation_mode && !INVOCATION_MODES.has(skill.invocation_mode)) {
+        issues.push({ field: `${prefix}.invocation_mode`, message: `must be one of ${[...INVOCATION_MODES].join(", ")}` });
+      }
+    });
+  }
+
+  if (!Array.isArray(r.presets)) {
+    issues.push({ field: "presets", message: "must be an array" });
+  } else {
+    r.presets.forEach((preset: any, index: number) => {
+      const prefix = `presets[${index}]`;
+      requiredString(preset.id, `${prefix}.id`, issues);
+      requiredString(preset.name, `${prefix}.name`, issues);
+      if (typeof preset.version !== "number" || preset.version < 1) {
+        issues.push({ field: `${prefix}.version`, message: "must be a positive integer" });
+      }
+      if (!Array.isArray(preset.skills)) {
+        issues.push({ field: `${prefix}.skills`, message: "must be an array" });
+      }
+    });
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
+export function createSkillRecipe(recipe: Partial<SkillRecipe> & { name: string; sources: RecipeSource[]; skills: RecipeSkill[]; presets: RecipePreset[] }): SkillRecipe {
+  const result: SkillRecipe = {
+    schema_version: 1,
+    recipe_id: recipe.recipe_id ?? `recipe_${randomUUID().slice(0, 12)}`,
+    name: recipe.name,
+    description: recipe.description ?? null,
+    created_at: recipe.created_at ?? new Date().toISOString(),
+    created_by: recipe.created_by ?? "local",
+    sources: recipe.sources ?? [],
+    skills: recipe.skills ?? [],
+    presets: recipe.presets ?? [],
+    projects: recipe.projects ?? [],
+  };
+  const validation = validateSkillRecipe(result);
+  if (!validation.valid) {
+    const error: any = new Error("Skill recipe is invalid");
+    error.issues = validation.issues;
+    throw error;
+  }
+  return result;
+}
+

@@ -46,14 +46,17 @@ const {
   resolveProjectSelection,
   searchSkills,
   startCatalogServer,
-  restoreSkillNote,
+  recordSourceReview,
   recordEvaluationRun,
   recordObservedState,
-  recordSourceReview,
   resolveProjectEffectiveSet,
-  updateSkillProfile,
+  restoreSkillNote,
   updateEvaluationCase,
   updatePresetTemplate,
+  updateSkillProfile,
+  applyRecipe,
+  exportRecipe,
+  inspectRecipe,
 } = require(".");
 
 const MULTI_VALUE_FLAGS = new Set([
@@ -124,6 +127,9 @@ function usage() {
     "      | observed-state list [--project-id <id>] | observed-state compare <plan-id>",
     "  skills-catalog plan --skill <registry-skill-id>... --provider <id> --delivery-root <path>",
     "      [--registry <path>] [--project-id <id> --project-path <path> | --global] [--copy]",
+    "  skills-catalog recipe export [--project <id>] [--preset <id>] [--name <text>] [--out <file>]",
+    "  skills-catalog recipe inspect <file>",
+    "  skills-catalog recipe apply <file> [--path <path>] [--provider <id>] [--confirm]",
   ].join("\n");
 }
 
@@ -594,6 +600,37 @@ async function run(argv) {
       },
       distribution: { method: flags.copy === true ? "copy" : "symlink" },
     });
+  }
+
+  if (command === "recipe") {
+    const [action, targetFile] = positional.slice(1);
+    if (action === "export") {
+      const recipe = await exportRecipe({
+        catalogRoot,
+        registryRoot,
+        projectId: flags.project,
+        presetId: flags.preset,
+        name: flags.name,
+        description: flags.description,
+      });
+      if (flags.out) {
+        await fs.writeFile(path.resolve(flags.out), `${JSON.stringify(recipe, null, 2)}\n`, "utf8");
+      }
+      return recipe;
+    }
+    if (action === "inspect") {
+      return inspectRecipe({ recipePath: targetFile });
+    }
+    if (action === "apply") {
+      return applyRecipe({
+        catalogRoot,
+        registryRoot,
+        recipePath: targetFile,
+        projectPath: flags.path,
+        providerId: flags.provider?.[0],
+        confirm: flags.confirm === true,
+      });
+    }
   }
 
   throw new Error(usage());

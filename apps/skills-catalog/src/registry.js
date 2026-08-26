@@ -538,5 +538,6 @@ module.exports = {
   listSourceUpdateCandidates,
   listSkillRevisions,
   listSkillLineages,
+  loadRegistry,
   parseSkillMarkdown,
 };

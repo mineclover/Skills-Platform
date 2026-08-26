@@ -420,3 +420,65 @@ export interface UpstreamStatus {
   bindings: UpstreamBinding[];
   summary: UpstreamStatusSummary;
 }
+
+// Skill Recipe & Export / Import Lockfile Types
+export const RECIPE_SCHEMA_VERSION = 1;
+
+export interface RecipeSource {
+  source_id: string;
+  type: "git" | "local";
+  locator: string;
+  ref?: string;
+  resolved_commit?: string;
+}
+
+export interface RecipeSkill {
+  name: string;
+  artifact_type: ArtifactType;
+  invocation_mode: InvocationMode;
+  source_id: string;
+  source_relative_path: string;
+  content_digest: string;
+  description?: string | null;
+}
+
+export interface RecipePresetEntry {
+  skill_name: string;
+  source_relative_path?: string;
+  artifact_type?: ArtifactType;
+  required?: boolean;
+}
+
+export interface RecipePreset {
+  id: string;
+  name: string;
+  version: number;
+  description?: string | null;
+  purpose?: string | null;
+  work_scope_tags?: string[];
+  skills: RecipePresetEntry[];
+}
+
+export interface RecipeProjectBinding {
+  project_id: string;
+  project_name: string;
+  provider_id: string;
+  scope: "project" | "global";
+  default_preset_id: string;
+  default_preset_version?: number;
+  delivery_root_relative?: string;
+}
+
+export interface SkillRecipe {
+  schema_version: number;
+  recipe_id: string;
+  name: string;
+  description?: string | null;
+  created_at: string;
+  created_by?: string;
+  sources: RecipeSource[];
+  skills: RecipeSkill[];
+  presets: RecipePreset[];
+  projects?: RecipeProjectBinding[];
+}
+

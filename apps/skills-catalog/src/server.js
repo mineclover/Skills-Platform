@@ -9,6 +9,7 @@ const { adoptApprovedRevisionIntoPreset, latestSourceReview, listSourceAdoptionC
 const { latestSkillsByArtifact, listRegistrySkills } = require("./registry");
 const { createSkillsManagerInspector } = require("./upstream-inspector");
 const { applyRecordedActivationPlan } = require("./upstream-apply");
+const { applyRecipe, exportRecipe, inspectRecipe } = require("./recipes");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -448,6 +449,33 @@ function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = cr
           catalogRoot,
           planId: decodeURIComponent(observedComparison[1]),
           observedStateId: url.searchParams.get("observed_state_id") ?? undefined,
+        }));
+      }
+      if (url.pathname === "/api/recipes/export" && request.method === "GET") {
+        return json(response, 200, {
+          recipe: await exportRecipe({
+            catalogRoot,
+            registryRoot,
+            projectId: url.searchParams.get("project_id") ?? undefined,
+            presetId: url.searchParams.get("preset_id") ?? undefined,
+            name: url.searchParams.get("name") ?? undefined,
+            description: url.searchParams.get("description") ?? undefined,
+          }),
+        });
+      }
+      if (url.pathname === "/api/recipes/inspect" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 200, await inspectRecipe({ recipeContent: body.recipe }));
+      }
+      if (url.pathname === "/api/recipes/apply" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 200, await applyRecipe({
+          catalogRoot,
+          registryRoot,
+          recipeContent: body.recipe,
+          projectPath: body.project_path,
+          providerId: body.provider_id,
+          confirm: body.confirm === true,
         }));
       }
       return json(response, 404, { error: "Not found" });

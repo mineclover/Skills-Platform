@@ -9,5 +9,6 @@ module.exports = {
   ...require("./source-review"),
   ...require("./registry"),
   ...require("./skill-management"),
+  ...require("./recipes"),
   ...require("./server"),
 };
