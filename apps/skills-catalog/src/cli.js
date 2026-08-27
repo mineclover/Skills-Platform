@@ -634,6 +634,104 @@ async function run(argv) {
     }
   }
 
+  if (command === "hook") {
+    const [action, targetId] = positional.slice(1);
+    const {
+      listHooks,
+      registerHook,
+      removeHook,
+      updateHookStatus,
+      compileProviderConfigs,
+      triggerHookEvent,
+    } = require("./hooks-manager");
+
+    const projectPath = flags.project ?? flags.path ?? process.cwd();
+
+    if (!action || action === "list") {
+      const hooks = listHooks({ projectPath, eventName: flags.event });
+      return {
+        hooks_count: hooks.length,
+        hooks: hooks.map((h) => ({
+          id: h.id,
+          name: h.name,
+          event: h.event,
+          enabled: h.enabled,
+          matcher: h.matcher,
+          type: h.handler.type,
+          target: h.handler.target || h.handler.command,
+        })),
+      };
+    }
+
+    if (action === "add" || action === "register") {
+      const id = flags.id ?? targetId;
+      const name = flags.name ?? id;
+      const event = flags.event ?? "post_tool_use";
+      const handlerType = flags.type ?? (flags.command ? "command" : "script");
+      const target = flags.target ?? flags.handler ?? flags.script;
+      const cmd = flags.command;
+
+      if (!id) throw new Error("hook add requires --id <id>");
+      if (!target && !cmd) throw new Error("hook add requires --handler <path> or --command <cmd>");
+
+      return registerHook({
+        projectPath,
+        hook: {
+          id,
+          name,
+          event,
+          description: flags.desc ?? flags.description ?? null,
+          enabled: flags.disabled !== true,
+          matcher: flags.matcher ?? null,
+          handler: {
+            type: handlerType,
+            target: target ?? undefined,
+            command: cmd ?? undefined,
+            timeout_ms: flags.timeout ? Number(flags.timeout) : 5000,
+          },
+          priority: flags.priority ? Number(flags.priority) : 100,
+          providers: flags.provider ? (Array.isArray(flags.provider) ? flags.provider : [flags.provider]) : undefined,
+        },
+        sync: flags.sync !== false,
+      });
+    }
+
+    if (action === "remove" || action === "delete") {
+      const id = flags.id ?? targetId;
+      if (!id) throw new Error("hook remove requires <id>");
+      return removeHook({ projectPath, hookId: id, sync: flags.sync !== false });
+    }
+
+    if (action === "enable") {
+      const id = flags.id ?? targetId;
+      if (!id) throw new Error("hook enable requires <id>");
+      return updateHookStatus({ projectPath, hookId: id, enabled: true, sync: flags.sync !== false });
+    }
+
+    if (action === "disable") {
+      const id = flags.id ?? targetId;
+      if (!id) throw new Error("hook disable requires <id>");
+      return updateHookStatus({ projectPath, hookId: id, enabled: false, sync: flags.sync !== false });
+    }
+
+    if (action === "sync") {
+      return compileProviderConfigs({ projectPath });
+    }
+
+    if (action === "test" || action === "trigger") {
+      const eventName = flags.event ?? targetId ?? "post_tool_use";
+      let payload = {};
+      if (flags.payload) {
+        try {
+          payload = JSON.parse(flags.payload);
+        } catch {
+          payload = { raw: flags.payload };
+        }
+      }
+      return triggerHookEvent({ projectPath, eventName, payload });
+    }
+  }
+
   if (command === "loop") {
     const [action] = positional.slice(1);
     if (action === "run") {

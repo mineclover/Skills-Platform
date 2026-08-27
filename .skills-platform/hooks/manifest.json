@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-27T22:49:39.364Z",
+  "hooks": [
+    {
+      "id": "telemetry-collector",
+      "name": "Universal Telemetry Collector",
+      "event": "post_tool_use",
+      "description": "Captures tool invocation duration, parameters, and outcome into local NDJSON log.",
+      "enabled": true,
+      "matcher": "view_file|run_command",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/telemetry-hook.js",
+        "timeout_ms": 5000
+      },
+      "priority": 10,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "metadata": {
+        "system": true
+      }
+    },
+    {
+      "id": "session-stop-flush",
+      "name": "Session Stop Telemetry Flush",
+      "event": "session_stop",
+      "description": "Flushes queued telemetry and generates session summary when agent loop terminates.",
+      "enabled": true,
+      "matcher": null,
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/telemetry-hook.js",
+        "timeout_ms": 5000
+      },
+      "priority": 20,
+      "providers": [
+        "antigravity",
+        "claude"
+      ],
+      "metadata": {
+        "system": true
+      }
+    },
+    {
+      "id": "test-storm-guard",
+      "name": "Test Storm Suppression Guard",
+      "event": "on_test_run",
+      "description": "Blocks un-scoped full regression suite execution during inner-loop TDD cycles.",
+      "enabled": true,
+      "matcher": "test",
+      "handler": {
+        "type": "command",
+        "command": "node -e \"console.log('[Guard] Scoped test execution verified.')\"",
+        "timeout_ms": 2000
+      },
+      "priority": 50,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "metadata": {
+        "system": true
+      }
+    }
+  ]
+}

@@ -482,3 +482,70 @@ export interface SkillRecipe {
   projects?: RecipeProjectBinding[];
 }
 
+// Standard Hook Event Taxonomy & Contract Types
+export type StandardHookEvent =
+  | "session_start"
+  | "session_stop"
+  | "pre_invocation"
+  | "post_invocation"
+  | "on_skill_invoke"
+  | "pre_tool_use"
+  | "post_tool_use"
+  | "on_test_run"
+  | "on_phase_transition"
+  | "on_recipe_apply"
+  | "on_drift_detected"
+  | "on_anomaly_detected";
+
+export const STANDARD_HOOK_EVENTS: ReadonlySet<StandardHookEvent> = new Set([
+  "session_start",
+  "session_stop",
+  "pre_invocation",
+  "post_invocation",
+  "on_skill_invoke",
+  "pre_tool_use",
+  "post_tool_use",
+  "on_test_run",
+  "on_phase_transition",
+  "on_recipe_apply",
+  "on_drift_detected",
+  "on_anomaly_detected",
+]);
+
+export type HookHandlerType = "command" | "script" | "webhook" | "module";
+export const HOOK_HANDLER_TYPES: ReadonlySet<HookHandlerType> = new Set([
+  "command",
+  "script",
+  "webhook",
+  "module",
+]);
+
+export interface HookHandler {
+  type: HookHandlerType;
+  command?: string;
+  target?: string;
+  url?: string;
+  timeout_ms?: number;
+  env?: Record<string, string>;
+}
+
+export interface HookDefinition {
+  id: string;
+  name: string;
+  event: StandardHookEvent | string;
+  description?: string | null;
+  enabled: boolean;
+  matcher?: string | null;
+  handler: HookHandler;
+  priority?: number;
+  providers?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface HookManifest {
+  schema_version: number;
+  updated_at: string;
+  hooks: HookDefinition[];
+}
+
+

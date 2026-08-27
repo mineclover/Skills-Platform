@@ -11,6 +11,14 @@ const { createSkillsManagerInspector } = require("./upstream-inspector");
 const { applyRecordedActivationPlan } = require("./upstream-apply");
 const { applyRecipe, exportRecipe, inspectRecipe } = require("./recipes");
 const { getTelemetrySummary, recordTelemetry } = require("./telemetry");
+const {
+  listHooks,
+  registerHook,
+  removeHook,
+  updateHookStatus,
+  compileProviderConfigs,
+  triggerHookEvent,
+} = require("./hooks-manager");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -498,6 +506,55 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
           skillName: url.searchParams.get("skill_name") ?? undefined,
           since: url.searchParams.get("since") ?? undefined,
           limit: url.searchParams.get("limit") ? Number(url.searchParams.get("limit")) : 20,
+        }));
+      }
+      if (url.pathname === "/api/hooks" && request.method === "GET") {
+        const projectPath = url.searchParams.get("project_path") ?? process.cwd();
+        const eventName = url.searchParams.get("event") ?? undefined;
+        return json(response, 200, {
+          hooks: listHooks({ projectPath, eventName }),
+        });
+      }
+      if (url.pathname === "/api/hooks/register" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const projectPath = body.project_path ?? process.cwd();
+        return json(response, 201, registerHook({
+          projectPath,
+          hook: body.hook,
+          sync: body.sync !== false,
+        }));
+      }
+      if (url.pathname === "/api/hooks/toggle" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const projectPath = body.project_path ?? process.cwd();
+        return json(response, 200, updateHookStatus({
+          projectPath,
+          hookId: body.hook_id,
+          enabled: body.enabled,
+          sync: body.sync !== false,
+        }));
+      }
+      if (url.pathname === "/api/hooks/remove" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const projectPath = body.project_path ?? process.cwd();
+        return json(response, 200, removeHook({
+          projectPath,
+          hookId: body.hook_id,
+          sync: body.sync !== false,
+        }));
+      }
+      if (url.pathname === "/api/hooks/sync" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const projectPath = body.project_path ?? process.cwd();
+        return json(response, 200, compileProviderConfigs({ projectPath }));
+      }
+      if (url.pathname === "/api/hooks/trigger" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const projectPath = body.project_path ?? process.cwd();
+        return json(response, 200, await triggerHookEvent({
+          projectPath,
+          eventName: body.event ?? "post_tool_use",
+          payload: body.payload ?? {},
         }));
       }
       return json(response, 404, { error: "Not found" });

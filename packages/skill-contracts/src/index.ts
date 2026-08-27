@@ -25,6 +25,9 @@ import {
   type RecipePreset,
   type RecipeProjectBinding,
   type SkillRecipe,
+  type HookDefinition,
+  type HookHandler,
+  type HookManifest,
 } from "./types";
 
 export * from "./types";
@@ -245,4 +248,100 @@ export function createSkillRecipe(recipe: Partial<SkillRecipe> & { name: string;
   }
   return result;
 }
+
+export function validateHookDefinition(hook: unknown): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  if (!hook || typeof hook !== "object" || Array.isArray(hook)) {
+    return { valid: false, issues: [{ field: "hook", message: "must be an object" }] };
+  }
+
+  const h = hook as Record<string, any>;
+  requiredString(h.id, "id", issues);
+  requiredString(h.name, "name", issues);
+  requiredString(h.event, "event", issues);
+  if (typeof h.enabled !== "boolean") {
+    issues.push({ field: "enabled", message: "must be a boolean" });
+  }
+
+  const handler = h.handler;
+  if (!handler || typeof handler !== "object" || Array.isArray(handler)) {
+    issues.push({ field: "handler", message: "must be an object" });
+  } else {
+    requiredString(handler.type, "handler.type", issues);
+    if (!["command", "script", "webhook", "module"].includes(handler.type)) {
+      issues.push({
+        field: "handler.type",
+        message: "must be command, script, webhook, or module",
+      });
+    }
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
+export function validateHookManifest(manifest: unknown): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return { valid: false, issues: [{ field: "manifest", message: "must be an object" }] };
+  }
+
+  const m = manifest as Record<string, any>;
+  if (m.schema_version !== 1) {
+    issues.push({ field: "schema_version", message: "must equal 1" });
+  }
+  requiredString(m.updated_at, "updated_at", issues);
+
+  if (!Array.isArray(m.hooks)) {
+    issues.push({ field: "hooks", message: "must be an array" });
+  } else {
+    m.hooks.forEach((hook: any, index: number) => {
+      const hookValidation = validateHookDefinition(hook);
+      if (!hookValidation.valid) {
+        hookValidation.issues.forEach((issue) => {
+          issues.push({ field: `hooks[${index}].${issue.field}`, message: issue.message });
+        });
+      }
+    });
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
+export function createHookDefinition(hook: Partial<HookDefinition> & { id: string; name: string; event: string; handler: HookHandler }): HookDefinition {
+  const result: HookDefinition = {
+    id: hook.id,
+    name: hook.name,
+    event: hook.event,
+    description: hook.description ?? null,
+    enabled: hook.enabled !== false,
+    matcher: hook.matcher ?? null,
+    handler: hook.handler,
+    priority: hook.priority ?? 100,
+    providers: hook.providers ?? ["antigravity", "claude", "codex"],
+    metadata: hook.metadata ?? {},
+  };
+  const validation = validateHookDefinition(result);
+  if (!validation.valid) {
+    const error: any = new Error("Hook definition is invalid");
+    error.issues = validation.issues;
+    throw error;
+  }
+  return result;
+}
+
+export function createHookManifest(hooks: HookDefinition[] = []): HookManifest {
+  const manifest: HookManifest = {
+    schema_version: 1,
+    updated_at: new Date().toISOString(),
+    hooks,
+  };
+  const validation = validateHookManifest(manifest);
+  if (!validation.valid) {
+    const error: any = new Error("Hook manifest is invalid");
+    error.issues = validation.issues;
+    throw error;
+  }
+  return manifest;
+}
+
 
