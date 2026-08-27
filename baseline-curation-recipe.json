@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "recipe_id": "recipe_d4e3782d-88b",
+  "name": "Recipe for baseline-curation-core",
+  "description": "Automated skill installation recipe generated at 2026-08-27T11:34:12.392Z",
+  "created_at": "2026-08-27T11:34:12.393Z",
+  "created_by": "local",
+  "sources": [
+    {
+      "source_id": "source_local_979b585fd46689d6",
+      "type": "local",
+      "locator": "G:\\Downloads\\bounded-baseline-condenser-suite-v0.3.1\\skills",
+      "ref": "HEAD",
+      "resolved_commit": "a224f2492c93fdf4790eaf47b9b3bcdff8a17d72c2a3594e409acb8e7feb3463"
+    }
+  ],
+  "skills": [
+    {
+      "name": "baseline-domain-data-state",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-data-state",
+      "content_digest": "3d773bdab7e55393c1c61280cdcfa822e8b68bd4536aeebe0dca545ef164022e",
+      "description": "Extract and compact domain entities, identifiers, relationships, schemas, persistence, derived projections, state machines, invariants, versioning, and migration semantics for a canonical baseline under 80,000 tokens. Use for data models, JSON schemas, database plans, state diagrams, document models, and lifecycle specifications."
+    },
+    {
+      "name": "baseline-domain-delivery-roadmap",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-delivery-roadmap",
+      "content_digest": "1969d6b3fd39118bb7460db1e1c9bccd2138cb33b0cc570ec6bb6aa7adcd9dc6",
+      "description": "Extract and compact dependency-ordered implementation stages, outcomes, deliverables, entry and exit criteria, decision gates, owners, blockers, risks, migration work, and deferred scope for a canonical baseline under 80,000 tokens. Use for roadmaps, TODOs, implementation plans, milestones, handoff plans, and release sequencing."
+    },
+    {
+      "name": "baseline-domain-interfaces",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-interfaces",
+      "content_digest": "0303517e3012a486b383567631f09adc7800301151d126e5ebc88a0f172f0c2a",
+      "description": "Extract and compact API, event, message, file, adapter, plugin, and cross-module contracts—including producer/consumer obligations, payload semantics, errors, versioning, idempotency, ordering, authorization, and validation—into an 80,000-token canonical baseline."
+    },
+    {
+      "name": "baseline-domain-product-requirements",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-product-requirements",
+      "content_digest": "2609a4daeb4d9637d081145953ffddf91fac0c5de8808f34639c84a7ceb8b787",
+      "description": "Extract and compact product intent, scope, user-visible behavior, business rules, functional requirements, success conditions, and product acceptance for an implementation-grade baseline under 80,000 tokens. Use for PRDs, feature plans, user stories, stakeholder requirements, scope discussions, and product decision logs."
+    },
+    {
+      "name": "baseline-domain-quality-operations",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-quality-operations",
+      "content_digest": "2a1ada856f9d5f18011aa46bd4d1ee36b668c32ffcb000b5ac6bca59a75e518f",
+      "description": "Extract and compact performance, capacity, security, privacy, reliability, degradation, observability, deployment, configuration, backup, recovery, migration, rollback, and cost constraints for an implementation-grade baseline under 80,000 tokens."
+    },
+    {
+      "name": "baseline-domain-router",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-router",
+      "content_digest": "531e3ad17ca41392ee6b5642a0f0d65483706465f1417440e4e1a41990e30c07",
+      "description": "Route a large project corpus to semantic domain reducers and specialist overlays before an 80,000-token canonical-baseline compilation. Use when plans or designs span product, architecture, data, interfaces, runtime, operations, testing, roadmap, UI editors, browser DevTools, AI agents, 3D graphics, or metadata publishing."
+    },
+    {
+      "name": "baseline-domain-runtime-workflows",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-runtime-workflows",
+      "content_digest": "048d423b0c8117e49c12576e7f403f6c5e4fc956a72e92235e48e926cd4309d8",
+      "description": "Extract and compact triggers, ordered stages, state mutations, asynchronous coordination, retries, timeouts, cancellation, rollback, recovery, and completion conditions into canonical runtime flows under an 80,000-token baseline. Use for pipelines, lifecycle descriptions, sequence diagrams, jobs, synchronization loops, and event-driven orchestration."
+    },
+    {
+      "name": "baseline-domain-system-architecture",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-system-architecture",
+      "content_digest": "c6242e748f466caa100f7badb1e485e2bbd28a6c0c52efa7ea4516d4d87955b7",
+      "description": "Extract and compact components, responsibility boundaries, source-of-truth rules, dependency direction, adapters, runtime and deployment boundaries, failure domains, and architectural decisions for an 80,000-token canonical baseline. Use for architecture documents, module plans, ADRs, platform designs, and integration-boundary discussions."
+    },
+    {
+      "name": "baseline-domain-testing-acceptance",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-testing-acceptance",
+      "content_digest": "777499a97f266b1e8189ab4af7f2cc3ccd99cf3e8413e2ba1879e35ad3517a84",
+      "description": "Extract and compact acceptance criteria, verification methods, test levels, contract tests, fixtures, oracles, failure and edge coverage, non-functional evidence, and release gates for a canonical project baseline under 80,000 tokens."
+    },
+    {
+      "name": "baseline-reference-pack-builder",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-reference-pack-builder",
+      "content_digest": "7b58c60fee8825064b45a324e75a061ed81acb74b4c459d390d36ff398d20dbc",
+      "description": "Build the auxiliary source, authority, vocabulary, fact, conflict, dependency, archive, and token-budget documents used to safely condense a large project corpus into one canonical baseline under 80,000 tokens. Use for multi-source plans, versioned designs, long chat histories, conflicting PRDs or ADRs, and any condensation task where traceability and semantic-loss control matter."
+    },
+    {
+      "name": "bounded-baseline-condenser",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "bounded-baseline-condenser",
+      "content_digest": "e2e25faf8a66f489ceee39a4b1e3e1429099a4f07ee2a5464451038b90f9a658",
+      "description": "Consolidate fragmented project plans, PRDs, architecture notes, ADRs, contracts, TODOs, and change history into one canonical implementation baseline under a strict token budget. Use when a user asks to reduce, merge, freeze, hand off, or keep an entire plan or design within a context limit without losing requirements, accepted decisions, interfaces, invariants, validation criteria, risks, open issues, and source traceability. Default target is 72,000 tokens with a hard cap of 80,000 tokens."
+    }
+  ],
+  "presets": [
+    {
+      "id": "baseline-curation-core",
+      "name": "Baseline Curation Core (11-Skill Full Domain)",
+      "version": 1,
+      "description": "Comprehensive 8-domain baseline condensation and architectural reconciliation suite.",
+      "purpose": "Deeply analyze, reduce, and unify complex requirements, architecture, contracts, state, workflows, tests, and roadmap into a definitive baseline.",
+      "work_scope_tags": [
+        "architecture",
+        "curation",
+        "migration"
+      ],
+      "skills": [
+        {
+          "skill_name": "bounded-baseline-condenser",
+          "source_relative_path": "bounded-baseline-condenser",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-router",
+          "source_relative_path": "baseline-domain-router",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-reference-pack-builder",
+          "source_relative_path": "baseline-reference-pack-builder",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-product-requirements",
+          "source_relative_path": "baseline-domain-product-requirements",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-system-architecture",
+          "source_relative_path": "baseline-domain-system-architecture",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-data-state",
+          "source_relative_path": "baseline-domain-data-state",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-interfaces",
+          "source_relative_path": "baseline-domain-interfaces",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-runtime-workflows",
+          "source_relative_path": "baseline-domain-runtime-workflows",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-quality-operations",
+          "source_relative_path": "baseline-domain-quality-operations",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-testing-acceptance",
+          "source_relative_path": "baseline-domain-testing-acceptance",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-delivery-roadmap",
+          "source_relative_path": "baseline-domain-delivery-roadmap",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}

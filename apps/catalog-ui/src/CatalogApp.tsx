@@ -1123,6 +1123,8 @@ export function CatalogApp() {
                   <option value="planning">planning</option>
                   <option value="implementation">implementation</option>
                   <option value="review">review</option>
+                  <option value="curation">curation (자료 정리 / Baseline Condensation)</option>
+                  <option value="architecture">architecture (도메인 아키텍처 정제)</option>
                 </select>
                 <ChevronDown size={18} aria-hidden="true" />
               </label>

@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "recipe_id": "recipe_800b9896-e64",
+  "name": "Recipe for condensation-core",
+  "description": "Automated skill installation recipe generated at 2026-08-27T11:34:06.061Z",
+  "created_at": "2026-08-27T11:34:06.062Z",
+  "created_by": "local",
+  "sources": [
+    {
+      "source_id": "source_local_979b585fd46689d6",
+      "type": "local",
+      "locator": "G:\\Downloads\\bounded-baseline-condenser-suite-v0.3.1\\skills",
+      "ref": "HEAD",
+      "resolved_commit": "a224f2492c93fdf4790eaf47b9b3bcdff8a17d72c2a3594e409acb8e7feb3463"
+    }
+  ],
+  "skills": [
+    {
+      "name": "baseline-domain-router",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-router",
+      "content_digest": "531e3ad17ca41392ee6b5642a0f0d65483706465f1417440e4e1a41990e30c07",
+      "description": "Route a large project corpus to semantic domain reducers and specialist overlays before an 80,000-token canonical-baseline compilation. Use when plans or designs span product, architecture, data, interfaces, runtime, operations, testing, roadmap, UI editors, browser DevTools, AI agents, 3D graphics, or metadata publishing."
+    },
+    {
+      "name": "baseline-reference-pack-builder",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-reference-pack-builder",
+      "content_digest": "7b58c60fee8825064b45a324e75a061ed81acb74b4c459d390d36ff398d20dbc",
+      "description": "Build the auxiliary source, authority, vocabulary, fact, conflict, dependency, archive, and token-budget documents used to safely condense a large project corpus into one canonical baseline under 80,000 tokens. Use for multi-source plans, versioned designs, long chat histories, conflicting PRDs or ADRs, and any condensation task where traceability and semantic-loss control matter."
+    },
+    {
+      "name": "bounded-baseline-condenser",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "bounded-baseline-condenser",
+      "content_digest": "e2e25faf8a66f489ceee39a4b1e3e1429099a4f07ee2a5464451038b90f9a658",
+      "description": "Consolidate fragmented project plans, PRDs, architecture notes, ADRs, contracts, TODOs, and change history into one canonical implementation baseline under a strict token budget. Use when a user asks to reduce, merge, freeze, hand off, or keep an entire plan or design within a context limit without losing requirements, accepted decisions, interfaces, invariants, validation criteria, risks, open issues, and source traceability. Default target is 72,000 tokens with a hard cap of 80,000 tokens."
+    }
+  ],
+  "presets": [
+    {
+      "id": "condensation-core",
+      "name": "Condensation Core (3-Skill Ultra-light)",
+      "version": 1,
+      "description": "Ultra-lightweight baseline compiler for fast documentation and TODO condensation under 80k token budget.",
+      "purpose": "Compile fragmented project notes and plans into a single canonical MASTER_BASELINE.md without heavy context overhead.",
+      "work_scope_tags": [
+        "curation",
+        "planning",
+        "review"
+      ],
+      "skills": [
+        {
+          "skill_name": "bounded-baseline-condenser",
+          "source_relative_path": "bounded-baseline-condenser",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-router",
+          "source_relative_path": "baseline-domain-router",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-reference-pack-builder",
+          "source_relative_path": "baseline-reference-pack-builder",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}
