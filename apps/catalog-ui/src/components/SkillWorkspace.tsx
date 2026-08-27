@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   AlertTriangle,
   Bot,
   Check,
+  CheckCircle2,
   ChevronRight,
   Edit3,
   FileCode,
@@ -15,7 +17,9 @@ import {
   Shield,
   Sparkles,
   Tag,
+  TrendingUp,
   User,
+  XCircle,
   Zap,
 } from "lucide-react";
 import { FilterToolbar, type InvocationFilterMode, type ViewMode } from "./FilterToolbar";
@@ -399,11 +403,14 @@ export function SkillWorkspace({
           </button>
         </form>
 
-        {/* Feedback Health History */}
+        {/* Feedback Health History & Evidence Analytics */}
         <section className="skill-feedback">
           <div className="skill-feedback-heading">
             <div>
-              <p className="section-label">Feedback health</p>
+              <div className="feedback-title-row">
+                <Activity size={16} className="mint" />
+                <p className="section-label">Feedback Health & Evidence</p>
+              </div>
               <strong>
                 {loadingEvidence
                   ? "Loading evidence…"
@@ -414,7 +421,7 @@ export function SkillWorkspace({
                   ? `${feedbackSummary.total_feedback} records${
                       feedbackSummary.success_rate === null
                         ? ""
-                        : ` · ${Math.round(feedbackSummary.success_rate * 100)}% success`
+                        : ` · ${Math.round(feedbackSummary.success_rate * 100)}% success rate`
                     }`
                   : "No feedback recorded"}
               </small>
@@ -423,6 +430,18 @@ export function SkillWorkspace({
               {feedbackSummary?.health ?? "unknown"}
             </span>
           </div>
+
+          {/* Success Rate Progress Bar */}
+          {feedbackSummary && feedbackSummary.success_rate !== null && (
+            <div className="feedback-success-bar-container">
+              <div className="feedback-bar-track">
+                <div
+                  className="feedback-bar-fill"
+                  style={{ width: `${Math.round(feedbackSummary.success_rate * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           <form
             className="feedback-form"
@@ -443,12 +462,12 @@ export function SkillWorkspace({
                 value={feedbackOutcome}
                 onChange={(event) => setFeedbackOutcome(event.target.value)}
               >
-                <option value="success">Success</option>
-                <option value="correction">Correction</option>
-                <option value="scope_mismatch">Scope mismatch</option>
-                <option value="freshness">Freshness</option>
-                <option value="risk">Risk</option>
-                <option value="neutral">Neutral</option>
+                <option value="success">✅ Success</option>
+                <option value="correction">🔄 Correction</option>
+                <option value="scope_mismatch">⚠️ Scope mismatch</option>
+                <option value="freshness">⏳ Freshness issue</option>
+                <option value="risk">🚨 Risk event</option>
+                <option value="neutral">⚖️ Neutral</option>
               </select>
             </label>
             <label className="template-field">
@@ -457,11 +476,11 @@ export function SkillWorkspace({
                 value={feedbackEvidence}
                 onChange={(event) => setFeedbackEvidence(event.target.value)}
               >
-                <option value="manual">Manual</option>
-                <option value="evaluation">Evaluation</option>
+                <option value="manual">Manual audit</option>
+                <option value="evaluation">Evaluation suite</option>
                 <option value="activation_report">Activation report</option>
                 <option value="user_feedback">User feedback</option>
-                <option value="incident">Incident</option>
+                <option value="incident">Incident log</option>
               </select>
             </label>
             <label className="template-field feedback-summary-field">
@@ -469,7 +488,7 @@ export function SkillWorkspace({
               <input
                 value={feedbackText}
                 onChange={(event) => setFeedbackText(event.target.value)}
-                placeholder="What happened and what should be retained"
+                placeholder="Observed behavior or invariant violation to retain..."
               />
             </label>
             <button
@@ -488,11 +507,21 @@ export function SkillWorkspace({
 
           {feedback.length ? (
             <div className="feedback-history">
-              {feedback.slice(0, 3).map((item) => (
-                <div key={item.id}>
-                  <span>{item.outcome.replaceAll("_", " ")}</span>
-                  <p>{item.summary}</p>
-                  <small>{item.evidence_type.replaceAll("_", " ")}</small>
+              {feedback.slice(0, 4).map((item) => (
+                <div key={item.id} className={`feedback-item-card ${item.outcome}`}>
+                  <div className="feedback-item-header">
+                    <span className={`outcome-pill ${item.outcome}`}>
+                      {item.outcome === "success" && <CheckCircle2 size={12} />}
+                      {item.outcome === "risk" && <AlertTriangle size={12} />}
+                      {item.outcome === "correction" && <TrendingUp size={12} />}
+                      {item.outcome === "scope_mismatch" && <AlertTriangle size={12} />}
+                      {item.outcome.replaceAll("_", " ")}
+                    </span>
+                    <small className="evidence-type-tag">
+                      {item.evidence_type.replaceAll("_", " ")}
+                    </small>
+                  </div>
+                  <p className="feedback-item-summary">{item.summary}</p>
                 </div>
               ))}
             </div>
@@ -501,20 +530,34 @@ export function SkillWorkspace({
 
         {/* Evaluation Stats */}
         <section className="skill-evaluation">
-          <p className="section-label">Latest revision evaluation</p>
+          <div className="evaluation-heading-row">
+            <TrendingUp size={16} className="mint" />
+            <p className="section-label">Latest Revision Evaluation</p>
+          </div>
           <strong>
             {loadingEvidence
               ? "Loading evaluation…"
               : evaluationSummary
                 ? `${evaluationSummary.evaluated_active_case_count}/${evaluationSummary.active_case_count} active cases evaluated`
-                : "No evaluation data"}
+                : "No evaluation suite data"}
           </strong>
-          <small>
-            {evaluationSummary?.pass_rate === null || evaluationSummary?.pass_rate === undefined
-              ? "No completed run"
-              : `${Math.round(evaluationSummary.pass_rate * 100)}% pass rate`}{" "}
-            · {evaluationSummary?.latest_outcome ?? "No latest outcome"}
-          </small>
+          <div className="evaluation-status-row">
+            <small>
+              {evaluationSummary?.pass_rate === null || evaluationSummary?.pass_rate === undefined
+                ? "No completed run"
+                : `${Math.round(evaluationSummary.pass_rate * 100)}% pass rate`}
+            </small>
+            {evaluationSummary?.latest_outcome && (
+              <span className={`evaluation-outcome-badge ${evaluationSummary.latest_outcome}`}>
+                {evaluationSummary.latest_outcome === "passed" ? (
+                  <CheckCircle2 size={12} />
+                ) : (
+                  <XCircle size={12} />
+                )}
+                {evaluationSummary.latest_outcome}
+              </span>
+            )}
+          </div>
         </section>
 
         {/* Usage Notes with Prompt Injection Toggles */}
