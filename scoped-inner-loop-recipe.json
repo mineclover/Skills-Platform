@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mlc-scoped-inner-loop",
+  "name": "Scoped Vertical TDD & Inner Loop Recipe",
+  "description": "Inner-loop execution recipe for resolving isolated single TODO tasks with pinpoint test execution and zero full-suite scans.",
+  "created_at": "2026-08-27T21:38:08.080Z",
+  "created_by": "Skills Platform Catalog",
+  "sources": [
+    {
+      "source_id": "skills-platform-registry",
+      "type": "local",
+      "locator": "./.skills-platform/registry"
+    }
+  ],
+  "skills": [
+    {
+      "name": "vertical-context-extractor",
+      "artifact_type": "skill",
+      "invocation_mode": "model_invoked",
+      "source_id": "skills-platform-registry",
+      "source_relative_path": "vertical-context-extractor",
+      "description": "Extract strict local context pack, types, and single target test file for isolated vertical execution."
+    },
+    {
+      "name": "scoped-tdd-executor",
+      "artifact_type": "skill",
+      "invocation_mode": "model_invoked",
+      "source_id": "skills-platform-registry",
+      "source_relative_path": "scoped-tdd-executor",
+      "description": "Execute pinpoint unit test runner on single test target, preventing full regression scans during inner loops."
+    },
+    {
+      "name": "context-patch-synthesizer",
+      "artifact_type": "skill",
+      "invocation_mode": "model_invoked",
+      "source_id": "skills-platform-registry",
+      "source_relative_path": "context-patch-synthesizer",
+      "description": "Generate structured Context Patch Proposal with test evidence instead of raw unverified mutations."
+    }
+  ],
+  "presets": [
+    {
+      "id": "scoped-inner-loop-suite",
+      "name": "Scoped Inner Loop Suite",
+      "version": 1,
+      "description": "Fast-feedback pinpoint TDD execution suite without test storms",
+      "work_scope_tags": [
+        "execute",
+        "vertical"
+      ],
+      "skills": [
+        {
+          "skill_name": "vertical-context-extractor",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "scoped-tdd-executor",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "context-patch-synthesizer",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}

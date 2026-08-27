@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mlc-task-planning",
+  "name": "Task Planning & PRD Decomposition Recipe",
+  "description": "Outer-loop planning recipe for extracting PRDs, analyzing system dependencies, and decomposing work into atomic TODO queues.",
+  "created_at": "2026-08-27T21:38:08.080Z",
+  "created_by": "Skills Platform Catalog",
+  "sources": [
+    {
+      "source_id": "skills-platform-registry",
+      "type": "local",
+      "locator": "./.skills-platform/registry"
+    }
+  ],
+  "skills": [
+    {
+      "name": "task-decomposer",
+      "artifact_type": "skill",
+      "invocation_mode": "model_invoked",
+      "source_id": "skills-platform-registry",
+      "source_relative_path": "task-decomposer",
+      "description": "Decompose user requirements into dependency-ordered atomic tasks with quality gates."
+    },
+    {
+      "name": "horizontal-topic-scanner",
+      "artifact_type": "skill",
+      "invocation_mode": "model_invoked",
+      "source_id": "skills-platform-registry",
+      "source_relative_path": "horizontal-topic-scanner",
+      "description": "Scan system registry and blast radius to produce isolated topic handoffs without mutating code."
+    }
+  ],
+  "presets": [
+    {
+      "id": "task-planning-suite",
+      "name": "Task Planning Suite",
+      "version": 1,
+      "description": "Standard outer-loop decomposition and PRD planning template",
+      "work_scope_tags": [
+        "plan",
+        "horizontal"
+      ],
+      "skills": [
+        {
+          "skill_name": "task-decomposer",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "horizontal-topic-scanner",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}

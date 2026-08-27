@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mlc-release-governance",
+  "name": "Global Verification & Release Governance Recipe",
+  "description": "Outer-loop release recipe for running full regression test verification, updating single canonical baseline, and closing maintenance cases.",
+  "created_at": "2026-08-27T21:38:08.080Z",
+  "created_by": "Skills Platform Catalog",
+  "sources": [
+    {
+      "source_id": "skills-platform-registry",
+      "type": "local",
+      "locator": "./.skills-platform/registry"
+    }
+  ],
+  "skills": [
+    {
+      "name": "lifecycle-phase-controller",
+      "artifact_type": "skill",
+      "invocation_mode": "model_invoked",
+      "source_id": "skills-platform-registry",
+      "source_relative_path": "lifecycle-phase-controller",
+      "description": "Advance maintenance lifecycle state machine and control skill hot-swapping across loop phases."
+    },
+    {
+      "name": "global-regression-gatekeeper",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_id": "skills-platform-registry",
+      "source_relative_path": "global-regression-gatekeeper",
+      "description": "Authorize single global regression test suite execution upon convergence of all atomic tasks."
+    },
+    {
+      "name": "baseline-curation-core",
+      "artifact_type": "skill",
+      "invocation_mode": "model_invoked",
+      "source_id": "skills-platform-registry",
+      "source_relative_path": "baseline-curation-core",
+      "description": "Compacts validated changes into canonical MASTER_BASELINE under strict 80k token limits."
+    }
+  ],
+  "presets": [
+    {
+      "id": "release-governance-suite",
+      "name": "Release Governance Suite",
+      "version": 1,
+      "description": "Global regression verification and canonical baseline compaction template",
+      "work_scope_tags": [
+        "gate",
+        "governance"
+      ],
+      "skills": [
+        {
+          "skill_name": "lifecycle-phase-controller",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "global-regression-gatekeeper",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-curation-core",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}
