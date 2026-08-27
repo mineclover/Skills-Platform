@@ -548,4 +548,39 @@ export interface HookManifest {
   hooks: HookDefinition[];
 }
 
+// Vertical Topic Specification & Relative Context Hierarchy Types
+export type TopicLifecycleState = "OPEN" | "IN_PROGRESS" | "VERIFIED" | "REOPENED" | "CLOSED";
+
+export interface LocalHorizontalScope {
+  owned_files: string[];
+  read_only_interfaces: string[];
+  out_of_bounds: string[];
+}
+
+export interface ConcreteBehavioralInvariants {
+  pre_conditions: string[];
+  post_conditions: string[];
+  strict_invariants: string[];
+}
+
+export interface TargetedVerificationMechanism {
+  target_test_file: string;
+  allowed_command: string;
+  prohibited_commands: string[];
+}
+
+export interface VerticalTopicSpec {
+  schema_version: number;
+  topic_id: string;
+  canonical_name: string;
+  lineage_path: string[];
+  lifecycle_state: TopicLifecycleState;
+  local_horizontal_scope: LocalHorizontalScope;
+  invariants: ConcreteBehavioralInvariants;
+  verification: TargetedVerificationMechanism;
+  acceptance_criteria: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 

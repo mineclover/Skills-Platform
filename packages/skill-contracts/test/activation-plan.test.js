@@ -114,3 +114,58 @@ test("supports invocation modes (model_invoked, user_invoked, hybrid, unspecifie
   assert.equal(invalidResult.valid, false);
   assert.ok(invalidResult.issues.some((issue) => issue.field === "operations[0].invocation_mode"));
 });
+
+test("Vertical Topic Spec: validates, creates, and renders compliant markdown specification", () => {
+  const {
+    createVerticalTopicSpec,
+    validateVerticalTopicSpec,
+    renderVerticalTopicMarkdown,
+  } = require("../src");
+
+  const spec = createVerticalTopicSpec({
+    topic_id: "topic:auth_subsystem/jwt_verification_latency",
+    canonical_name: "Resolve JWT Signature Verification Latency and Cache Drift",
+    lineage_path: ["root", "topic:auth_subsystem", "topic:jwt_verification_latency"],
+    lifecycle_state: "IN_PROGRESS",
+    local_horizontal_scope: {
+      owned_files: ["packages/auth/src/jwt-verifier.js", "packages/auth/src/cache.js"],
+      read_only_interfaces: ["packages/skill-contracts/src/types.ts"],
+      out_of_bounds: ["apps/*", "packages/db/*"],
+    },
+    invariants: {
+      pre_conditions: ["Valid signing key exists"],
+      post_conditions: ["2nd verification is cached and takes < 1ms"],
+      strict_invariants: ["Cache TTL cannot exceed token exp claim"],
+    },
+    verification: {
+      target_test_file: "packages/auth/test/jwt-verifier.test.js",
+      allowed_command: "node --test packages/auth/test/jwt-verifier.test.js",
+      prohibited_commands: ["npm test", "pytest"],
+    },
+    acceptance_criteria: [
+      "Target scoped unit test passes with 0 failures",
+      "Latency anomaly telemetry records < 1ms on warm cache",
+    ],
+  });
+
+  assert.equal(spec.schema_version, 1);
+  assert.equal(spec.topic_id, "topic:auth_subsystem/jwt_verification_latency");
+  assert.equal(validateVerticalTopicSpec(spec).valid, true);
+
+  const md = renderVerticalTopicMarkdown(spec);
+  assert.ok(md.includes("VERTICAL SPECIFICATION: topic:auth_subsystem/jwt_verification_latency"));
+  assert.ok(md.includes("Local Horizontal Scope"));
+  assert.ok(md.includes("packages/auth/src/jwt-verifier.js"));
+  assert.ok(md.includes("Test Storm Guard"));
+  assert.ok(md.includes("Target scoped unit test passes with 0 failures"));
+});
+
+test("Vertical Topic Spec: rejects missing required fields and invalid states", () => {
+  const { validateVerticalTopicSpec } = require("../src");
+  const invalid = validateVerticalTopicSpec({
+    topic_id: "invalid_topic",
+    canonical_name: "",
+  });
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.issues.some((i) => i.field === "canonical_name"));
+});

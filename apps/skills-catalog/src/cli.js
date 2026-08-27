@@ -752,6 +752,73 @@ async function run(argv) {
     }
   }
 
+  if (command === "spec") {
+    const [action, targetFile] = positional.slice(1);
+    const {
+      createVerticalTopicSpec,
+      validateVerticalTopicSpec,
+      renderVerticalTopicMarkdown,
+    } = require("@skills-platform/contracts");
+
+    if (action === "init") {
+      const topicId = flags.id ?? targetFile ?? "topic:default";
+      const name = flags.name ?? "Target Problem Resolution";
+      const spec = createVerticalTopicSpec({
+        topic_id: topicId,
+        canonical_name: name,
+        lineage_path: flags.lineage ? flags.lineage.split(",") : ["root", topicId],
+        local_horizontal_scope: {
+          owned_files: flags.owned ? (Array.isArray(flags.owned) ? flags.owned : [flags.owned]) : [],
+          read_only_interfaces: flags.interfaces ? (Array.isArray(flags.interfaces) ? flags.interfaces : [flags.interfaces]) : [],
+          out_of_bounds: flags.forbidden ? (Array.isArray(flags.forbidden) ? flags.forbidden : [flags.forbidden]) : [],
+        },
+        invariants: {
+          pre_conditions: flags.pre ? (Array.isArray(flags.pre) ? flags.pre : [flags.pre]) : [],
+          post_conditions: flags.post ? (Array.isArray(flags.post) ? flags.post : [flags.post]) : [],
+          strict_invariants: flags.strict ? (Array.isArray(flags.strict) ? flags.strict : [flags.strict]) : [],
+        },
+        verification: {
+          target_test_file: flags.test ?? "test/target.test.js",
+          allowed_command: flags.command ?? `node --test ${flags.test ?? "test/target.test.js"}`,
+          prohibited_commands: ["npm test", "pytest", "ctest"],
+        },
+        acceptance_criteria: flags.criteria ? (Array.isArray(flags.criteria) ? flags.criteria : [flags.criteria]) : ["Target scoped test passes with 0 failures"],
+      });
+
+      if (flags.out) {
+        const outPath = path.resolve(flags.out);
+        if (outPath.endsWith(".md")) {
+          await fs.writeFile(outPath, renderVerticalTopicMarkdown(spec), "utf8");
+        } else {
+          await fs.writeFile(outPath, JSON.stringify(spec, null, 2) + "\n", "utf8");
+        }
+      }
+      return spec;
+    }
+
+    if (action === "render") {
+      if (!targetFile) throw new Error("spec render requires <spec.json>");
+      const raw = JSON.parse(await fs.readFile(path.resolve(targetFile), "utf8"));
+      const md = renderVerticalTopicMarkdown(raw);
+      if (flags.out) {
+        await fs.writeFile(path.resolve(flags.out), md, "utf8");
+      }
+      return { rendered_markdown: md };
+    }
+
+    if (action === "validate") {
+      if (!targetFile) throw new Error("spec validate requires <spec.json>");
+      const raw = JSON.parse(await fs.readFile(path.resolve(targetFile), "utf8"));
+      const validation = validateVerticalTopicSpec(raw);
+      if (!validation.valid) {
+        const error = new Error("Vertical topic spec is invalid");
+        error.issues = validation.issues;
+        throw error;
+      }
+      return { valid: true, topic_id: raw.topic_id };
+    }
+  }
+
   throw new Error(usage());
 }
 

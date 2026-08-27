@@ -28,6 +28,11 @@ import {
   type HookDefinition,
   type HookHandler,
   type HookManifest,
+  type TopicLifecycleState,
+  type LocalHorizontalScope,
+  type ConcreteBehavioralInvariants,
+  type TargetedVerificationMechanism,
+  type VerticalTopicSpec,
 } from "./types";
 
 export * from "./types";
@@ -342,6 +347,175 @@ export function createHookManifest(hooks: HookDefinition[] = []): HookManifest {
     throw error;
   }
   return manifest;
+}
+
+export const TOPIC_LIFECYCLE_STATES: ReadonlySet<TopicLifecycleState> = new Set([
+  "OPEN",
+  "IN_PROGRESS",
+  "VERIFIED",
+  "REOPENED",
+  "CLOSED",
+]);
+
+export function validateVerticalTopicSpec(spec: unknown): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  if (!spec || typeof spec !== "object" || Array.isArray(spec)) {
+    return { valid: false, issues: [{ field: "spec", message: "must be an object" }] };
+  }
+
+  const s = spec as Record<string, any>;
+  if (s.schema_version !== 1) {
+    issues.push({ field: "schema_version", message: "must equal 1" });
+  }
+  requiredString(s.topic_id, "topic_id", issues);
+  requiredString(s.canonical_name, "canonical_name", issues);
+  requiredString(s.created_at, "created_at", issues);
+  requiredString(s.updated_at, "updated_at", issues);
+
+  if (!Array.isArray(s.lineage_path) || s.lineage_path.length === 0) {
+    issues.push({ field: "lineage_path", message: "must be a non-empty array of topic identifiers" });
+  }
+
+  if (!s.lifecycle_state || !TOPIC_LIFECYCLE_STATES.has(s.lifecycle_state)) {
+    issues.push({ field: "lifecycle_state", message: `must be one of ${[...TOPIC_LIFECYCLE_STATES].join(", ")}` });
+  }
+
+  if (!s.local_horizontal_scope || typeof s.local_horizontal_scope !== "object") {
+    issues.push({ field: "local_horizontal_scope", message: "must be an object" });
+  } else {
+    if (!Array.isArray(s.local_horizontal_scope.owned_files)) {
+      issues.push({ field: "local_horizontal_scope.owned_files", message: "must be an array" });
+    }
+    if (!Array.isArray(s.local_horizontal_scope.read_only_interfaces)) {
+      issues.push({ field: "local_horizontal_scope.read_only_interfaces", message: "must be an array" });
+    }
+    if (!Array.isArray(s.local_horizontal_scope.out_of_bounds)) {
+      issues.push({ field: "local_horizontal_scope.out_of_bounds", message: "must be an array" });
+    }
+  }
+
+  if (!s.invariants || typeof s.invariants !== "object") {
+    issues.push({ field: "invariants", message: "must be an object" });
+  } else {
+    if (!Array.isArray(s.invariants.pre_conditions)) {
+      issues.push({ field: "invariants.pre_conditions", message: "must be an array" });
+    }
+    if (!Array.isArray(s.invariants.post_conditions)) {
+      issues.push({ field: "invariants.post_conditions", message: "must be an array" });
+    }
+    if (!Array.isArray(s.invariants.strict_invariants)) {
+      issues.push({ field: "invariants.strict_invariants", message: "must be an array" });
+    }
+  }
+
+  if (!s.verification || typeof s.verification !== "object") {
+    issues.push({ field: "verification", message: "must be an object" });
+  } else {
+    requiredString(s.verification.target_test_file, "verification.target_test_file", issues);
+    requiredString(s.verification.allowed_command, "verification.allowed_command", issues);
+    if (!Array.isArray(s.verification.prohibited_commands)) {
+      issues.push({ field: "verification.prohibited_commands", message: "must be an array" });
+    }
+  }
+
+  if (!Array.isArray(s.acceptance_criteria) || s.acceptance_criteria.length === 0) {
+    issues.push({ field: "acceptance_criteria", message: "must be a non-empty array of criteria strings" });
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
+export function createVerticalTopicSpec(spec: Partial<VerticalTopicSpec> & { topic_id: string; canonical_name: string; verification: TargetedVerificationMechanism }): VerticalTopicSpec {
+  const now = new Date().toISOString();
+  const result: VerticalTopicSpec = {
+    schema_version: 1,
+    topic_id: spec.topic_id,
+    canonical_name: spec.canonical_name,
+    lineage_path: spec.lineage_path ?? ["root", spec.topic_id],
+    lifecycle_state: spec.lifecycle_state ?? "IN_PROGRESS",
+    local_horizontal_scope: spec.local_horizontal_scope ?? {
+      owned_files: [],
+      read_only_interfaces: [],
+      out_of_bounds: [],
+    },
+    invariants: spec.invariants ?? {
+      pre_conditions: [],
+      post_conditions: [],
+      strict_invariants: [],
+    },
+    verification: spec.verification,
+    acceptance_criteria: spec.acceptance_criteria ?? ["Target scoped test passes cleanly with 0 failures"],
+    created_at: spec.created_at ?? now,
+    updated_at: spec.updated_at ?? now,
+  };
+  const validation = validateVerticalTopicSpec(result);
+  if (!validation.valid) {
+    const error: any = new Error("Vertical topic spec is invalid");
+    error.issues = validation.issues;
+    throw error;
+  }
+  return result;
+}
+
+export function renderVerticalTopicMarkdown(spec: VerticalTopicSpec): string {
+  const lineage = spec.lineage_path.join(" -> ");
+  const owned = spec.local_horizontal_scope.owned_files.map((f: string) => `- \`${f}\``).join("\n") || "- (None specified)";
+  const readOnly = spec.local_horizontal_scope.read_only_interfaces.map((f: string) => `- \`${f}\``).join("\n") || "- (None specified)";
+  const outBounds = spec.local_horizontal_scope.out_of_bounds.map((f: string) => `- \`${f}\``).join("\n") || "- (None specified)";
+
+  const pre = spec.invariants.pre_conditions.map((c: string) => `- ${c}`).join("\n") || "- (None specified)";
+  const post = spec.invariants.post_conditions.map((c: string) => `- ${c}`).join("\n") || "- (None specified)";
+  const strict = spec.invariants.strict_invariants.map((c: string) => `- ${c}`).join("\n") || "- (None specified)";
+
+  const prohibited = spec.verification.prohibited_commands.map((c: string) => `\`${c}\``).join(", ") || "(None)";
+  const criteria = spec.acceptance_criteria.map((c: string) => `- [ ] ${c}`).join("\n");
+
+  return `# 🎯 VERTICAL SPECIFICATION: ${spec.topic_id}
+
+> **Topic Name**: ${spec.canonical_name}  
+> **Lifecycle State**: \`${spec.lifecycle_state}\`  
+> **Lineage Path**: \`${lineage}\`  
+> **Schema Version**: 1 (Updated: ${spec.updated_at})
+
+---
+
+## 1. 해당 토픽의 로컬 수평 경계 (Local Horizontal Scope)
+*상위 레벨의 수직 토픽은 현재 실행 에이전트의 로컬 수평 기준면이 됩니다.*
+
+### 소유 및 변경 대상 파일 (Owned Target Files)
+${owned}
+
+### 참조 전용 인터페이스 (Read-Only Interfaces)
+${readOnly}
+
+### 🚫 절대 수정 금지 영역 (Out of Bounds)
+${outBounds}
+
+---
+
+## 2. 구체적 불변식 및 행위 정의 (Concrete Behavioral Invariants)
+
+### 사전 조건 (Pre-conditions)
+${pre}
+
+### 사후 조건 (Post-conditions)
+${post}
+
+### 엄격한 불변식 (Strict Invariants)
+${strict}
+
+---
+
+## 3. 국소 검증 메커니즘 (Targeted Verification Mechanism)
+- **단일 타겟 테스트 파일**: \`${spec.verification.target_test_file}\`
+- **허용 실행 명령어**: \`${spec.verification.allowed_command}\`
+- **🚫 차단 명령어 (Test Storm Guard)**: ${prohibited}
+
+---
+
+## 4. 완료 및 상위 승격 조건 (Acceptance & Roll-up Gate)
+${criteria}
+`;
 }
 
 
