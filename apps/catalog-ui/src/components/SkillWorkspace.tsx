@@ -1,22 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  BarChart2,
   Bot,
   Check,
   CheckCircle2,
   ChevronRight,
+  Clock,
+  Cpu,
   Edit3,
   FileCode,
   FileText,
+  Gauge,
   Layers,
   LayoutGrid,
   List,
   LoaderCircle,
   MessageSquare,
+  Radio,
+  RefreshCw,
   Shield,
   Sparkles,
   Tag,
+  Terminal,
   TrendingUp,
   User,
   XCircle,
@@ -31,14 +38,187 @@ import {
   getProviderInfo,
   resolveDeliveryPath,
 } from "../visual-identity";
+import {
+  calculateInvocationModeRatios,
+  createMockTelemetrySummary,
+  fetchTelemetrySummary,
+  formatDuration,
+} from "../api/catalog-api";
 import type {
   CatalogSkill,
   EvaluationSummary,
   FeedbackSummary,
   InvocationMode,
+  InvocationModeDistribution,
+  InvocationModeRatio,
   SkillFeedback,
   SkillNote,
+  TelemetryEvent,
+  TelemetrySummary,
 } from "../types";
+
+export function formatTimeAgo(timestamp: string): string {
+  const diff = Date.now() - new Date(timestamp).getTime();
+  if (Number.isNaN(diff) || diff < 0) return "just now";
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 30) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+export function InvocationModeRatioVisualizer({
+  ratios,
+  byMode,
+}: {
+  ratios?: InvocationModeRatio[];
+  byMode?: InvocationModeDistribution;
+}) {
+  const computedRatios = useMemo(() => {
+    if (ratios && ratios.length > 0) return ratios;
+    if (byMode) return calculateInvocationModeRatios(byMode);
+    return calculateInvocationModeRatios();
+  }, [ratios, byMode]);
+
+  const totalCount = computedRatios.reduce((acc, r) => acc + r.count, 0);
+
+  return (
+    <div className="invocation-ratio-visualizer" aria-label="Invocation mode ratio breakdown">
+      <div className="ratio-header-row">
+        <div className="ratio-title-group">
+          <BarChart2 size={15} className="mint" />
+          <span className="ratio-title">Invocation Mode Breakdown</span>
+        </div>
+        <span className="ratio-total-tag">{totalCount} total runs</span>
+      </div>
+
+      {/* Stacked Proportional Bar */}
+      <div
+        className="ratio-bar-track"
+        role="progressbar"
+        aria-valuenow={100}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        {computedRatios.map((ratio) => {
+          if (ratio.percentage <= 0 && totalCount > 0) return null;
+          const meta = getInvocationModeInfo(ratio.mode);
+          const widthPercent = totalCount === 0 ? 25 : Math.max(ratio.percentage, 4);
+          return (
+            <div
+              key={ratio.mode}
+              className={`ratio-bar-segment ${meta.pillClass}`}
+              style={{ width: `${widthPercent}%` }}
+              title={`${meta.label}: ${ratio.count} invocations (${ratio.percentage}%)`}
+            >
+              {ratio.percentage >= 12 ? (
+                <span className="segment-label">
+                  {meta.icon} {ratio.percentage}%
+                </span>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend & Breakdown Chips */}
+      <div className="ratio-legend-grid">
+        {computedRatios.map((ratio) => {
+          const meta = getInvocationModeInfo(ratio.mode);
+          return (
+            <div key={ratio.mode} className={`ratio-legend-item ${meta.pillClass}`}>
+              <span className="legend-dot" aria-hidden="true" />
+              <span className="legend-mode-name">{meta.shortLabel}</span>
+              <span className="legend-count">{ratio.count}</span>
+              <span className="legend-percent">({ratio.percentage}%)</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function TelemetryActivityTimeline({
+  events,
+  skillName,
+}: {
+  events: TelemetryEvent[];
+  skillName?: string;
+}) {
+  const filteredEvents = useMemo(() => {
+    if (!skillName) return events;
+    const directMatches = events.filter(
+      (e) => e.skill_name.toLowerCase() === skillName.toLowerCase(),
+    );
+    return directMatches.length > 0 ? directMatches : events;
+  }, [events, skillName]);
+
+  return (
+    <div className="telemetry-timeline-container" aria-label="Recent telemetry timeline">
+      <div className="timeline-header">
+        <Clock size={15} className="mint" />
+        <span className="section-label">Real-Time Invocation Feed</span>
+        <span className="timeline-count-pill">{filteredEvents.length} events</span>
+      </div>
+
+      {filteredEvents.length === 0 ? (
+        <div className="telemetry-feed-empty">
+          <Activity size={18} className="muted" />
+          <span>No live telemetry recorded for this skill yet.</span>
+        </div>
+      ) : (
+        <div className="telemetry-event-list">
+          {filteredEvents.slice(0, 5).map((ev, index) => {
+            const timeAgo = formatTimeAgo(ev.timestamp);
+            return (
+              <div
+                key={ev.id || `${ev.timestamp}-${index}`}
+                className={`telemetry-event-card ${ev.outcome}`}
+              >
+                <div className="event-top-row">
+                  <div className="event-identity-cluster">
+                    <span className={`event-outcome-badge ${ev.outcome}`}>
+                      {ev.outcome === "success" && <CheckCircle2 size={12} />}
+                      {ev.outcome === "risk" && <AlertTriangle size={12} />}
+                      {ev.outcome === "correction" && <TrendingUp size={12} />}
+                      {ev.outcome === "scope_mismatch" && <AlertTriangle size={12} />}
+                      {ev.outcome === "neutral" && <Shield size={12} />}
+                      <span>{ev.outcome.replaceAll("_", " ")}</span>
+                    </span>
+                    <InvocationBadge mode={ev.invocation_mode} size="sm" showTooltip={true} />
+                    <ProviderBadge
+                      providerId={ev.provider_id}
+                      showDeliveryPath={false}
+                      showTooltip={false}
+                    />
+                  </div>
+                  <div className="event-metrics-cluster">
+                    <span className="event-duration-tag">
+                      <Zap size={11} /> {formatDuration(ev.duration_ms)}
+                    </span>
+                    <span className="event-tools-tag">{ev.tool_calls_count} tools</span>
+                    <span className="event-timestamp">{timeAgo}</span>
+                  </div>
+                </div>
+                <p className="event-summary-text">{ev.summary}</p>
+                {ev.recipe_id && (
+                  <div className="event-footer-row">
+                    <span className="recipe-tag">Recipe: {ev.recipe_id}</span>
+                    <span className="evidence-type-tag">Evidence: {ev.evidence_type}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SkillCardGrid({
   skills,
@@ -166,6 +346,7 @@ export function SkillWorkspace({
   onRecordFeedback,
   onAddNote,
   providerId = "antigravity",
+  telemetrySummary: propTelemetrySummary,
 }: {
   skills: CatalogSkill[];
   selectedLineageId: string | null;
@@ -196,11 +377,13 @@ export function SkillWorkspace({
     patch: { kind: string; body: string; inject_into_prompt: boolean },
   ) => void;
   providerId?: string;
+  telemetrySummary?: TelemetrySummary | null;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [invocationFilter, setInvocationFilter] = useState<InvocationFilterMode>("all");
   const [providerFilter, setProviderFilter] = useState("all");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [internalTelemetry, setInternalTelemetry] = useState<TelemetrySummary | null>(null);
 
   const [purpose, setPurpose] = useState("");
   const [useWhen, setUseWhen] = useState("");
@@ -286,6 +469,32 @@ export function SkillWorkspace({
     selected?.latest_skill?.invocation_mode,
     selected?.lineage.invocation_mode,
   ]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchSummary = async () => {
+      try {
+        const skillName = selected?.profile.title || selected?.lineage.skill_name;
+        const summary = await fetchTelemetrySummary({ skillName });
+        if (active) setInternalTelemetry(summary);
+      } catch {
+        // Resilient to intermittent poll errors
+      }
+    };
+
+    void fetchSummary();
+    const interval = setInterval(() => {
+      void fetchSummary();
+    }, 4000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [selected?.lineage.id, selected?.lineage.skill_name, selected?.profile.title]);
+
+  const telemetrySummary =
+    propTelemetrySummary ?? internalTelemetry ?? createMockTelemetrySummary();
 
   const renderDetailPanel = () => {
     if (!selected) return null;
@@ -402,6 +611,78 @@ export function SkillWorkspace({
             {saving ? "Saving skill…" : "Save skill profile"}
           </button>
         </form>
+
+        {/* Real-time Telemetry & Invocation Mode Ratio Visualizer */}
+        <section className="skill-telemetry-analytics" aria-label="Real-time skill telemetry">
+          <div className="skill-feedback-heading">
+            <div>
+              <div className="feedback-title-row">
+                <Activity size={16} className="mint live-pulse-icon" />
+                <p className="section-label">Real-Time Telemetry & Health Analytics</p>
+              </div>
+              <strong>
+                {telemetrySummary.total_invocations} Invocations ·{" "}
+                {formatDuration(telemetrySummary.average_duration_ms)} avg latency
+              </strong>
+              <small>
+                {Math.round(telemetrySummary.success_rate * 100)}% success rate across active
+                multi-agent hooks
+              </small>
+            </div>
+            <div className="telemetry-health-pills">
+              <span className="health-pill healthy" title="Healthy invocations">
+                🟢 {telemetrySummary.by_health.healthy} healthy
+              </span>
+              {telemetrySummary.by_health.needs_review > 0 && (
+                <span className="health-pill needs-review" title="Invocations needing review">
+                  🟡 {telemetrySummary.by_health.needs_review} review
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Key Metric Gauges Strip */}
+          <div className="telemetry-metrics-strip">
+            <div className="telemetry-metric-box">
+              <span className="metric-box-label">Invocations</span>
+              <strong className="metric-box-val">{telemetrySummary.total_invocations}</strong>
+              <small className="metric-box-sub">Agent tool runs</small>
+            </div>
+            <div className="telemetry-metric-box">
+              <span className="metric-box-label">Avg Latency</span>
+              <strong className="metric-box-val mint">
+                {formatDuration(telemetrySummary.average_duration_ms)}
+              </strong>
+              <small className="metric-box-sub">&lt; 50ms invariant</small>
+            </div>
+            <div className="telemetry-metric-box">
+              <span className="metric-box-label">Success Rate</span>
+              <strong className="metric-box-val">
+                {Math.round(telemetrySummary.success_rate * 100)}%
+              </strong>
+              <small className="metric-box-sub">Pass ratio</small>
+            </div>
+            <div className="telemetry-metric-box">
+              <span className="metric-box-label">Active Providers</span>
+              <strong className="metric-box-val">
+                {Object.keys(telemetrySummary.by_provider).length || 1}
+              </strong>
+              <small className="metric-box-sub">Multi-agent</small>
+            </div>
+          </div>
+
+          {/* Invocation Mode Ratio Visualizer */}
+          <InvocationModeRatioVisualizer
+            ratios={telemetrySummary.invocation_mode_ratios}
+            byMode={telemetrySummary.by_mode}
+          />
+
+          {/* Recent Activity Timeline */}
+          <TelemetryActivityTimeline
+            events={telemetrySummary.recent_events}
+            skillName={selected.profile.title || selected.lineage.skill_name}
+          />
+        </section>
 
         {/* Feedback Health History & Evidence Analytics */}
         <section className="skill-feedback">

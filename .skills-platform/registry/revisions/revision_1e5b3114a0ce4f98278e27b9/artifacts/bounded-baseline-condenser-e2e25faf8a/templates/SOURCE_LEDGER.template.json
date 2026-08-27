@@ -1,0 +1,45 @@
+{
+  "metadata": {
+    "baseline_id": "PROJECT-BASELINE-vX.Y",
+    "mode": "target_state",
+    "hard_limit": 80000,
+    "working_target": 72000,
+    "tokenizer": "o200k_base",
+    "count_status": "exact"
+  },
+  "sources": [
+    {
+      "source_id": "SRC-001",
+      "path": "docs/example.md",
+      "version_or_date": "",
+      "authority": "current_proposal",
+      "status": "current",
+      "domains": ["architecture"]
+    }
+  ],
+  "facts": [
+    {
+      "id": "REQ-001",
+      "kind": "requirement",
+      "statement": "",
+      "status": "accepted",
+      "priority": "P0",
+      "retention_level": "L5",
+      "authority": "frozen_baseline",
+      "scope": [],
+      "depends_on": [],
+      "supersedes": [],
+      "source_refs": ["SRC-001#section"],
+      "output_refs": ["MASTER_BASELINE.md#requirements-and-acceptance"],
+      "disposition": "retained | merged | archived | omitted_disclosed"
+    }
+  ],
+  "conflicts": [],
+  "audit": {
+    "p0_coverage": 0,
+    "p1_coverage": 0,
+    "orphan_ids": [],
+    "hidden_conflicts": [],
+    "limitations": []
+  }
+}

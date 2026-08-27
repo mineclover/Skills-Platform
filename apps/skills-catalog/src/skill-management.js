@@ -261,18 +261,34 @@ function validateFeedbackTarget(feedback) {
   }
 }
 
+const INTEGER_METRIC_FIELDS = new Set([
+  "attempted",
+  "successful",
+  "corrections",
+  "scope_mismatches",
+  "freshness_issues",
+  "risk_events",
+  "tool_calls_count",
+  "failed_suites",
+  "total_suites",
+  "retries",
+  "assertions_passed",
+]);
+
 function normalizeFeedbackMetrics(metrics) {
   if (metrics === undefined || metrics === null) return {};
   if (!metrics || typeof metrics !== "object" || Array.isArray(metrics)) throw new Error("Feedback metrics must be an object");
   const normalized = {};
-  for (const field of ["attempted", "successful", "corrections", "scope_mismatches", "freshness_issues", "risk_events"]) {
-    if (metrics[field] === undefined) continue;
-    const value = Number(metrics[field]);
-    if (!Number.isInteger(value) || value < 0) throw new Error(`Feedback metric ${field} must be a non-negative integer`);
+  for (const [field, rawValue] of Object.entries(metrics)) {
+    if (rawValue === undefined || rawValue === null) continue;
+    const value = Number(rawValue);
+    if (Number.isNaN(value) || !Number.isFinite(value) || value < 0) {
+      throw new Error(`Feedback metric ${field} must be a non-negative number`);
+    }
+    if (INTEGER_METRIC_FIELDS.has(field) && !Number.isInteger(value)) {
+      throw new Error(`Feedback metric ${field} must be a non-negative integer`);
+    }
     normalized[field] = value;
-  }
-  for (const field of Object.keys(metrics)) {
-    if (!(field in normalized)) throw new Error(`Feedback metric is not supported: ${field}`);
   }
   return normalized;
 }

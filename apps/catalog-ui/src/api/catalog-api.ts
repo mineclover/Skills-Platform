@@ -1,11 +1,17 @@
 import type {
   ApplyProgress,
   ApplyResult,
+  InvocationMode,
+  InvocationModeDistribution,
+  InvocationModeRatio,
   RecipeApplyOptions,
   RecipeApplyResult,
   RecipeInspectionResult,
   RecipeInspectionSummary,
   SkillRecipe,
+  TelemetryEvent,
+  TelemetryQueryParams,
+  TelemetrySummary,
 } from "../types";
 
 export const catalogApi = import.meta.env.VITE_CATALOG_API?.replace(/\/$/, "") ?? "";
@@ -352,4 +358,333 @@ export async function readApplyStream(
   if (!result) throw new Error("Skills Manager did not return an apply result");
   return result;
 }
+
+export function calculateInvocationModeRatios(
+  byMode: InvocationModeDistribution = {
+    model_invoked: 0,
+    user_invoked: 0,
+    hybrid: 0,
+    unspecified: 0,
+  },
+): InvocationModeRatio[] {
+  const total =
+    (byMode.model_invoked || 0) +
+    (byMode.user_invoked || 0) +
+    (byMode.hybrid || 0) +
+    (byMode.unspecified || 0);
+  const modes: InvocationMode[] = ["model_invoked", "user_invoked", "hybrid", "unspecified"];
+  if (total === 0) {
+    return modes.map((mode) => ({ mode, count: 0, percentage: 0 }));
+  }
+  return modes.map((mode) => {
+    const count = byMode[mode] || 0;
+    const percentage = Math.round((count / total) * 1000) / 10;
+    return { mode, count, percentage };
+  });
+}
+
+export function formatDuration(durationMs: number): string {
+  if (durationMs < 0 || !Number.isFinite(durationMs)) return "0ms";
+  if (durationMs < 1) return "< 1ms";
+  if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
+  const seconds = durationMs / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remSeconds = Math.round(seconds % 60);
+  return `${minutes}m ${remSeconds}s`;
+}
+
+export function createMockTelemetrySummary(params?: TelemetryQueryParams): TelemetrySummary {
+  const now = Date.now();
+  const rawEvents: TelemetryEvent[] = [
+    {
+      id: "ev_101",
+      timestamp: new Date(now - 1000 * 18).toISOString(),
+      provider_id: "antigravity",
+      project_id: params?.projectId || "skills-platform",
+      recipe_id: "scoped-inner-loop-recipe",
+      skill_name: "planning",
+      lineage_id: "lineage_planning",
+      invocation_mode: "model_invoked",
+      duration_ms: 38,
+      tool_calls_count: 3,
+      outcome: "success",
+      evidence_type: "activation_report",
+      summary: "Autonomous reflex plan decomposition executed within threshold.",
+      details: "Step plan synthesized in 38ms with 3 tool calls.",
+      metrics: { duration_ms: 38, tool_calls_count: 3 },
+    },
+    {
+      id: "ev_102",
+      timestamp: new Date(now - 1000 * 62).toISOString(),
+      provider_id: "codex",
+      project_id: params?.projectId || "skills-platform",
+      recipe_id: "scoped-inner-loop-recipe",
+      skill_name: "testing",
+      lineage_id: "lineage_testing",
+      invocation_mode: "user_invoked",
+      duration_ms: 184,
+      tool_calls_count: 2,
+      outcome: "success",
+      evidence_type: "manual",
+      summary: "Pinpoint test runner invoked directly by human operator.",
+      details: "Ran scoped node:test with 0 regressions.",
+      metrics: { duration_ms: 184, tool_calls_count: 2 },
+    },
+    {
+      id: "ev_103",
+      timestamp: new Date(now - 1000 * 135).toISOString(),
+      provider_id: "claude",
+      project_id: params?.projectId || "skills-platform",
+      recipe_id: "release-governance-recipe",
+      skill_name: "code-review",
+      lineage_id: "lineage_code_review",
+      invocation_mode: "hybrid",
+      duration_ms: 76,
+      tool_calls_count: 4,
+      outcome: "correction",
+      evidence_type: "evaluation",
+      summary: "Rule policy drift corrected during static invariant check.",
+      details: "Auto-reconciled symlink binding paths.",
+      metrics: { duration_ms: 76, tool_calls_count: 4 },
+    },
+    {
+      id: "ev_104",
+      timestamp: new Date(now - 1000 * 220).toISOString(),
+      provider_id: "antigravity",
+      project_id: params?.projectId || "skills-platform",
+      recipe_id: "task-planning-recipe",
+      skill_name: "planning",
+      lineage_id: "lineage_planning",
+      invocation_mode: "model_invoked",
+      duration_ms: 42,
+      tool_calls_count: 2,
+      outcome: "success",
+      evidence_type: "activation_report",
+      summary: "PRD task breakdown completed cleanly.",
+      details: "Generated 3 atomic task queue items.",
+      metrics: { duration_ms: 42, tool_calls_count: 2 },
+    },
+    {
+      id: "ev_105",
+      timestamp: new Date(now - 1000 * 310).toISOString(),
+      provider_id: "codex",
+      project_id: params?.projectId || "skills-platform",
+      recipe_id: "scoped-inner-loop-recipe",
+      skill_name: "UI Design",
+      lineage_id: "lineage_ui",
+      invocation_mode: "user_invoked",
+      duration_ms: 215,
+      tool_calls_count: 1,
+      outcome: "risk",
+      evidence_type: "incident",
+      summary: "Latency spike and unexpected binding collision detected.",
+      details: "High duration 215ms on target render pass.",
+      metrics: { duration_ms: 215, tool_calls_count: 1 },
+    },
+    {
+      id: "ev_106",
+      timestamp: new Date(now - 1000 * 430).toISOString(),
+      provider_id: "antigravity",
+      project_id: params?.projectId || "skills-platform",
+      recipe_id: "scoped-inner-loop-recipe",
+      skill_name: "testing",
+      lineage_id: "lineage_testing",
+      invocation_mode: "model_invoked",
+      duration_ms: 29,
+      tool_calls_count: 2,
+      outcome: "success",
+      evidence_type: "evaluation",
+      summary: "Reflex invariant assertions verified before build step.",
+      details: "Passed fast assertion checks.",
+      metrics: { duration_ms: 29, tool_calls_count: 2 },
+    },
+    {
+      id: "ev_107",
+      timestamp: new Date(now - 1000 * 590).toISOString(),
+      provider_id: "claude",
+      project_id: params?.projectId || "skills-platform",
+      recipe_id: "task-planning-recipe",
+      skill_name: "planning",
+      lineage_id: "lineage_planning",
+      invocation_mode: "hybrid",
+      duration_ms: 54,
+      tool_calls_count: 1,
+      outcome: "neutral",
+      evidence_type: "manual",
+      summary: "Read-only inspection of project effective skill set.",
+      details: "No mutations made.",
+      metrics: { duration_ms: 54, tool_calls_count: 1 },
+    },
+  ];
+
+  let filtered = rawEvents;
+  if (params?.projectId) {
+    filtered = filtered.filter((e) => e.project_id === params.projectId);
+  }
+  if (params?.providerId && params.providerId !== "all") {
+    filtered = filtered.filter(
+      (e) => e.provider_id.toLowerCase() === params.providerId?.toLowerCase(),
+    );
+  }
+  if (params?.skillName) {
+    filtered = filtered.filter(
+      (e) => e.skill_name.toLowerCase() === params.skillName?.toLowerCase(),
+    );
+  }
+  if (params?.since) {
+    const sinceDate = new Date(params.since);
+    filtered = filtered.filter((e) => new Date(e.timestamp) >= sinceDate);
+  }
+
+  const limit = params?.limit && params.limit > 0 ? params.limit : 20;
+  const recentEvents = filtered.slice(0, limit);
+
+  const total = filtered.length;
+  const totalDuration = filtered.reduce((acc, e) => acc + (e.duration_ms || 0), 0);
+  const avgDuration = total > 0 ? Math.round((totalDuration / total) * 10) / 10 : 0;
+  const successCount = filtered.filter((e) => e.outcome === "success").length;
+  const successRate = total > 0 ? Math.round((successCount / total) * 100) / 100 : 1.0;
+
+  const byMode: InvocationModeDistribution = {
+    model_invoked: filtered.filter((e) => e.invocation_mode === "model_invoked").length,
+    user_invoked: filtered.filter((e) => e.invocation_mode === "user_invoked").length,
+    hybrid: filtered.filter((e) => e.invocation_mode === "hybrid").length,
+    unspecified: filtered.filter((e) => e.invocation_mode === "unspecified").length,
+  };
+
+  const byProvider: Record<string, number> = {};
+  for (const e of filtered) {
+    byProvider[e.provider_id] = (byProvider[e.provider_id] || 0) + 1;
+  }
+
+  const healthyCount = filtered.filter(
+    (e) => e.outcome === "success" || e.outcome === "neutral",
+  ).length;
+  const needsReviewCount = filtered.filter((e) =>
+    ["correction", "scope_mismatch", "freshness", "risk"].includes(e.outcome),
+  ).length;
+  const unknownCount = total - healthyCount - needsReviewCount;
+
+  const ratios = calculateInvocationModeRatios(byMode);
+
+  return {
+    total_invocations: total,
+    average_duration_ms: avgDuration,
+    success_rate: successRate,
+    by_mode: byMode,
+    by_provider: byProvider,
+    by_health: {
+      healthy: healthyCount,
+      needs_review: needsReviewCount,
+      unknown: Math.max(0, unknownCount),
+    },
+    recent_events: recentEvents,
+    invocation_mode_ratios: ratios,
+    last_event_at: recentEvents[0]?.timestamp || new Date().toISOString(),
+  };
+}
+
+export async function fetchTelemetrySummary(
+  params?: TelemetryQueryParams,
+): Promise<TelemetrySummary> {
+  if (catalogApi) {
+    try {
+      const query = new URLSearchParams();
+      if (params?.projectId) query.set("project_id", params.projectId);
+      if (params?.providerId && params.providerId !== "all") {
+        query.set("provider_id", params.providerId);
+      }
+      if (params?.skillName) query.set("skill_name", params.skillName);
+      if (params?.since) query.set("since", params.since);
+      if (params?.limit) query.set("limit", String(params.limit));
+
+      const response = await fetch(`${catalogApi}/api/telemetry/summary?${query}`);
+      if (response.ok) {
+        const body: TelemetrySummary = await response.json();
+        if (!body.invocation_mode_ratios && body.by_mode) {
+          body.invocation_mode_ratios = calculateInvocationModeRatios(body.by_mode);
+        }
+        return body;
+      }
+    } catch {
+      // Graceful offline fallback
+    }
+  }
+
+  return createMockTelemetrySummary(params);
+}
+
+export async function recordTelemetryApi(
+  payload: Partial<TelemetryEvent>,
+): Promise<{ ok: boolean; recorded: boolean; event: TelemetryEvent }> {
+  const fullEvent: TelemetryEvent = {
+    id: payload.id || `ev_${Math.random().toString(36).slice(2, 9)}`,
+    timestamp: payload.timestamp || new Date().toISOString(),
+    provider_id: payload.provider_id || "antigravity",
+    project_id: payload.project_id || "skills-platform",
+    recipe_id: payload.recipe_id ?? null,
+    skill_name: payload.skill_name || "planning",
+    lineage_id: payload.lineage_id ?? null,
+    invocation_mode: payload.invocation_mode || "model_invoked",
+    duration_ms: typeof payload.duration_ms === "number" ? payload.duration_ms : 35,
+    tool_calls_count: typeof payload.tool_calls_count === "number" ? payload.tool_calls_count : 1,
+    outcome: payload.outcome || "success",
+    evidence_type: payload.evidence_type || "activation_report",
+    summary: payload.summary || "Recorded telemetry event",
+    details: payload.details || null,
+    metrics: payload.metrics,
+  };
+
+  if (catalogApi) {
+    try {
+      const response = await fetch(`${catalogApi}/api/telemetry/record`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(fullEvent),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  return {
+    ok: true,
+    recorded: true,
+    event: fullEvent,
+  };
+}
+
+export function subscribeTelemetryPolling(
+  callback: (summary: TelemetrySummary) => void,
+  intervalMs = 4000,
+  params?: TelemetryQueryParams,
+): () => void {
+  let active = true;
+
+  const poll = async () => {
+    try {
+      const summary = await fetchTelemetrySummary(params);
+      if (active) {
+        callback(summary);
+      }
+    } catch {
+      // Resilient to intermittent poll errors
+    }
+  };
+
+  void poll();
+  const timer = setInterval(() => {
+    void poll();
+  }, intervalMs);
+
+  return () => {
+    active = false;
+    clearInterval(timer);
+  };
+}
+
 

@@ -130,6 +130,7 @@ function usage() {
     "  skills-catalog recipe export [--project <id>] [--preset <id>] [--name <text>] [--out <file>]",
     "  skills-catalog recipe inspect <file>",
     "  skills-catalog recipe apply <file> [--path <path>] [--provider <id>] [--confirm]",
+    "  skills-catalog loop run --prd <path> [--project <path>] [--provider <id>] [--confirm]",
   ].join("\n");
 }
 
@@ -629,6 +630,26 @@ async function run(argv) {
         projectPath: flags.path,
         providerId: flags.provider?.[0],
         confirm: flags.confirm === true,
+      });
+    }
+  }
+
+  if (command === "loop") {
+    const [action] = positional.slice(1);
+    if (action === "run") {
+      const { runLifecycleLoop } = require("./lifecycle-loop");
+      const prdPath = flags.prd ?? positional[2];
+      if (!prdPath) {
+        throw new Error("loop run requires --prd <path>");
+      }
+      return runLifecycleLoop({
+        prdPath,
+        projectPath: flags.project ?? flags.path ?? process.cwd(),
+        providerId: flags.provider?.[0] ?? (typeof flags.provider === "string" ? flags.provider : undefined) ?? "codex",
+        catalogRoot,
+        registryRoot,
+        confirm: flags.confirm !== false,
+        dryRun: flags["dry-run"] === true,
       });
     }
   }

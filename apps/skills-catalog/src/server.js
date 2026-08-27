@@ -10,6 +10,7 @@ const { latestSkillsByArtifact, listRegistrySkills } = require("./registry");
 const { createSkillsManagerInspector } = require("./upstream-inspector");
 const { applyRecordedActivationPlan } = require("./upstream-apply");
 const { applyRecipe, exportRecipe, inspectRecipe } = require("./recipes");
+const { getTelemetrySummary, recordTelemetry } = require("./telemetry");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -43,7 +44,7 @@ function parseJsonBody(request) {
       try {
         resolve(JSON.parse(Buffer.concat(parts).toString("utf8")));
       } catch {
-        reject(new Error("Request body must be valid JSON"));
+        reject(new Error("Invalid JSON"));
       }
     });
     request.on("error", reject);
@@ -55,7 +56,7 @@ function workScopeTags(url, body = {}) {
   return url.searchParams.getAll("work_scope");
 }
 
-function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = createSkillsManagerInspector(), upstreamCli = upstreamInspector }) {
+function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstreamInspector = createSkillsManagerInspector(), upstreamCli = upstreamInspector }) {
   if (!catalogRoot || !registryRoot) throw new Error("catalogRoot and registryRoot are required");
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
@@ -478,6 +479,27 @@ function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = cr
           confirm: body.confirm === true,
         }));
       }
+      if (url.pathname === "/api/telemetry/record" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, await recordTelemetry({
+          catalogRoot,
+          registryRoot,
+          telemetryPath,
+          payload: body,
+        }));
+      }
+      if (url.pathname === "/api/telemetry/summary" && request.method === "GET") {
+        return json(response, 200, await getTelemetrySummary({
+          catalogRoot,
+          registryRoot,
+          telemetryPath,
+          projectId: url.searchParams.get("project_id") ?? undefined,
+          providerId: url.searchParams.get("provider_id") ?? undefined,
+          skillName: url.searchParams.get("skill_name") ?? undefined,
+          since: url.searchParams.get("since") ?? undefined,
+          limit: url.searchParams.get("limit") ? Number(url.searchParams.get("limit")) : 20,
+        }));
+      }
       return json(response, 404, { error: "Not found" });
     } catch (error) {
       return json(response, 400, { error: error.message, issues: error.issues ?? [] });
@@ -485,8 +507,8 @@ function createCatalogServer({ catalogRoot, registryRoot, upstreamInspector = cr
   });
 }
 
-async function startCatalogServer({ catalogRoot, registryRoot, host = "127.0.0.1", port = 4300 }) {
-  const server = createCatalogServer({ catalogRoot, registryRoot });
+async function startCatalogServer({ catalogRoot, registryRoot, telemetryPath, host = "127.0.0.1", port = 4300 }) {
+  const server = createCatalogServer({ catalogRoot, registryRoot, telemetryPath });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(port, host, () => {

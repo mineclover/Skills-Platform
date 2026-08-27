@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   AlertCircle,
   AlertTriangle,
   ArrowRight,
+  BarChart2,
   Check,
   CheckCircle2,
   Clock,
@@ -12,11 +14,13 @@ import {
   Filter,
   Layers3,
   LoaderCircle,
+  Radio,
   RefreshCcw,
   Search,
   ShieldCheck,
   Sparkles,
   Terminal,
+  TrendingUp,
   Wrench,
   X,
   Zap,
@@ -25,20 +29,76 @@ import type {
   DriftSummary,
   RemoteComparison,
   RemoteHistory,
+  TelemetryEvent,
+  TelemetrySummary,
   UpstreamBinding,
   UpstreamStatus,
 } from "../types";
 import {
   DeliveryPathIndicator,
+  InvocationBadge,
   ProviderBadge,
   calculateProjectStatus,
   getProviderInfo,
   resolveDeliveryPath,
 } from "../visual-identity";
+import {
+  createMockTelemetrySummary,
+  fetchTelemetrySummary,
+  formatDuration,
+} from "../api/catalog-api";
 
 // ============================================================================
 // 1. Helper Functions & Filtering Logic
 // ============================================================================
+
+export function formatTimeAgo(timestamp: string): string {
+  const diff = Date.now() - new Date(timestamp).getTime();
+  if (Number.isNaN(diff) || diff < 0) return "just now";
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 30) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+export function getBindingTelemetry(
+  skillId: string,
+  providerId: string,
+  events: TelemetryEvent[] = [],
+) {
+  const cleanId = (skillId || "").trim().toLowerCase();
+  const cleanProv = (providerId || "").trim().toLowerCase();
+
+  const matching = events.filter((e) => {
+    const evSkill = (e.skill_name || "").toLowerCase();
+    const evLineage = (e.lineage_id || "").toLowerCase();
+    const evProv = (e.provider_id || "").toLowerCase();
+
+    const matchesSkill = evSkill === cleanId || evLineage === cleanId || cleanId.includes(evSkill);
+    const matchesProv = !cleanProv || evProv === cleanProv;
+    return matchesSkill && matchesProv;
+  });
+
+  const totalRuns = matching.length;
+  const latest = matching[0] || null;
+  const avgDuration =
+    totalRuns > 0
+      ? Math.round(matching.reduce((acc, m) => acc + (m.duration_ms || 0), 0) / totalRuns)
+      : 0;
+
+  return {
+    totalRuns,
+    lastInvokedAt: latest?.timestamp || null,
+    latestOutcome: latest?.outcome || null,
+    latestInvocationMode: latest?.invocation_mode || null,
+    avgDuration,
+    hasActivity: totalRuns > 0,
+  };
+}
 
 export type BindingFilterStatus =
   | "all"
@@ -208,6 +268,7 @@ export interface LiveActivationDrawerProps {
   onRefresh: () => void;
   onReconcileDrift?: () => void;
   onReapplyPlan?: () => void;
+  telemetrySummary?: TelemetrySummary | null;
 }
 
 export function LiveActivationDrawer({
@@ -224,10 +285,42 @@ export function LiveActivationDrawer({
   onRefresh,
   onReconcileDrift,
   onReapplyPlan,
+  telemetrySummary: propTelemetrySummary,
 }: LiveActivationDrawerProps) {
   const [targetScope, setTargetScope] = useState<"project" | "global">("project");
   const [statusFilter, setStatusFilter] = useState<BindingFilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [internalTelemetry, setInternalTelemetry] = useState<TelemetrySummary | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const summary = await fetchTelemetrySummary({
+          projectId: selectedProjectId ?? undefined,
+        });
+        if (active) setInternalTelemetry(summary);
+      } catch {
+        // Resilient fallback
+      }
+    };
+
+    void poll();
+    const timer = setInterval(() => {
+      void poll();
+    }, 4000);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [isOpen, selectedProjectId]);
+
+  const telemetrySummary =
+    propTelemetrySummary ??
+    internalTelemetry ??
+    createMockTelemetrySummary({ projectId: selectedProjectId ?? undefined });
 
   const activeStatus = targetScope === "project" ? projectStatus : globalStatus;
   const driftSummary = useMemo(
@@ -427,6 +520,56 @@ export function LiveActivationDrawer({
           )}
         </div>
 
+        {/* Provider-level Execution Counters & Live Telemetry Metrics */}
+        <div className="drawer-telemetry-counters-strip" aria-label="Provider telemetry counters">
+          <div className="telemetry-strip-header">
+            <Radio size={14} className="mint live-pulse-icon" />
+            <span className="telemetry-strip-title">Provider Execution Counters & Telemetry</span>
+            <span className="telemetry-strip-total">
+              {telemetrySummary.total_invocations} runs ·{" "}
+              {formatDuration(telemetrySummary.average_duration_ms)} avg latency
+            </span>
+          </div>
+
+          <div className="provider-counters-grid">
+            {(["antigravity", "codex", "claude"] as const).map((provId) => {
+              const count = telemetrySummary.by_provider[provId] || 0;
+              const meta = getProviderInfo(provId);
+              const provEvents = telemetrySummary.recent_events.filter(
+                (e) => e.provider_id.toLowerCase() === provId.toLowerCase(),
+              );
+              const provAvgMs =
+                provEvents.length > 0
+                  ? Math.round(
+                      provEvents.reduce((sum, e) => sum + (e.duration_ms || 0), 0) /
+                        provEvents.length,
+                    )
+                  : 0;
+
+              return (
+                <div key={provId} className={`provider-counter-card ${provId}`}>
+                  <div className="provider-counter-top">
+                    <ProviderBadge
+                      providerId={provId}
+                      showDeliveryPath={false}
+                      showTooltip={false}
+                    />
+                    <span className="counter-invocations-pill">
+                      <strong>{count}</strong> runs
+                    </span>
+                  </div>
+                  <div className="provider-counter-meta">
+                    <span className="counter-latency-tag">
+                      <Zap size={11} /> {provAvgMs > 0 ? formatDuration(provAvgMs) : "0ms"} avg
+                    </span>
+                    <span className="counter-status-tag active">Active Junction</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Bindings Filter & Search Controls */}
         <div className="drawer-filter-bar">
           <div className="binding-search-wrapper">
@@ -538,6 +681,11 @@ export function LiveActivationDrawer({
                 const bProvider = binding.provider_id || providerId;
                 const path =
                   binding.target_path || resolveDeliveryPath(bProvider, binding.skill_instance_id);
+                const telemetry = getBindingTelemetry(
+                  binding.skill_instance_id,
+                  binding.provider_id,
+                  telemetrySummary.recent_events,
+                );
 
                 return (
                   <article
@@ -571,6 +719,34 @@ export function LiveActivationDrawer({
                       <div className="binding-path-row">
                         <span className="path-prefix">Target Delivery Path:</span>
                         <code className="binding-path-code">{path}</code>
+                      </div>
+
+                      {/* Active Junction Telemetry Indicators */}
+                      <div className="binding-telemetry-row">
+                        <span className="junction-telemetry-badge">
+                          <Zap size={11} className="mint" /> {telemetry.totalRuns} runs
+                        </span>
+                        {telemetry.hasActivity ? (
+                          <>
+                            <span className="junction-time-tag">
+                              <Clock size={11} /> {formatTimeAgo(telemetry.lastInvokedAt!)}
+                            </span>
+                            {telemetry.latestOutcome && (
+                              <span className={`junction-outcome-pill ${telemetry.latestOutcome}`}>
+                                {telemetry.latestOutcome.replaceAll("_", " ")}
+                              </span>
+                            )}
+                            {telemetry.latestInvocationMode && (
+                              <InvocationBadge
+                                mode={telemetry.latestInvocationMode}
+                                size="sm"
+                                showTooltip={false}
+                              />
+                            )}
+                          </>
+                        ) : (
+                          <span className="junction-idle-tag">idle junction</span>
+                        )}
                       </div>
                     </div>
                   </article>

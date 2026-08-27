@@ -1,0 +1,165 @@
+{
+  "passed": 32,
+  "failed": 0,
+  "tests": [
+    {
+      "name": "All 100 CLI runs logged events successfully",
+      "passed": true,
+      "expected": 100,
+      "actual": 100
+    },
+    {
+      "name": "In-process latency average < 5ms",
+      "passed": true,
+      "avgMs": 0.6334735
+    },
+    {
+      "name": "In-process latency P95 < 15ms",
+      "passed": true,
+      "p95Ms": 1.0244000000002416
+    },
+    {
+      "name": "Resilience to Connection Refused (exits 0 in < 500ms without blocking)",
+      "passed": true,
+      "status": 0,
+      "durationMs": 81.86330000000089
+    },
+    {
+      "name": "Resilience to Blackhole/Socket Hang (non-blocking, exits 0 promptly)",
+      "passed": true,
+      "status": 0,
+      "durationMs": 89.77870000000075
+    },
+    {
+      "name": "Resilience to TCP Connection Reset (exits 0 without uncaught exception)",
+      "passed": true,
+      "status": 0,
+      "durationMs": 70.69909999999982
+    },
+    {
+      "name": "Resilience to Garbage HTTP Response (exits 0 cleanly)",
+      "passed": true,
+      "status": 0,
+      "durationMs": 73.07960000000094
+    },
+    {
+      "name": "Resilience to Invalid URL string (exits 0 cleanly)",
+      "passed": true
+    },
+    {
+      "name": "All resilient events persisted to local log despite HTTP failures",
+      "passed": true,
+      "loggedCount": 5
+    },
+    {
+      "name": "Broken JSON syntax on STDIN exits 0",
+      "passed": true
+    },
+    {
+      "name": "Binary / NUL noise on STDIN exits 0",
+      "passed": true
+    },
+    {
+      "name": "2MB Large STDIN payload handled without crash",
+      "passed": true
+    },
+    {
+      "name": "Whitespace-only STDIN exits 0",
+      "passed": true
+    },
+    {
+      "name": "Hostile CLI flags parsed safely and exits 0",
+      "passed": true
+    },
+    {
+      "name": "All logged lines under hostile inputs are strictly valid single-line JSON",
+      "passed": true,
+      "totalLines": 5
+    },
+    {
+      "name": "All 60 concurrent processes exited code 0",
+      "passed": true
+    },
+    {
+      "name": "Exactly 60 lines recorded without loss",
+      "passed": true,
+      "expected": 60,
+      "actual": 60
+    },
+    {
+      "name": "Zero corrupted/interleaved lines in concurrent log",
+      "passed": true,
+      "corruptedLines": 0
+    },
+    {
+      "name": "All unique worker skills captured",
+      "passed": true,
+      "uniqueSkills": 60
+    },
+    {
+      "name": "Antigravity Windows path extracts task-decomposer",
+      "passed": true
+    },
+    {
+      "name": "Antigravity sets model_invoked and activation_report",
+      "passed": true
+    },
+    {
+      "name": "Antigravity run_command extracts scoped-tdd-executor",
+      "passed": true
+    },
+    {
+      "name": "Antigravity scoped test sets evaluation evidence_type",
+      "passed": true
+    },
+    {
+      "name": "Antigravity loop command extracts lifecycle-phase-controller",
+      "passed": true
+    },
+    {
+      "name": "Claude post_tool_execution infers provider_id: 'claude' without explicit platform flag",
+      "passed": true,
+      "expected": "claude",
+      "actual": "claude"
+    },
+    {
+      "name": "Claude post_tool_execution extracts skill_name: 'horizontal-topic-scanner'",
+      "passed": true,
+      "actual": "horizontal-topic-scanner"
+    },
+    {
+      "name": "Claude tool error mapped to outcome 'risk'",
+      "passed": true
+    },
+    {
+      "name": "Kebab-case CLI arguments (--skill-name, --recipe-id, etc.) parsed into telemetry event",
+      "passed": true,
+      "expectedSkill": "task-decomposer",
+      "actualSkill": "task-decomposer",
+      "expectedRecipe": "mlc-task-planning",
+      "actualRecipe": "mlc-task-planning",
+      "expectedMode": "user_invoked",
+      "actualMode": "user_invoked"
+    },
+    {
+      "name": "extractFromCommand matches flags formatted with '=' equals sign",
+      "passed": true,
+      "actual": {
+        "recipe_id": "custom-recipe",
+        "skill_name": "custom-skill"
+      }
+    },
+    {
+      "name": "Artifact digest path extracts codebase-design",
+      "passed": true
+    },
+    {
+      "name": "Stream mode processes multi-line NDJSON stream",
+      "passed": true
+    },
+    {
+      "name": "Stream mode logged all 3 stream events",
+      "passed": true
+    }
+  ]
+}

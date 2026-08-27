@@ -1,0 +1,13 @@
+SKILL.md
+README.md
+manifest.txt
+references/retention-rubric.md
+references/canonical-schema.md
+references/compression-audit.md
+templates/MASTER_BASELINE.template.md
+templates/COMPRESSION_REPORT.template.md
+templates/SOURCE_LEDGER.template.json
+scripts/count_tokens.py
+scripts/validate_baseline.py
+examples/minimal-workflow.md
+single-file/bounded-baseline-condenser.single.md

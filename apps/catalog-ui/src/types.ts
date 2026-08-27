@@ -7,6 +7,8 @@ import type {
   RegistrySkill,
   FeedbackSummary,
   SkillFeedback,
+  FeedbackOutcome,
+  EvidenceType,
   SkillNote,
   SkillProfile,
   SkillRecipe,
@@ -269,6 +271,66 @@ export interface RecipeApplyResult {
   } | null;
 }
 
+export type TelemetryOutcome = FeedbackOutcome;
+export type TelemetryEvidenceType = EvidenceType;
+
+export interface TelemetryEvent {
+  id?: string;
+  timestamp: string;          // ISO 8601 UTC timestamp
+  provider_id: string;        // "antigravity" | "claude" | "codex" | "ralph-tui" | string
+  project_id: string;
+  recipe_id?: string | null;
+  skill_name: string;
+  lineage_id?: string | null;
+  invocation_mode: InvocationMode;
+  duration_ms: number;
+  tool_calls_count: number;
+  outcome: FeedbackOutcome;
+  evidence_type: EvidenceType;
+  summary: string;
+  details?: string | null;
+  metrics?: Record<string, number>;
+}
+
+export interface InvocationModeDistribution {
+  model_invoked: number;
+  user_invoked: number;
+  hybrid: number;
+  unspecified: number;
+}
+
+export interface InvocationModeRatio {
+  mode: InvocationMode;
+  count: number;
+  percentage: number;
+}
+
+export interface TelemetryHealthDistribution {
+  healthy: number;
+  needs_review: number;
+  unknown: number;
+}
+
+export interface TelemetrySummary {
+  total_invocations: number;
+  average_duration_ms: number;
+  success_rate: number;
+  by_mode: InvocationModeDistribution;
+  by_provider: Record<string, number>;
+  by_health: TelemetryHealthDistribution;
+  recent_events: TelemetryEvent[];
+  invocation_mode_ratios?: InvocationModeRatio[];
+  last_event_at?: string | null;
+}
+
+export interface TelemetryQueryParams {
+  projectId?: string;
+  providerId?: string;
+  skillName?: string;
+  since?: string;
+  limit?: number;
+}
+
 export type {
   ArtifactType,
   InvocationMode,
@@ -278,6 +340,8 @@ export type {
   RegistrySkill,
   FeedbackSummary,
   SkillFeedback,
+  FeedbackOutcome,
+  EvidenceType,
   SkillNote,
   SkillProfile,
   SkillRecipe,
@@ -286,4 +350,5 @@ export type {
   RecipePreset,
   RecipeProjectBinding,
 };
+
 

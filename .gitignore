@@ -6,6 +6,9 @@ coverage/
 !.env.example
 
 # Local Skills Platform catalog state and materialized delivery bindings
-.skills-platform/
+.skills-platform/*
+!.skills-platform/hooks/
+!.skills-platform/registry/
 skills/
 *.tsbuildinfo
+

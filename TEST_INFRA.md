@@ -1,52 +1,42 @@
-# E2E Test Infra: Skills Platform UI & Recipe Hub
+# E2E Test Infra: Skills Platform Telemetry & Lifecycle Loop
 
 ## Test Philosophy
-- **Requirement-Driven & Opaque-Box**: Tests verify user-visible capabilities derived from `ORIGINAL_REQUEST.md`, contracts, and backend APIs without tight coupling to internal React component implementation details.
-- **Methodology**: 5-tier testing architecture (Category-Partition, Boundary Value Analysis, Pairwise Combinations, Real-World Workloads, and White-Box Adversarial Hardening).
+- Opaque-box, requirement-driven verification derived strictly from `ORIGINAL_REQUEST.md`.
+- No internal module assumptions; test via public entry points (CLI, HTTP REST, Hook execution, File system assertions).
+- Methodology: Category-Partition + Boundary Value Analysis + Pairwise Interaction + Real-World Workload Testing.
 
-## Feature Inventory & Test Mapping
-| # | Feature | Requirement | Tier 1 (Feature) | Tier 2 (Boundary) | Tier 3 (Cross-Feature) | Tier 4 (E2E Scenario) |
-|---|---------|-------------|:----------------:|:-----------------:|:----------------------:|:---------------------:|
-| F1 | 1-Click Recipe Export | ORIGINAL_REQUEST §R1 | ≥5 | ≥5 | ✓ | ✓ |
-| F2 | Recipe Upload & Drag-Drop | ORIGINAL_REQUEST §R1 | ≥5 | ≥5 | ✓ | ✓ |
-| F3 | Recipe Inspector Panel | ORIGINAL_REQUEST §R1 | ≥5 | ≥5 | ✓ | ✓ |
-| F4 | Recipe Apply Workflow | ORIGINAL_REQUEST §R1 | ≥5 | ≥5 | ✓ | ✓ |
-| F5 | Navigation Modernization | ORIGINAL_REQUEST §R2 | ≥5 | ≥5 | ✓ | ✓ |
-| F6 | Quick-Filter Toolbars | ORIGINAL_REQUEST §R2 | ≥5 | ≥5 | ✓ | ✓ |
-| F7 | Table vs Card Grid Views | ORIGINAL_REQUEST §R2 | ≥5 | ≥5 | ✓ | ✓ |
-| F8 | Inline Profile & Note Inspection | ORIGINAL_REQUEST §R2 | ≥5 | ≥5 | ✓ | ✓ |
-| F9 | Multi-Provider & Delivery Paths | ORIGINAL_REQUEST §R3 | ≥5 | ≥5 | ✓ | ✓ |
-| F10 | Invocation Mode Visual Badges | ORIGINAL_REQUEST §R3 | ≥5 | ≥5 | ✓ | ✓ |
-| F11 | Pristine & Drift Indicators | ORIGINAL_REQUEST §R3 | ≥5 | ≥5 | ✓ | ✓ |
-| F12 | 5-Step Activation Stepper | ORIGINAL_REQUEST §R4 | ≥5 | ≥5 | ✓ | ✓ |
-| F13 | Live Activation Drawer & Drift Reconcile | ORIGINAL_REQUEST §R4 | ≥5 | ≥5 | ✓ | ✓ |
-| F14 | Monorepo Quality Verification | ORIGINAL_REQUEST §Quality | ≥5 | ≥5 | ✓ | ✓ |
+## Feature Inventory Mapping
+| # | Feature | Source | Tier 1 | Tier 2 | Tier 3 | Tier 4 |
+|---|---------|--------|:------:|:------:|:------:|:------:|
+| 1 | Telemetry Hook Script Execution | ORIGINAL_REQUEST §R1 | 5 | 5 | ✓ | ✓ |
+| 2 | Multi-Agent Hook Configs (Antigravity/Claude) | ORIGINAL_REQUEST §R1 | 5 | 5 | ✓ | ✓ |
+| 3 | Local NDJSON Log Appending | ORIGINAL_REQUEST §R1 | 5 | 5 | ✓ | ✓ |
+| 4 | Hook Execution Speed (<50ms Benchmark) | Acceptance Criteria | 5 | 5 | ✓ | ✓ |
+| 5 | Telemetry Ingestion API (`POST /api/telemetry/record`) | ORIGINAL_REQUEST §R2 | 5 | 5 | ✓ | ✓ |
+| 6 | Feedback Bridge to `SkillFeedback` Store | ORIGINAL_REQUEST §R2 | 5 | 5 | ✓ | ✓ |
+| 7 | Telemetry Summary API (`GET /api/telemetry/summary`) | ORIGINAL_REQUEST §R2 | 5 | 5 | ✓ | ✓ |
+| 8 | CLI `loop run` Command & Argument Parsing | ORIGINAL_REQUEST §R3 | 5 | 5 | ✓ | ✓ |
+| 9 | Phase 1 (Plan) & PRD Task Extraction | ORIGINAL_REQUEST §R3 | 5 | 5 | ✓ | ✓ |
+| 10 | Phase 2 (Inner Loop) Junction Swapping | ORIGINAL_REQUEST §R3 | 5 | 5 | ✓ | ✓ |
+| 11 | Test Storm Suppression & Pinpoint Scoped Tests | Acceptance Criteria | 5 | 5 | ✓ | ✓ |
+| 12 | Phase 3 (Release Gate) & `MASTER_BASELINE.md` | ORIGINAL_REQUEST §R3 | 5 | 5 | ✓ | ✓ |
+| 13 | UI Telemetry API Polling & Fallbacks | ORIGINAL_REQUEST §R4 | 5 | 5 | ✓ | ✓ |
+| 14 | UI Invocation Mode Visualizer & Metrics | ORIGINAL_REQUEST §R4 | 5 | 5 | ✓ | ✓ |
+| 15 | UI Telemetry Activity & Risk Feeds | ORIGINAL_REQUEST §R4 | 5 | 5 | ✓ | ✓ |
 
 ## Test Architecture
-- **Runner**: Node.js native `node:test` + `node:assert/strict`.
-- **Test Locations**:
-  - `apps/catalog-ui/test/recipes.test.js` (F1, F2, F3, F4)
-  - `apps/catalog-ui/test/navigation-and-filters.test.js` (F5, F6, F7, F8)
-  - `apps/catalog-ui/test/visual-identity.test.js` (F9, F10, F11)
-  - `apps/catalog-ui/test/diagnostics-and-stream.test.js` (F12, F13)
-  - `apps/catalog-ui/test/integration-scenarios.test.js` (Tier 4 & Tier 5)
-- **Execution Command**: `npm test` at monorepo root or within `apps/catalog-ui`.
-- **Pass Semantics**: All test files must pass with exit code `0` and 0 assertions failed.
-
-## Real-World Application Scenarios (Tier 4)
-| # | Scenario | Features Exercised | Expected Outcome |
-|---|----------|--------------------|------------------|
-| S1 | Multi-Machine Recipe Export and Re-Import | F1, F2, F3, F4 | Export catalog from source project, upload recipe in fresh instance, inspect metrics, apply to new project with Codex provider |
-| S2 | Invocation Mode Reflex vs Command Filtering | F5, F6, F7, F10 | Filter skills across 🤖 Model, 👤 User, and 🔀 Hybrid, toggle Table/Card views, verify correct count and badges |
-| S3 | Multi-Provider Switching and Delivery Path Verification | F4, F9, F11 | Assign Antigravity provider (`.agents/skills/`), verify delivery path, switch to Claude (`.claude/skills/`), verify path updates and pristine reset |
-| S4 | 5-Step Live Activation and Streaming Diagnostics | F12, F13 | Trigger project activation, observe sequential step events (`Plan` → `Inspect` → `Preview` → `Materialize` → `Verify`), confirm completion |
-| S5 | Drift Detection and 1-Click Reconciliation | F11, F13 | Simulate missing provider symlinks, surface drift warning banner in Live Activation drawer, trigger 1-click reconciliation, verify sync restoration |
-| S6 | Template Customization and Recipe Sharing | F1, F3, F8 | Compose custom preset with mixed invocation skills, export as recipe, inspect JSON schema validity |
-| S7 | Full Project Lifecycle Quality Gate | F14, all | Execute full clean build, TypeScript check across all packages, and execute 100% of test suites |
+- Test Runner: Node.js standard test runner (`node --test tests/e2e/**/*.test.js`)
+- Test Directory: `tests/e2e/`
+  - `tests/e2e/tier1-features/`
+  - `tests/e2e/tier2-boundaries/`
+  - `tests/e2e/tier3-pairwise/`
+  - `tests/e2e/tier4-scenarios/`
+  - `tests/e2e/tier5-adversarial/`
+- Test Runner script: `node tests/e2e/run-all.js`
 
 ## Coverage Thresholds
-- **Tier 1 (Feature Coverage)**: ≥70 test cases across all features
-- **Tier 2 (Boundary & Corner Cases)**: ≥70 test cases (empty files, invalid JSON, missing providers, corrupt state)
-- **Tier 3 (Cross-Feature Combinations)**: ≥15 interaction tests
-- **Tier 4 (Real-World Application Scenarios)**: ≥7 complete lifecycle scenarios
-- **Total Minimum Target**: ≥160 automated tests across monorepo test suites
+- Tier 1: ≥5 per feature (Total: 75+ tests)
+- Tier 2: ≥5 per feature boundary (Total: 75+ tests)
+- Tier 3: Pairwise combinations across platform hooks, telemetry bridge, and loop phases (Total: 15+ tests)
+- Tier 4: Realistic end-to-end multi-agent workflows (Total: 8+ scenarios)
+- **Minimum Total Test Count**: ~170+ E2E test assertions

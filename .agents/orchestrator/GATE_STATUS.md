@@ -1,45 +1,52 @@
-# Gate Status — Skills Platform UI & Recipe Hub Modernization
+# Gate Status Tracking
 
-## Gate — Iteration 1 (Milestone 1: Recipe Hub & Transfer Workspace)
+## Gate — Milestone M1 (Iteration 1)
 | Agent | Role | Verdict | Source |
-|---|---|---|---|
-| `m1_worker` | teamwork_preview_worker | DONE (build passed, 54/54 tests) | `handoff.md` |
-| `m1_reviewer_1` | teamwork_preview_reviewer | APPROVE | `handoff.md` |
-| `m1_reviewer_2` | teamwork_preview_reviewer | APPROVE | `handoff.md` |
-| `m1_challenger_1` | teamwork_preview_challenger | APPROVE | `handoff.md` |
-| `m1_challenger_2` | teamwork_preview_challenger | APPROVE | `handoff.md` |
-| `m1_auditor` | teamwork_preview_auditor | CLEAN | `handoff.md` |
+|-------|------|---------|--------|
+| worker_m1 | teamwork_preview_worker | DONE (pass 16/16, latency <2ms) | handoff.md |
+| reviewer_m1 | teamwork_preview_reviewer | APPROVE | handoff.md |
+| challenger_m1 | teamwork_preview_challenger | REQUEST_CHANGES (3 defect findings) | handoff.md |
+| auditor_m1 | teamwork_preview_auditor | CLEAN | handoff.md |
+
+Gate Result: **FAIL** (challenger_m1 REQUEST_CHANGES)
+
+## Gate — Milestone M1 (Iteration 2)
+| Agent | Role | Verdict | Source |
+|-------|------|---------|--------|
+| worker_m1_r2 | teamwork_preview_worker | DONE (pass 32/32 adversarial harness, 19/19 unit) | handoff.md |
+| auditor_m2 | teamwork_preview_auditor | CLEAN | handoff.md |
 
 Gate Result: **PASS**
 
----
-
-## Gate — Iteration 2 (Milestone 2: Workspace Layout & Navigation Modernization)
+## Gate — Milestone M2 (Iteration 1)
 | Agent | Role | Verdict | Source |
-|---|---|---|---|
-| `m2_worker` | teamwork_preview_worker | DONE (build passed, 79/79 tests) | `handoff.md` |
-| `m2_reviewer_1` | teamwork_preview_reviewer | APPROVE | `handoff.md` |
-| `m2_reviewer_2` | teamwork_preview_reviewer | APPROVE | `handoff.md` |
-| `m2_challenger_1` | teamwork_preview_challenger | APPROVE | `handoff.md` |
-| `m2_challenger_2` | teamwork_preview_challenger | APPROVE | `handoff.md` |
-| `m2_auditor` | teamwork_preview_auditor | CLEAN | `handoff.md` |
+|-------|------|---------|--------|
+| worker_m2 | teamwork_preview_worker | DONE (pass 12/12 test suites) | handoff.md |
+| reviewer_m2 | teamwork_preview_reviewer | APPROVE | handoff.md |
+| auditor_m2 | teamwork_preview_auditor | CLEAN | handoff.md |
 
 Gate Result: **PASS**
 
----
-
-## Gate — Iteration 3 (Final Verification Gate: Full Monorepo & Milestones 1–5)
+## Gate — Milestone M3 (Iteration 1)
 | Agent | Role | Verdict | Source |
-|---|---|---|---|
-| `m5_test_writer` | teamwork_preview_test_writer | DONE (178/178 tests passed, TEST_READY.md published) | `handoff.md` |
-| `final_reviewer_1` | teamwork_preview_reviewer | APPROVE | `handoff.md` |
-| `final_reviewer_2` | teamwork_preview_reviewer | APPROVE | `handoff.md` |
-| `final_challenger_1` | teamwork_preview_challenger | APPROVE | `handoff.md` |
-| `final_auditor` | teamwork_preview_auditor | CLEAN | `handoff.md` |
+|-------|------|---------|--------|
+| worker_m3 | teamwork_preview_worker | DONE (pass 20/20 lifecycle tests, 248 monorepo pass) | handoff.md |
+| auditor_master | teamwork_preview_auditor | CLEAN | handoff.md |
 
 Gate Result: **PASS**
-All criteria met:
-1. Build and tests pass: 178/178 tests (100% pass rate), 0 TypeScript compiler errors.
-2. Reviewers 1 & 2: APPROVE.
-3. Challenger 1: APPROVE.
-4. Forensic Auditor: CLEAN (Zero integrity violations).
+
+## Gate — Milestone M4 (Iteration 1)
+| Agent | Role | Verdict | Source |
+|-------|------|---------|--------|
+| worker_m4 | teamwork_preview_worker | DONE (pass 289/289 tests, clean Vite build) | handoff.md |
+| auditor_master | teamwork_preview_auditor | CLEAN | handoff.md |
+
+Gate Result: **PASS**
+
+## Gate — Milestone M5 / Master Gate (Iteration 1)
+| Agent | Role | Verdict | Source |
+|-------|------|---------|--------|
+| worker_m5 | teamwork_preview_worker | DONE (pass 184/184 E2E Tiers 1-5, npm test/check/build clean) | handoff.md |
+| auditor_master | teamwork_preview_auditor | CLEAN (0 integrity violations, 100% genuine) | handoff.md |
+
+Gate Result: **PASS**
