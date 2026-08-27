@@ -1125,6 +1125,8 @@ export function CatalogApp() {
                   <option value="review">review</option>
                   <option value="curation">curation (자료 정리 / Baseline Condensation)</option>
                   <option value="architecture">architecture (도메인 아키텍처 정제)</option>
+                  <option value="toolchain">toolchain (MLC 툴체인 및 호출 가드)</option>
+                  <option value="governance">governance (MLC 케이스 거버넌스 및 게이트)</option>
                 </select>
                 <ChevronDown size={18} aria-hidden="true" />
               </label>

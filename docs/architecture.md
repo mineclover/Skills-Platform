@@ -1,111 +1,63 @@
 # Skills Platform Architecture
 
-## Product boundary
+## 1. Product Boundary & Maintenance Control Plane (MLC)
 
-Skills Platform is the **registry and activation-catalog control plane**. It
-owns imported source provenance, immutable revisions, review status, skill
-contracts, evaluation evidence, skill-set releases, project policy, presets,
-and the decision of what should be active for a work scope.
-
-The existing Skills Manager is the **delivery adapter**. Its
-`skills-manager-inspect` CLI is the sole integration boundary used by Skills
-Platform. It owns provider discovery, agent-path compatibility,
-symbolic-link/copy materialization, filesystem/config reconciliation,
-shared-root impact warnings, progress, and post-delivery verification. It does
-not decide catalog membership or replace registry provenance.
-
-Agent-readable `skills/` folders are delivery endpoints. They are never a
-canonical registry or an authority for policy.
+Skills Platform is the **registry, activation catalog, and Maintenance Control Plane (MLC)** for AI agent customizations. It manages the continuous closed control loop across:
 
 ```text
-source -> inspect -> registry revision -> review / release / project policy
-                                      |
-                              ActivationPlan (immutable)
-                                      |
-        Skills Manager CLI adapter: inspect -> preview -> apply -> verify
-                                      |
-                        provider-specific skills/ delivery path
+Prior Context -> Behavior (Skills) -> Evidence -> Context Patch Proposal -> Validated Baseline
 ```
 
-## Workspace ownership
+The platform strictly separates the **Target System** (applications, codebases, microservices) from the **Maintenance Control Plane** (Skills Platform).
+
+```text
+Maintenance Control Plane (Skills Platform)
+├── Registry Layer     : Element, Topic, Responsibility, Convention, Method, Tool Capability
+├── Context Layer      : Horizontal Context (Exploration) vs Vertical Context (Single Resolution)
+├── Behavior Layer     : Horizontal Exploration vs Vertical Resolution vs Validation
+├── Tool & Guard Layer : Context -> Method -> Skill -> Capability -> Tool Binding -> Invocation Guard
+├── Evidence Layer     : Signal, Observation, Test Evidence, Change Evidence, Runtime Evidence
+└── Governance Layer   : 10-Stage Case Machine, Responsibility Gate, Release Stabilization, Drift Detector
+```
+
+## 2. Core Operational Principles (MLC Invariants)
+
+1. **Context is a Precondition of Behavior**: Skills execute only with explicit published context snapshots.
+2. **Behaviors Never Mutate Published Contexts Directly**: Skills produce patch proposals; only the Governance layer validates and publishes baselines.
+3. **Tools Are Execution Mechanisms, Not Behaviors**: Tools provide atomic capabilities; methods define procedures; skills orchestrate behaviors.
+4. **Horizontal vs Vertical Separation**:
+   - **Horizontal Exploration**: Analyzes signals, discovers candidates, and outputs `Topic Handoff` (no direct code mutations).
+   - **Vertical Resolution**: Focuses on a single `topic_id` to diagnose, change, and validate.
+5. **Responsibility Gate**: Problem origin != resolution location (`OWNED_RESOLUTION`, `BOUNDARY_MITIGATION`, `HANDOFF_REQUIRED`).
+
+## 3. Workspace Ownership
 
 | Path | Owner | Responsibility |
 | --- | --- | --- |
 | `apps/skills-catalog` | Skills Platform | Registry, catalog, evaluation, release, project assignments, REST API, CLI. |
-| `apps/catalog-ui` | Skills Platform | Web UI (React 19, TypeScript, Vite) with modular workspaces (`ProjectWorkspace`, `SkillWorkspace`, `TemplateWorkspace`, `ReviewQueue`, `LiveActivationStatus`). |
-| `packages/skill-contracts` | Skills Platform | Versioned TypeScript contracts, schemas, artifact taxonomy (`ArtifactType`, `InvocationMode`), and directory digests. |
-| `packages/skills-manager-adapter` | Skills Platform | Reference delivery adapter (TypeScript) providing atomic preview, verified Windows junctions / symlinks, safe unlinking, and rollback. |
+| `apps/catalog-ui` | Skills Platform | Web UI (React 19, TypeScript, Vite) with Recipe Hub, FilterToolbar, 5-stage progress stepper, and live diagnostic drawer. |
+| `packages/skill-contracts` | Skills Platform | Versioned TypeScript contracts, schemas, recipe specifications (`RECIPE_SCHEMA_VERSION = 1`), and artifact/invocation taxonomy. |
+| `packages/skills-manager-adapter` | Skills Platform | Reference delivery adapter providing atomic preview, verified Windows junctions / symlinks, safe unlinking, and rollback. |
 
-## Supported Artifact Types & Invocation Taxonomy
+## 4. Multi-Provider Delivery Directory Matrix
 
-### 1. Platform Artifact Types (`ArtifactType`)
-- **`skill`**: Standard procedural runbooks and progressive disclosure agent skills (`SKILL.md`).
-- **`rule`**: Contextual guidelines and coding standards (`GEMINI.md`, `AGENTS.md`, `*.rule.md`).
-- **`hook`**: Event lifecycle triggers (`hook.md`, `*.hook.sh`, `*.hook.js`).
-- **`plugin`**: Composite bundles containing skills, rules, and configurations (`plugin.json`, `plugin.md`).
-- **`mcp_server`**: Model Context Protocol integration declarations (`mcp.json`, `mcp.md`).
+| Assistant Target | Canonical Provider ID | Project Delivery Path | Delivery Mechanism |
+|---|---|---|---|
+| **Google Antigravity** | `antigravity` / `agy` | `<project_root>/.agents/skills/<skill-name>` | NTFS Junction / Symlink |
+| **OpenAI Codex CLI** | `codex` | `<project_root>/skills/<skill-name>` | NTFS Junction / Symlink |
+| **Anthropic Claude Desktop** | `claude` | `<project_root>/.claude/skills/<skill-name>` | NTFS Junction / Symlink |
 
-### 2. Invocation Taxonomy (`InvocationMode`)
-- **`model_invoked`** (Reflexes): Autonomous engineering reflexes reached for by the agent during coding, refactoring, verification, or design.
-- **`user_invoked`** (Commands): Explicitly executed by humans for high-impact or destructive operations to avoid agent bias (e.g. `hate`, `macrothink`, `re0-release`).
-- **`hybrid`**: Can be used both as an autonomous reflex and an explicit human command.
-- **`unspecified`**: Unclassified baseline.
+## 5. Invocation Taxonomy (`InvocationMode`)
 
-## CLI adapter contract
+- **`model_invoked`** (Reflexes): Autonomous cognitive reflexes (e.g. `debloat`, `factchk`, `mandela`, `baseline-domain-router`).
+- **`user_invoked`** (Commands): Explicitly executed by humans for high-impact or destructive operations (e.g. `bounded-baseline-condenser`, `hate`, `macrothink`, `re0-release`).
+- **`hybrid`**: Dual-purpose skills usable both as autonomous background checks and direct user commands.
+- **`unspecified`**: Unclassified legacy baseline.
 
-The catalog issues an `ActivationPlan` containing only immutable identities and
-requested delivery intent:
+## 6. Distribution & Safety Rules
 
-- `plan_id`, `schema_version`, `created_at`, and caller context;
-- registry skill revision ID, source digest, and canonical artifact path;
-- target project/worktree, provider, scope, and link-or-copy preference;
-- desired enabled state and expected delivery path;
-- collision strategy and required shared-root confirmation.
-
-The Catalog calls the upstream CLI rather than importing Skills Manager source,
-calling its Tauri commands, editing its configuration, or modifying a provider
-root itself. The CLI returns an `ActivationReport` containing each examined
-operation, its observed pre/post state, actual materialization method, errors,
-and drift. It must reject a plan whose schema, revision digest, target scope,
-or shared-root confirmation is invalid.
-
-### Command routing
-
-| Catalog intent | Skills Manager CLI boundary | Mutation |
-| --- | --- | --- |
-| Discover target and state | `projects`, `inspect`, `providers`, `bindings` | No |
-| Check a planned binding | `skill preview` | No |
-| Change one binding | `skill enable` / `skill disable` | Yes, explicit confirmation |
-| Change a resolved set | `batch enable` / `batch disable` | Yes, explicit confirmation |
-| Verify outcome | `providers`, `bindings` | No |
-
-The bridge implements discovery, verification, and the confirmed per-skill CLI
-write path. Before a write it resolves an immutable Catalog registry revision
-to a Skills Manager `skill_instance_id`, and retains the following mapping as
-plan evidence:
-registry skill/revision/digest, manager instance ID, manager project ID,
-provider/tool ID, inspected source path, and observation time. It must call
-`skill preview` before every mutating command and record the upstream JSON
-result before re-inspecting the target. Registry import into a Skills Manager
-hub is a separate, explicit adoption action; applying a Catalog plan must never
-silently import arbitrary source content.
-
-## Distribution rules
-
-1. Symbolic links are the default materialization method.
+1. Symbolic links and NTFS junctions are the default materialization method.
 2. Copies are explicit fallbacks and retain their source revision/digest.
-3. Disable/remove only changes a delivery binding; it never destroys a registry revision.
-4. Upstream updates create reviewable candidate revisions; they do not change a binding automatically.
-5. The catalog can request delivery, but only the adapter may mutate provider roots or configuration.
-6. The CLI is the only supported Catalog-to-Skills-Manager control channel.
-
-## Capability scoping and future runtime integration
-
-The Platform minimizes capability and context at the policy boundary: project
-presets and work-scope overlays select only the reviewed skills needed for a
-task. It persists evidence and bounded reports, not agent reasoning traces or
-unbounded tool logs. Any future runtime or CI integration needs a separately
-versioned, reviewable execution contract; it must not weaken the current
-preview, confirmation, or verification safeguards. See
-[capability scoping and runtime integration principles](./agent-execution-principles.md)
-for the design guidance and its current-contract boundary.
+3. Unlinking/pristine only changes delivery bindings; it never destroys registry revisions or unmanaged files.
+4. Upstream updates create reviewable candidate revisions without modifying active project delivery paths automatically.
+5. Mutating tools (`mutate`) must pass the Responsibility Gate before execution.

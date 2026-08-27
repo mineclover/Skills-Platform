@@ -16,7 +16,14 @@ import type {
   RecipeProjectBinding,
 } from "@skills-platform/contracts";
 
-export type Scope = "planning" | "implementation" | "review" | "curation" | "architecture";
+export type Scope =
+  | "planning"
+  | "implementation"
+  | "review"
+  | "curation"
+  | "architecture"
+  | "toolchain"
+  | "governance";
 
 export type SkillRow = {
   name: string;
