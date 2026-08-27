@@ -10,13 +10,18 @@ import {
   Copy,
   Cpu,
   Download,
+  ExternalLink,
   FileCode,
   FileDown,
   FileUp,
+  Folder,
   FolderGit2,
+  FolderTree,
   Layers,
   Play,
   RefreshCw,
+  Search,
+  SlidersHorizontal,
   Sparkles,
   Terminal,
   UploadCloud,
@@ -40,6 +45,7 @@ import {
 } from "../visual-identity";
 import type {
   CatalogSkill,
+  InvocationMode,
   RecipeApplyResult,
   RecipeInspectionResult,
   RemotePreset,
@@ -54,6 +60,124 @@ export interface RecipeWorkspaceProps {
   selectedProjectId: string | null;
   onSelectProject?: (projectId: string) => void;
 }
+
+// Built-in Curated Quick Recipe Cards
+interface QuickRecipeCard {
+  id: string;
+  presetId?: string;
+  name: string;
+  category: string;
+  description: string;
+  skillsCount: number;
+  icon: typeof Layers;
+  scopeTag: string;
+  glowColor: "mint" | "violet" | "amber" | "coral" | "cyan";
+  composition: {
+    model: number;
+    user: number;
+    hybrid: number;
+    unspecified: number;
+  };
+}
+
+const CURATED_QUICK_RECIPES: QuickRecipeCard[] = [
+  {
+    id: "quick-recursive-context",
+    presetId: "mlc-recursive-context",
+    name: "MLC Recursive Context & Exploration",
+    category: "H/V Exploration Engine",
+    description: "4 Base Registries and 9 H/V Exploration & Recursive Context Composer skills for complex tasks.",
+    skillsCount: 13,
+    icon: Sparkles,
+    scopeTag: "scope: explore",
+    glowColor: "mint",
+    composition: { model: 9, user: 4, hybrid: 0, unspecified: 0 },
+  },
+  {
+    id: "quick-condensation-core",
+    presetId: "condensation-core",
+    name: "Condensation Core (80k Compiler)",
+    category: "Context Compiler",
+    description: "Ultra-lightweight baseline compiler with domain router and reference pack builder.",
+    skillsCount: 3,
+    icon: Cpu,
+    scopeTag: "scope: curation",
+    glowColor: "cyan",
+    composition: { model: 2, user: 1, hybrid: 0, unspecified: 0 },
+  },
+  {
+    id: "quick-architecture-curation",
+    presetId: "baseline-curation-core",
+    name: "Architecture Curation Core",
+    category: "Deep Architecture",
+    description: "Compiler plus 8 core architectural domain reducers for system specifications.",
+    skillsCount: 11,
+    icon: Layers,
+    scopeTag: "scope: architecture",
+    glowColor: "violet",
+    composition: { model: 9, user: 2, hybrid: 0, unspecified: 0 },
+  },
+  {
+    id: "quick-toolchain-plane",
+    presetId: "mlc-toolchain-plane",
+    name: "MLC Toolchain & Capability Plane",
+    category: "Tool & Capability Layer",
+    description: "Method registry, toolchain planner, invocation guard, and result normalizer.",
+    skillsCount: 6,
+    icon: Terminal,
+    scopeTag: "scope: toolchain",
+    glowColor: "amber",
+    composition: { model: 4, user: 2, hybrid: 0, unspecified: 0 },
+  },
+  {
+    id: "quick-lifecycle-governance",
+    presetId: "mlc-lifecycle-governance",
+    name: "MLC Lifecycle & Governance Plane",
+    category: "Lifecycle & Governance",
+    description: "10-state Maintenance Case state machine, signal intake, and responsibility gates.",
+    skillsCount: 8,
+    icon: SlidersHorizontal,
+    scopeTag: "scope: governance",
+    glowColor: "coral",
+    composition: { model: 5, user: 3, hybrid: 0, unspecified: 0 },
+  },
+  {
+    id: "quick-specialist-domains",
+    presetId: "mlc-specialist-domains",
+    name: "MLC Specialist Domain Overlays",
+    category: "Specialist Overlays",
+    description: "AI Agent Systems, Browser DevTools, UI Editor, 3D Graphics, and Knowledge Publishing.",
+    skillsCount: 5,
+    icon: FolderGit2,
+    scopeTag: "scope: specialist",
+    glowColor: "violet",
+    composition: { model: 5, user: 0, hybrid: 0, unspecified: 0 },
+  },
+  {
+    id: "quick-paperthin-reflexes",
+    presetId: "paperthin-reflexes",
+    name: "Paperthin Reflexes & Commands",
+    category: "Core Coding Baseline",
+    description: "Everyday coding reflexes, TDD verification, safe refactoring, and human steering tools.",
+    skillsCount: 28,
+    icon: Zap,
+    scopeTag: "scope: baseline",
+    glowColor: "mint",
+    composition: { model: 16, user: 10, hybrid: 2, unspecified: 0 },
+  },
+  {
+    id: "quick-full-suite",
+    presetId: "baseline-full-suite",
+    name: "MLC Master Full Suite Bundle",
+    category: "Full Control Plane",
+    description: "Complete 43-skill suite containing all compilers, H/V engines, toolchains, and governance.",
+    skillsCount: 43,
+    icon: Layers,
+    scopeTag: "scope: all",
+    glowColor: "cyan",
+    composition: { model: 31, user: 10, hybrid: 2, unspecified: 0 },
+  },
+];
 
 const SAMPLE_RECIPE: SkillRecipe = {
   schema_version: 1,
@@ -193,6 +317,13 @@ export function RecipeWorkspace({
   const [inspectionResult, setInspectionResult] = useState<RecipeInspectionResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Inspected Skills Search and Filter State
+  const [skillFilterMode, setSkillFilterMode] = useState<"all" | InvocationMode>("all");
+  const [skillSearchQuery, setSkillSearchQuery] = useState<string>("");
+
+  // Quick Preset Loading State
+  const [loadingPresetId, setLoadingPresetId] = useState<string | null>(null);
+
   // Apply State
   const [targetProjectPath, setTargetProjectPath] = useState<string>(
     projects.find((p) => p.id === selectedProjectId)?.name
@@ -286,6 +417,68 @@ export function RecipeWorkspace({
       setInspecting(false);
     }
   }, []);
+
+  // Quick Loader from Curated Quick Recipe Gallery
+  const handleLoadQuickRecipe = useCallback(
+    async (card: QuickRecipeCard) => {
+      setLoadingPresetId(card.id);
+      setNotice(null);
+      try {
+        if (card.presetId) {
+          const { recipe } = await exportRecipeApi({
+            presetId: card.presetId,
+            name: card.name,
+            description: card.description,
+          });
+          const recipeJson = JSON.stringify(recipe, null, 2);
+          setRawJson(recipeJson);
+          await inspectContent(recipeJson);
+          setNotice({
+            type: "success",
+            message: `Loaded live canonical recipe for "${card.name}" (${card.skillsCount} skills).`,
+          });
+        } else {
+          const sampleString = JSON.stringify(SAMPLE_RECIPE, null, 2);
+          setRawJson(sampleString);
+          await inspectContent(sampleString);
+        }
+      } catch {
+        const fallbackRecipe: SkillRecipe = {
+          schema_version: 1,
+          recipe_id: card.id,
+          name: card.name,
+          description: card.description,
+          created_at: new Date().toISOString(),
+          created_by: "Skills Platform Quick Library",
+          sources: [
+            {
+              source_id: "skills-platform-registry",
+              type: "local",
+              locator: "./.skills-platform/registry",
+            },
+          ],
+          skills: [],
+          presets: [
+            {
+              id: card.presetId || card.id,
+              name: card.name,
+              version: 1,
+              description: card.description,
+              work_scope_tags: [card.scopeTag.replace("scope: ", "")],
+              skills: [],
+            },
+          ],
+          projects: [],
+        };
+        const fallbackJson = JSON.stringify(fallbackRecipe, null, 2);
+        setRawJson(fallbackJson);
+        await inspectContent(fallbackJson);
+      } finally {
+        setLoadingPresetId(null);
+      }
+    },
+    [inspectContent],
+  );
 
   // Handle File Drop & Upload
   const handleFile = useCallback(
@@ -418,6 +611,57 @@ export function RecipeWorkspace({
     }
   }, [targetProjectPath, selectedProvider]);
 
+  // Filtered skills in inspected recipe
+  const parsedRecipeSkills = useMemo(() => {
+    if (!rawJson.trim()) return [];
+    try {
+      const parsed = JSON.parse(rawJson);
+      return Array.isArray(parsed.skills) ? parsed.skills : [];
+    } catch {
+      return [];
+    }
+  }, [rawJson]);
+
+  const filteredInspectedSkills = useMemo(() => {
+    return parsedRecipeSkills.filter((s: any) => {
+      const mode = s.invocation_mode || "unspecified";
+      if (skillFilterMode !== "all" && mode !== skillFilterMode) {
+        return false;
+      }
+      if (skillSearchQuery.trim()) {
+        const query = skillSearchQuery.toLowerCase();
+        const matchName = s.name?.toLowerCase().includes(query);
+        const matchDesc = s.description?.toLowerCase().includes(query);
+        const matchSource = s.source_id?.toLowerCase().includes(query);
+        if (!matchName && !matchDesc && !matchSource) return false;
+      }
+      return true;
+    });
+  }, [parsedRecipeSkills, skillFilterMode, skillSearchQuery]);
+
+  // Telemetry ratios for inspected recipe
+  const telemetryRatios = useMemo(() => {
+    const total = parsedRecipeSkills.length;
+    if (total === 0) return { model: 0, user: 0, hybrid: 0, unspecified: 0 };
+    let model = 0;
+    let user = 0;
+    let hybrid = 0;
+    let unspecified = 0;
+    for (const s of parsedRecipeSkills) {
+      const mode = s.invocation_mode;
+      if (mode === "model_invoked") model++;
+      else if (mode === "user_invoked") user++;
+      else if (mode === "hybrid") hybrid++;
+      else unspecified++;
+    }
+    return {
+      model: Math.round((model / total) * 100),
+      user: Math.round((user / total) * 100),
+      hybrid: Math.round((hybrid / total) * 100),
+      unspecified: Math.round((unspecified / total) * 100),
+    };
+  }, [parsedRecipeSkills]);
+
   return (
     <div className="recipe-workspace">
       {/* Workspace Header */}
@@ -477,6 +721,76 @@ export function RecipeWorkspace({
           </button>
         </div>
       )}
+
+      {/* Quick Curated Recipe Gallery Deck */}
+      <section className="quick-recipe-section">
+        <div className="quick-recipe-header">
+          <div className="quick-recipe-title">
+            <Sparkles size={16} className="mint" />
+            <h3>Curated Recipe Quick Library</h3>
+            <span className="quick-recipe-count">8 Modular Bundles</span>
+          </div>
+          <span className="quick-recipe-hint">1-click inspect, parse & apply live recipes</span>
+        </div>
+
+        <div className="quick-recipe-grid">
+          {CURATED_QUICK_RECIPES.map((card) => {
+            const Icon = card.icon;
+            const isLoading = loadingPresetId === card.id;
+            return (
+              <div key={card.id} className={`quick-recipe-card ${card.glowColor}`}>
+                <div className="quick-card-top">
+                  <div className="quick-card-badge-row">
+                    <span className="quick-category-tag">{card.category}</span>
+                    <span className="quick-scope-tag">{card.scopeTag}</span>
+                  </div>
+                  <div className="quick-card-title-row">
+                    <Icon size={18} className="quick-icon" />
+                    <h4>{card.name}</h4>
+                  </div>
+                  <p className="quick-card-desc">{card.description}</p>
+                </div>
+
+                <div className="quick-card-bottom">
+                  <div className="quick-card-meta">
+                    <span className="quick-skills-badge">
+                      <strong>{card.skillsCount}</strong> skills
+                    </span>
+                    <div className="micro-telemetry-bar" title="Model vs User vs Hybrid distribution">
+                      <div
+                        className="micro-segment model"
+                        style={{ width: `${(card.composition.model / card.skillsCount) * 100}%` }}
+                      />
+                      <div
+                        className="micro-segment user"
+                        style={{ width: `${(card.composition.user / card.skillsCount) * 100}%` }}
+                      />
+                      <div
+                        className="micro-segment hybrid"
+                        style={{ width: `${(card.composition.hybrid / card.skillsCount) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="quick-load-btn"
+                    disabled={isLoading}
+                    onClick={() => void handleLoadQuickRecipe(card)}
+                  >
+                    {isLoading ? (
+                      <RefreshCw size={13} className="spin" />
+                    ) : (
+                      <ExternalLink size={13} />
+                    )}
+                    <span>Inspect</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Tab 1: Hub & Inspector View */}
       {activeTab === "hub" && (
@@ -686,6 +1000,46 @@ export function RecipeWorkspace({
                       </div>
                     </div>
 
+                    {/* Proportional Telemetry Gradient Ratio Bar */}
+                    <div className="telemetry-bar-container">
+                      <div className="telemetry-bar-header">
+                        <span className="telemetry-bar-title">Invocation Mode Proportions</span>
+                        <span className="telemetry-bar-total">
+                          {inspectionResult.summary.skills_count} skills declared
+                        </span>
+                      </div>
+                      <div className="telemetry-gradient-bar">
+                        {telemetryRatios.model > 0 && (
+                          <div
+                            className="bar-slice model"
+                            style={{ width: `${telemetryRatios.model}%` }}
+                            title={`Model-invoked Reflex: ${telemetryRatios.model}%`}
+                          />
+                        )}
+                        {telemetryRatios.user > 0 && (
+                          <div
+                            className="bar-slice user"
+                            style={{ width: `${telemetryRatios.user}%` }}
+                            title={`User-invoked Command: ${telemetryRatios.user}%`}
+                          />
+                        )}
+                        {telemetryRatios.hybrid > 0 && (
+                          <div
+                            className="bar-slice hybrid"
+                            style={{ width: `${telemetryRatios.hybrid}%` }}
+                            title={`Hybrid Mode: ${telemetryRatios.hybrid}%`}
+                          />
+                        )}
+                        {telemetryRatios.unspecified > 0 && (
+                          <div
+                            className="bar-slice unspecified"
+                            style={{ width: `${telemetryRatios.unspecified}%` }}
+                            title={`Unspecified: ${telemetryRatios.unspecified}%`}
+                          />
+                        )}
+                      </div>
+                    </div>
+
                     {/* Invocation Mode Breakdown */}
                     <div className="recipe-breakdown-section">
                       <div className="section-title-row">
@@ -694,7 +1048,16 @@ export function RecipeWorkspace({
                       </div>
                       <div className="invocation-breakdown-grid">
                         <Tooltip content={INVOCATION_MODE_INFO.model_invoked.tooltip}>
-                          <div className="invocation-mode-card model has-tooltip">
+                          <div
+                            className={`invocation-mode-card model has-tooltip ${
+                              skillFilterMode === "model_invoked" ? "active-filter" : ""
+                            }`}
+                            onClick={() =>
+                              setSkillFilterMode((prev) =>
+                                prev === "model_invoked" ? "all" : "model_invoked",
+                              )
+                            }
+                          >
                             <div className="mode-title-row">
                               <Bot size={15} />
                               <strong>🤖 Model-invoked (Reflex)</strong>
@@ -707,7 +1070,16 @@ export function RecipeWorkspace({
                         </Tooltip>
 
                         <Tooltip content={INVOCATION_MODE_INFO.user_invoked.tooltip}>
-                          <div className="invocation-mode-card user has-tooltip">
+                          <div
+                            className={`invocation-mode-card user has-tooltip ${
+                              skillFilterMode === "user_invoked" ? "active-filter" : ""
+                            }`}
+                            onClick={() =>
+                              setSkillFilterMode((prev) =>
+                                prev === "user_invoked" ? "all" : "user_invoked",
+                              )
+                            }
+                          >
                             <div className="mode-title-row">
                               <User size={15} />
                               <strong>👤 User-invoked (Command)</strong>
@@ -720,7 +1092,16 @@ export function RecipeWorkspace({
                         </Tooltip>
 
                         <Tooltip content={INVOCATION_MODE_INFO.hybrid.tooltip}>
-                          <div className="invocation-mode-card hybrid has-tooltip">
+                          <div
+                            className={`invocation-mode-card hybrid has-tooltip ${
+                              skillFilterMode === "hybrid" ? "active-filter" : ""
+                            }`}
+                            onClick={() =>
+                              setSkillFilterMode((prev) =>
+                                prev === "hybrid" ? "all" : "hybrid",
+                              )
+                            }
+                          >
                             <div className="mode-title-row">
                               <Sparkles size={15} />
                               <strong>🔀 Hybrid Mode</strong>
@@ -733,7 +1114,16 @@ export function RecipeWorkspace({
                         </Tooltip>
 
                         <Tooltip content={INVOCATION_MODE_INFO.unspecified.tooltip}>
-                          <div className="invocation-mode-card unspecified has-tooltip">
+                          <div
+                            className={`invocation-mode-card unspecified has-tooltip ${
+                              skillFilterMode === "unspecified" ? "active-filter" : ""
+                            }`}
+                            onClick={() =>
+                              setSkillFilterMode((prev) =>
+                                prev === "unspecified" ? "all" : "unspecified",
+                              )
+                            }
+                          >
                             <div className="mode-title-row">
                               <Code2 size={15} />
                               <strong>⚙️ Unspecified</strong>
@@ -746,6 +1136,108 @@ export function RecipeWorkspace({
                         </Tooltip>
                       </div>
                     </div>
+
+                    {/* Inspected Skills Explorer & Filter Grid */}
+                    {parsedRecipeSkills.length > 0 && (
+                      <div className="recipe-skills-explorer">
+                        <div className="explorer-header-row">
+                          <div className="section-title-row">
+                            <Cpu size={16} className="mint" />
+                            <h3>Declared Skills Explorer ({filteredInspectedSkills.length})</h3>
+                          </div>
+                          <div className="explorer-search-box">
+                            <Search size={14} className="search-icon" />
+                            <input
+                              type="text"
+                              value={skillSearchQuery}
+                              onChange={(e) => setSkillSearchQuery(e.target.value)}
+                              placeholder="Search declared skills..."
+                            />
+                            {skillSearchQuery && (
+                              <button
+                                type="button"
+                                className="clear-search"
+                                onClick={() => setSkillSearchQuery("")}
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Invocation Mode Filter Chips */}
+                        <div className="explorer-filter-chips">
+                          <button
+                            type="button"
+                            className={`filter-chip ${skillFilterMode === "all" ? "active" : ""}`}
+                            onClick={() => setSkillFilterMode("all")}
+                          >
+                            All ({parsedRecipeSkills.length})
+                          </button>
+                          <button
+                            type="button"
+                            className={`filter-chip model ${
+                              skillFilterMode === "model_invoked" ? "active" : ""
+                            }`}
+                            onClick={() => setSkillFilterMode("model_invoked")}
+                          >
+                            🤖 Reflex ({inspectionResult.summary.by_invocation_mode.model_invoked})
+                          </button>
+                          <button
+                            type="button"
+                            className={`filter-chip user ${
+                              skillFilterMode === "user_invoked" ? "active" : ""
+                            }`}
+                            onClick={() => setSkillFilterMode("user_invoked")}
+                          >
+                            👤 Command ({inspectionResult.summary.by_invocation_mode.user_invoked})
+                          </button>
+                          <button
+                            type="button"
+                            className={`filter-chip hybrid ${
+                              skillFilterMode === "hybrid" ? "active" : ""
+                            }`}
+                            onClick={() => setSkillFilterMode("hybrid")}
+                          >
+                            🔀 Hybrid ({inspectionResult.summary.by_invocation_mode.hybrid})
+                          </button>
+                        </div>
+
+                        {/* Skills Grid */}
+                        <div className="inspected-skills-grid">
+                          {filteredInspectedSkills.map((skill: any, idx: number) => (
+                            <div key={idx} className="inspected-skill-card">
+                              <div className="skill-card-top">
+                                <div className="skill-card-name">
+                                  <strong>{skill.name}</strong>
+                                  <span className="artifact-type-badge">
+                                    {skill.artifact_type || "skill"}
+                                  </span>
+                                </div>
+                                <InvocationBadge mode={skill.invocation_mode || "unspecified"} />
+                              </div>
+                              {skill.description && (
+                                <p className="skill-card-desc">{skill.description}</p>
+                              )}
+                              <div className="skill-card-bottom">
+                                <span className="source-tag">
+                                  Source: <code>{skill.source_id || "default"}</code>
+                                </span>
+                                {skill.content_digest && (
+                                  <span
+                                    className="digest-tag"
+                                    title={`Click to copy: ${skill.content_digest}`}
+                                    onClick={() => void copyText(skill.content_digest)}
+                                  >
+                                    <code>{skill.content_digest.slice(0, 18)}...</code>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Presets List */}
                     {inspectionResult.presets && inspectionResult.presets.length > 0 && (
@@ -1070,6 +1562,51 @@ export function RecipeWorkspace({
                     </div>
                   </label>
                 </div>
+              </div>
+            </div>
+
+            {/* Virtual Filesystem Simulator Visual */}
+            <div className="delivery-simulator-card">
+              <div className="simulator-header">
+                <FolderTree size={16} className="mint" />
+                <span>Virtual Delivery Filesystem Simulator</span>
+                <span className="simulator-provider-badge">
+                  Target: <strong>{selectedProvider}</strong>
+                </span>
+              </div>
+              <div className="simulator-tree">
+                <div className="tree-row root">
+                  <Folder size={14} className="mint" />
+                  <span>{targetProjectPath || "./my-project"}/</span>
+                </div>
+                <div className="tree-row branch">
+                  <span className="tree-indent">├──</span>
+                  <Folder size={14} className="cyan" />
+                  <strong>
+                    {selectedProvider === "antigravity"
+                      ? ".agents/skills/"
+                      : selectedProvider === "claude"
+                      ? ".claude/skills/"
+                      : "skills/"}
+                  </strong>
+                  <span className="tree-pill-status">NTFS Junction / Symlink</span>
+                </div>
+                {parsedRecipeSkills.slice(0, 4).map((s: any, i: number) => (
+                  <div key={i} className="tree-row leaf">
+                    <span className="tree-indent">│&nbsp;&nbsp;&nbsp;├──</span>
+                    <FileCode size={13} className="text-muted" />
+                    <span>{s.name}/</span>
+                    <span className="leaf-tag">SKILL.md</span>
+                  </div>
+                ))}
+                {parsedRecipeSkills.length > 4 && (
+                  <div className="tree-row leaf-more">
+                    <span className="tree-indent">│&nbsp;&nbsp;&nbsp;└──</span>
+                    <span className="text-muted">
+                      ...and {parsedRecipeSkills.length - 4} more declared skills
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

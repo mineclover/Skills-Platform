@@ -134,6 +134,101 @@ button:focus-visible, select:focus-visible { outline: 2px solid #63e5c0; outline
 .mode-title-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .mode-count { font-size: 20px; font-weight: 700; color: #f4f7fb; }
 .invocation-mode-card small { font-size: 11px; color: #889eb2; }
+.invocation-mode-card.active-filter { border-color: #63e5c0; box-shadow: 0 0 10px rgba(99, 229, 192, 0.25); background: #132a30; }
+
+/* Quick Curated Recipe Gallery Deck */
+.quick-recipe-section { display: flex; flex-direction: column; gap: 14px; background: #0c141c; border: 1px solid #233444; border-radius: 8px; padding: 20px 22px; }
+.quick-recipe-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.quick-recipe-title { display: flex; align-items: center; gap: 8px; }
+.quick-recipe-title h3 { margin: 0; font-size: 16px; font-weight: 650; color: #f0f6fc; }
+.quick-recipe-count { font-size: 11.5px; color: #63e5c0; background: #13262e; border: 1px solid #254d42; padding: 2px 7px; border-radius: 4px; font-weight: 600; }
+.quick-recipe-hint { font-size: 12px; color: #768e9e; }
+.recipe-tag-pill { font-size: 11.5px; color: #63e5c0; background: #132731; border: 1px solid #2e7d69; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+
+.quick-recipe-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.quick-recipe-card { background: #101a23; border: 1px solid #283949; border-radius: 7px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; transition: all .2s ease; position: relative; }
+.quick-recipe-card:hover { transform: translateY(-2px); border-color: #4a637a; box-shadow: 0 6px 18px rgba(0,0,0,0.3); }
+.quick-recipe-card.mint:hover { border-color: #63e5c0; box-shadow: 0 0 16px rgba(99,229,192,0.15); }
+.quick-recipe-card.cyan:hover { border-color: #58d5f7; box-shadow: 0 0 16px rgba(88,213,247,0.15); }
+.quick-recipe-card.violet:hover { border-color: #c4a1ff; box-shadow: 0 0 16px rgba(196,161,255,0.15); }
+.quick-recipe-card.amber:hover { border-color: #f1cf86; box-shadow: 0 0 16px rgba(241,207,134,0.15); }
+.quick-recipe-card.coral:hover { border-color: #f18787; box-shadow: 0 0 16px rgba(241,135,135,0.15); }
+
+.quick-card-top { display: flex; flex-direction: column; gap: 8px; }
+.quick-card-badge-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.quick-category-tag { font-size: 10.5px; font-weight: 600; text-transform: uppercase; color: #8ba2b6; letter-spacing: .04em; }
+.quick-scope-tag { font-size: 10.5px; color: #63e5c0; font-family: ui-monospace, monospace; }
+.quick-card-title-row { display: flex; align-items: center; gap: 7px; }
+.quick-card-title-row h4 { margin: 0; font-size: 14px; font-weight: 650; color: #edf3f9; line-height: 1.35; }
+.quick-icon { color: #63e5c0; flex-shrink: 0; }
+.quick-card-desc { margin: 0; font-size: 12px; color: #859bb0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.quick-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid #1f2e3d; }
+.quick-card-meta { display: flex; flex-direction: column; gap: 4px; }
+.quick-skills-badge { font-size: 12px; color: #d0e0ed; }
+.quick-skills-badge strong { color: #63e5c0; font-weight: 700; }
+.micro-telemetry-bar { width: 68px; height: 5px; border-radius: 3px; background: #192734; display: flex; overflow: hidden; gap: 1px; }
+.micro-segment.model { background: #63e5c0; }
+.micro-segment.user { background: #f1cf86; }
+.micro-segment.hybrid { background: #c4a1ff; }
+
+.quick-load-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #152733; border: 1px solid #2b4557; color: #63e5c0; transition: all .15s ease; cursor: pointer; }
+.quick-load-btn:hover { background: #1e3a4c; border-color: #63e5c0; color: #fff; }
+
+/* Proportional Telemetry Gradient Ratio Bar */
+.telemetry-bar-container { display: flex; flex-direction: column; gap: 8px; background: #101a23; border: 1px solid #283949; border-radius: 6px; padding: 14px 16px; }
+.telemetry-bar-header { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 600; color: #cbd9e6; }
+.telemetry-bar-total { font-size: 11.5px; color: #8ba0b4; }
+.telemetry-gradient-bar { height: 10px; border-radius: 5px; background: #1a2836; display: flex; overflow: hidden; gap: 2px; }
+.bar-slice { height: 100%; transition: width .3s ease; }
+.bar-slice.model { background: #63e5c0; }
+.bar-slice.user { background: #f1cf86; }
+.bar-slice.hybrid { background: #c4a1ff; }
+.bar-slice.unspecified { background: #73889c; }
+
+/* Inspected Skills Explorer */
+.recipe-skills-explorer { display: flex; flex-direction: column; gap: 14px; background: #101a23; border: 1px solid #283949; border-radius: 6px; padding: 16px; }
+.explorer-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.explorer-search-box { position: relative; display: flex; align-items: center; min-width: 220px; }
+.explorer-search-box input { width: 100%; background: #0c141c; border: 1px solid #2c3e50; color: #f0f6fc; font-size: 12.5px; padding: 6px 28px 6px 28px; border-radius: 4px; outline: none; }
+.explorer-search-box input:focus { border-color: #63e5c0; }
+.explorer-search-box .search-icon { position: absolute; left: 9px; color: #728a9e; pointer-events: none; }
+.explorer-search-box .clear-search { position: absolute; right: 8px; border: 0; background: none; color: #728a9e; cursor: pointer; padding: 2px; }
+
+.explorer-filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-chip { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 550; background: #14222d; border: 1px solid #2a3c4e; color: #9ab1c5; cursor: pointer; transition: all .15s ease; }
+.filter-chip:hover { border-color: #445d73; color: #edf3f9; }
+.filter-chip.active { background: #1c3540; border-color: #2e7d69; color: #63e5c0; font-weight: 600; }
+.filter-chip.model.active { color: #63e5c0; }
+.filter-chip.user.active { color: #f1cf86; }
+.filter-chip.hybrid.active { color: #c4a1ff; }
+
+.inspected-skills-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-height: 380px; overflow-y: auto; padding-right: 4px; }
+.inspected-skill-card { background: #0c141c; border: 1px solid #253747; border-radius: 5px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.inspected-skill-card:hover { border-color: #3b536b; }
+.skill-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.skill-card-name { display: flex; align-items: center; gap: 6px; }
+.skill-card-name strong { font-size: 13px; color: #f0f6fc; }
+.artifact-type-badge { font-size: 10px; background: #182836; color: #8ba2b8; padding: 1px 5px; border-radius: 3px; font-family: ui-monospace, monospace; }
+.skill-card-desc { margin: 0; font-size: 11.5px; color: #879cb0; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.skill-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: #6b8296; padding-top: 4px; border-top: 1px solid #1a2734; }
+.source-tag code { color: #9bb2c6; font-size: 10.5px; }
+.digest-tag { cursor: pointer; }
+.digest-tag code { color: #63e5c0; background: #0e1e24; padding: 1px 4px; border-radius: 2px; font-size: 10.5px; }
+.digest-tag:hover code { background: #142f38; }
+
+/* Virtual Filesystem Simulator */
+.delivery-simulator-card { background: #101a23; border: 1px solid #283949; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.simulator-header { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #d0e0ed; }
+.simulator-provider-badge { margin-left: auto; font-size: 11.5px; color: #8ba2b8; }
+.simulator-provider-badge strong { color: #63e5c0; }
+.simulator-tree { background: #080e14; border: 1px solid #1c2b38; border-radius: 5px; padding: 12px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; display: flex; flex-direction: column; gap: 4px; color: #cfdce8; }
+.tree-row { display: flex; align-items: center; gap: 6px; }
+.tree-row.root { color: #63e5c0; font-weight: 600; }
+.tree-indent { color: #516a7f; }
+.tree-pill-status { margin-left: 8px; font-size: 10px; color: #63e5c0; background: #0e2720; border: 1px solid #235848; padding: 1px 6px; border-radius: 3px; }
+.leaf-tag { font-size: 10px; color: #7f95a8; background: #14202b; padding: 0 4px; border-radius: 2px; margin-left: 4px; }
+.text-muted { color: #6e8498; }
 
 .recipe-preset-list { display: grid; gap: 8px; }
 .recipe-preset-item { display: flex; align-items: center; justify-content: space-between; background: #101a23; border: 1px solid #283746; border-radius: 6px; padding: 10px 14px; gap: 12px; }
@@ -141,6 +236,15 @@ button:focus-visible, select:focus-visible { outline: 2px solid #63e5c0; outline
 .preset-item-info strong { font-size: 13.5px; color: #e4ecf4; }
 .preset-item-info span { font-size: 11.5px; color: #7f95a8; }
 .preset-item-badge { background: #172733; color: #63e5c0; border: 1px solid #254d42; padding: 3px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+
+@media (max-width: 1200px) {
+  .quick-recipe-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .quick-recipe-grid { grid-template-columns: 1fr; }
+  .inspected-skills-grid { grid-template-columns: 1fr; }
+}
 
 /* Export Panel */
 .recipe-export-panel { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(440px, 1.25fr); gap: 28px; background: #0c141c; border: 1px solid #2e3f50; border-radius: 8px; padding: 28px; }
