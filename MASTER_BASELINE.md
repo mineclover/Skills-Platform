@@ -3,7 +3,7 @@
 > **Status**: Frozen Canonical Implementation Baseline  
 > **Core Architecture**: 시스템 유지보수 라이프사이클과 툴 정의 체계 (Maintenance Lifecycle & Tool Governance System)  
 > **Audience**: Implementation agents, maintainers, code reviewers, and multi-agent control planes  
-> **Authority**: High normative force — preserves user architectural directives, closed-loop maintenance principles (MLC-01 ~ MLC-14), ADR 0001-0003, and multi-provider delivery specifications.
+> **Authority**: High normative force — preserves user architectural directives, closed-loop maintenance principles (MLC-01 ~ MLC-14), ADR 0001-0005, and multi-provider delivery specifications.
 
 ---
 
@@ -77,109 +77,26 @@ Maintenance Control Plane (Skills Platform)
 
 ---
 
-## 3. 독립 3대 라이프사이클 체계
+## 3. 모듈화된 프리셋 및 작업 스코프 인벤토리 (Modular Presets)
 
-| 라이프사이클 | 대상 | 목적 및 제어 루프 |
-|---|---|---|
-| **시스템 유지보수 라이프사이클** | 전체 운영 시스템 | `Baseline -> Observe -> Explore -> Resolve -> Stabilize -> Learn -> Govern -> Baseline 갱신` |
-| **유지보수 케이스 라이프사이클** | 하나의 문제 또는 목표 | `SIGNALLED -> EXPLORING -> TOPIC_SELECTED -> ROUTED -> CONTEXT_READY -> RESOLVING -> VALIDATING -> RELEASING -> STABILIZING -> CLOSED` |
-| **제어 자산 라이프사이클** | 컨텍스트·컨벤션·툴 | `DRAFT -> VALIDATED -> PUBLISHED -> IN_USE -> SUPERSEDED -> ARCHIVED` |
-
----
-
-## 4. 수평(Horizontal)·수직(Vertical) 분리 및 재귀(Recursive) 흐름
-
-```text
-수평 컨텍스트
-  -> 수평 행동 (탐색·비교)
-  -> 토픽 선별 (Topic Handoff)
-  -> 책임 게이트 (Responsibility Routing)
-  -> 수직 컨텍스트 발행 (단일 Topic ID)
-  -> 수직 행동 (원인 분석 -> 변경 -> 검증)
-  -> 운영 반영 및 안정화 관찰
-  -> 학습 (Context Patch Proposal) -> 거버넌스 갱신
-```
-
-### 4.1 수평/수직 분리 원칙
-- **수평 행동 (Horizontal)**: 문제를 직접 고치지 않고, 신호 간 상관관계를 분석해 해결 토픽을 선별하고 `Topic Handoff`를 발행함.
-- **수직 행동 (Vertical)**: 오직 하나의 `topic_id`에만 집중하여 문제를 해결하며, 조사 범위를 무제한 확장하지 않음.
-- **재귀적 분기 (Recursive)**: 수직 해결 중 새로운 불확실성 발견 시, 수직 스코프를 억지로 넓히지 않고 자식 수평 탐색(`Child Horizontal Exploration`)을 파생시킴.
-
-### 4.2 책임 라우팅 게이트 (Responsibility Gate)
-`문제의 원인 위치 != 현재 태스크의 해결 위치`
-
-| 라우팅 결과 | 의미 및 허용 행동 |
-|---|---|
-| **`OWNED_RESOLUTION`** | 관리 중인 내부 요소를 직접 수정 |
-| **`DELEGATED_RESOLUTION`** | 위임받은 명시적 범위 내에서만 수정 |
-| **`BOUNDARY_MITIGATION`** | 외부 요소는 건드리지 않고 관리 중인 어댑터/경계에서 방어 완화 |
-| **`HANDOFF_REQUIRED`** | 외부 실제 관리 책임자에게 이슈/증거 이관 |
-| **`OBSERVE_ONLY`** | 관찰과 증거 수집만 수행 |
-| **`OUT_OF_SCOPE`** | 현재 유지보수 체계 밖으로 판정 |
+| Preset ID | Category | Skills Count | Dynamic Work Scope | Primary Purpose |
+|---|---|:---:|---|---|
+| **`paperthin-reflexes`** | Core Coding Baseline | 28 | (Default) | 일상 코딩, 리팩토링, TDD, 모델 반사신경 |
+| **`condensation-core`** | Context Compiler | 3 | `scope: curation` | 80k 단일 정본 구현 기준선 컴파일 |
+| **`baseline-curation-core`** | Deep Architecture | 11 | `scope: architecture` | 8대 도메인 전수 정제 및 아키텍처 축약 |
+| **`mlc-recursive-context`** | H/V Context Engine | 13 | `scope: explore` | 4대 레지스트리 및 9대 H/V 재귀 탐색 |
+| **`mlc-specialist-domains`** | Specialist Overlays | 5 | `scope: specialist` | AI Agent, DevTools, UI Editor 등 전문 도메인 |
+| **`mlc-toolchain-plane`** | Tool & Capability Layer | 6 | `scope: toolchain` | Method 레지스트리, 툴체인 계획, 호출 가드 |
+| **`mlc-lifecycle-governance`** | Lifecycle & Governance | 8 | `scope: governance` | 10단계 케이스 머신, 신호 수집, 책임 게이트 |
+| **`baseline-full-suite`** | Full Master Suite | 43 | (All) | 43종 전체 MLC 제어 평면 일괄 사용 |
+| **`builtin-pristine`** | Clean Slate Baseline | 0 | (Pristine) | 0개 스킬 상태로 안전한 완전 초기화 |
 
 ---
 
-## 5. 스킬·방법·기능·툴의 분리 (Tooling Taxonomy)
-
-```text
-Context    : 무엇을 알고 있어야 하는가 (사전 지식, 컨벤션, 경계)
-Method     : 어떤 추상적 방식으로 조사하거나 해결할 것인가 (예: Dependency Impact Analysis)
-Skill      : 방법을 선택하고 절차를 수행하는 실행 논리 (Behavior Orchestrator)
-Capability : 절차가 필요로 하는 도구 독립적 원자 능력 (예: search-code, capture-trace, apply-patch)
-Tool       : Capability를 실제로 제공하는 실행 수단 (예: git, NTFS Junction, Chrome CDP, Jest)
-```
-
-### 5.1 툴 분류 5개 축
-1. **생명주기 역할**: `baseline`, `observe`, `explore`, `select`, `context-build`, `diagnose`, `change`, `validate`, `release`, `stabilize`, `learn`, `govern`
-2. **행동 방향**: `horizontal`, `vertical`, `both`
-3. **효과 등급**: `observe` (읽기), `analyze` (파생 분석), `propose` (제안), `mutate` (실제 변경), `control` (배포/롤백), `govern` (규칙 갱신)
-4. **책임 적용 범위**: `managed`, `delegated-managed`, `boundary-managed`, `consumed`, `observed`, `external`
-5. **증거 강도**: `reference` < `declared` < `implementation` < `runtime` < `validated` < `production`
-
----
-
-## 6. 핵심 불변조건 (Invariant Rules MLC-01 ~ MLC-14)
-
-- **MLC-01**: 모든 행동은 반드시 검증되어 발행된 `Context Snapshot`을 참조해야 한다.
-- **MLC-02**: 모든 수직 행동은 단 하나의 canonical `topic_id`를 가져야 한다.
-- **MLC-03**: 수평 행동은 토픽을 탐색·선별하며 직접 코드를 수정하지 않는다.
-- **MLC-04**: 수직 행동은 선택된 토픽에만 집중하며 탐색 범위를 무제한 확장하지 않는다.
-- **MLC-05**: 변경 툴(`mutate`)은 반드시 `Responsibility Gate`를 통과해야 한다.
-- **MLC-06**: consumed, observed, external 요소의 내부는 직접 변경하지 않는다.
-- **MLC-07**: 행동은 컨텍스트를 직접 수정하지 않고 `Context Patch Proposal`을 생성한다.
-- **MLC-08**: 검증 증거(Evidence) 없이 해결 완료를 선언하지 않는다.
-- **MLC-09**: 테스트 통과와 운영 안정화 완료를 명확히 구분한다.
-- **MLC-10**: 모든 Tool Invocation은 입력, 출력, 효과, 권한, 증거를 기록해야 한다.
-- **MLC-11**: 신호(Signal)와 토픽(Topic)의 1:N / N:1 관계를 허용하고 추적한다.
-- **MLC-12**: 수직 해결 중 새 탐색이 필요하면 자식 수평 행동을 재귀적으로 생성한다.
-- **MLC-13**: 툴 이름이 아니라 `Capability`와 `Method`를 기준으로 행동을 설계한다.
-- **MLC-14**: 관리 책임이 없는 문제는 직접 수정하지 않고 경계 완화, 이관, 관찰로 라우팅한다.
-
----
-
-## 7. Skills Platform 구현체 매핑 및 배포 매트릭스
-
-Skills Platform은 위 **Maintenance Control Plane**의 실제 소프트웨어 구현체이다.
-
-| Control Plane 레이어 | Skills Platform 구현 모듈 | 역할 및 물리적 위치 |
-|---|---|---|
-| **Registry Layer** | `apps/skills-catalog/src/registry.js` | 불변 SHA-256 리비전 저장소 (`.skills-platform/registry/`) |
-| **Catalog & Governance** | `apps/skills-catalog/src/catalog-state.js` | 프로젝트, 프리셋, 라이프사이클 관리 (`.skills-platform/catalog/catalog.json`) |
-| **Tool & Delivery Adapter** | `@skills-platform/skills-manager-adapter` | OS 파일시스템 Junction/Symlink 원자적 전달 및 Invocation Guard |
-| **Contracts** | `@skills-platform/contracts` | 불변 데이터 타입, Recipe 스키마, 무결성 검증기 |
-| **Reactive Web UI** | `@skills-platform/catalog-ui` | Recipe Hub, 5-Stage Stepper Modal, Live Diagnostic Drawer |
-
-### 7.1 멀티 프로바이더 바인딩 규칙
-- **Google Antigravity**: `<project>/.agents/skills/<skill-name>` (Junction)
-- **OpenAI Codex CLI**: `<project>/skills/<skill-name>` (Junction)
-- **Anthropic Claude Desktop**: `<project>/.claude/skills/<skill-name>` (Junction)
-
----
-
-## 8. 품질 검증 및 릴리스 게이트
+## 4. 품질 검증 및 릴리스 게이트
 
 1. **TypeScript 무결성**: `npm run check` -> **0 errors**
-2. **회귀 및 E2E 테스트**: `npm test` -> **100% Pass Rate** (178/178 tests)
+2. **회귀 및 E2E 테스트**: `npm test` -> **100% Pass Rate**
 3. **프로덕션 빌드**: `npm run build` -> 정상 번들링 완료
 
 ---

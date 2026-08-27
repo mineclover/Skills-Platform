@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "recipe_id": "recipe_f1dae5e1-0f9",
+  "name": "Recipe for mlc-toolchain-plane",
+  "description": "Automated skill installation recipe generated at 2026-08-27T18:28:52.585Z",
+  "created_at": "2026-08-27T18:28:52.586Z",
+  "created_by": "local",
+  "sources": [
+    {
+      "source_id": "source_local_979b585fd46689d6",
+      "type": "local",
+      "locator": "G:\\Downloads\\bounded-baseline-condenser-suite-v0.3.1\\skills",
+      "ref": "HEAD",
+      "resolved_commit": "a224f2492c93fdf4790eaf47b9b3bcdff8a17d72c2a3594e409acb8e7feb3463"
+    }
+  ],
+  "skills": [
+    {
+      "name": "maintenance-method-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-method-registry",
+      "content_digest": "866621d3425a7d31737160a4865d3560ded20d5d2d037204ad99160995898822",
+      "description": "Register tool-independent exploration, diagnosis, validation, release, and governance methods with suitability rules, required capabilities, procedure phases, outputs, evidence, and lifecycle state. Use when horizontal context must know how to explore or vertical behavior must choose a problem-solving method without naming a concrete tool."
+    },
+    {
+      "name": "maintenance-tool-effectiveness-reviewer",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-tool-effectiveness-reviewer",
+      "content_digest": "77fccee887de06141e98b22d90d727862e38a7fd89419eea5b43ddc2d615e9fc",
+      "description": "Evaluate maintenance methods and tools using execution history, success rate, evidence quality, false positives or misses, cost, latency, intrusiveness, failure recovery, security, and operator burden; propose lifecycle or registry changes without editing tool definitions directly. Use periodically and after significant failures."
+    },
+    {
+      "name": "maintenance-tool-invocation-guard",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-tool-invocation-guard",
+      "content_digest": "c2ecad68c009a636b94438188224da7a7b414894bbe5aa6482b124d28f5ba0e6",
+      "description": "Authorize or block each maintenance tool invocation by checking context snapshot, lifecycle stage, method and toolchain membership, responsibility mode, target scope, effect class, approvals, data policy, validation plan, rollback plan, and runtime preconditions. Use immediately before every tool call, especially mutate, control, or govern operations."
+    },
+    {
+      "name": "maintenance-tool-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-tool-registry",
+      "content_digest": "a3c4ddf467ad021ddee08b8b4da48e71b50df64a8d2a0153a46f40d290d9a81a",
+      "description": "Register atomic capabilities and concrete tool bindings with effects, environments, inputs, outputs, side effects, evidence grade, failure modes, responsibility compatibility, mutation policy, reversibility, ownership, and lifecycle state. Use to define the executable tool layer beneath maintenance behaviors."
+    },
+    {
+      "name": "maintenance-tool-result-normalizer",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-tool-result-normalizer",
+      "content_digest": "fa337d3e9915363332c770d00005dc54beb813de40bf84fb206dff6735a7bd56",
+      "description": "Normalize heterogeneous outputs from search, runtime, analysis, mutation, test, deployment, and governance tools into typed evidence, observations, change records, and failure records with provenance and confidence. Use after tool execution so behaviors and lifecycle gates do not depend on vendor-specific output shapes."
+    },
+    {
+      "name": "maintenance-toolchain-planner",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-toolchain-planner",
+      "content_digest": "9903885500a8a07e6eb3410e433d4000df7dfc45524eaee8c04d6f22cea40057",
+      "description": "Convert a selected maintenance method into an executable toolchain by matching required capabilities to available tool bindings and filtering by lifecycle stage, environment, responsibility, authority, evidence quality, reversibility, intrusiveness, cost, and fallback. Use before horizontal exploration, vertical diagnosis, mutation, validation, release, or governance execution."
+    }
+  ],
+  "presets": [
+    {
+      "id": "mlc-toolchain-plane",
+      "name": "MLC Toolchain & Capability Plane (6-Skill)",
+      "version": 1,
+      "description": "Tool-independent Method, Capability, Toolchain Planning, and Invocation Guard governance.",
+      "purpose": "Orchestrate toolchains from abstract methods to concrete capabilities with strict invocation guard and evidence normalization.",
+      "work_scope_tags": [
+        "governance",
+        "toolchain"
+      ],
+      "skills": [
+        {
+          "skill_name": "maintenance-method-registry",
+          "source_relative_path": "maintenance-method-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-tool-registry",
+          "source_relative_path": "maintenance-tool-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-toolchain-planner",
+          "source_relative_path": "maintenance-toolchain-planner",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-tool-invocation-guard",
+          "source_relative_path": "maintenance-tool-invocation-guard",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-tool-result-normalizer",
+          "source_relative_path": "maintenance-tool-result-normalizer",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-tool-effectiveness-reviewer",
+          "source_relative_path": "maintenance-tool-effectiveness-reviewer",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}

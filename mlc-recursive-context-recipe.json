@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "recipe_id": "recipe_9a3584c9-73d",
+  "name": "Recipe for mlc-recursive-context",
+  "description": "Automated skill installation recipe generated at 2026-08-27T18:28:52.385Z",
+  "created_at": "2026-08-27T18:28:52.386Z",
+  "created_by": "local",
+  "sources": [
+    {
+      "source_id": "source_local_979b585fd46689d6",
+      "type": "local",
+      "locator": "G:\\Downloads\\bounded-baseline-condenser-suite-v0.3.1\\skills",
+      "ref": "HEAD",
+      "resolved_commit": "a224f2492c93fdf4790eaf47b9b3bcdff8a17d72c2a3594e409acb8e7feb3463"
+    }
+  ],
+  "skills": [
+    {
+      "name": "baseline-context-behavior-separation-validator",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-context-behavior-separation-validator",
+      "content_digest": "24cc7c460c06418df0257989ba8aaf332e439dc1388cb37aa5ae51ce79dfb8e3",
+      "description": "Validate that prior context and action behavior remain separate: contexts contain declarative identity, goals, conventions, methods, responsibility, and acceptance; behaviors contain execution, tool calls, changes, and results. Use before publishing contexts, behaviors, or maintenance runs."
+    },
+    {
+      "name": "baseline-context-version-controller",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-context-version-controller",
+      "content_digest": "6fe73fdcd68dfac5b39deebfa9e47941d97f176fa1c7d1aa7a574220fad6ae99",
+      "description": "Publish immutable context snapshots, review context patch proposals, manage supersession and adoption, and prevent behavior runs from mutating prior context in place. Use when exploration or resolution discovers new facts, conventions, goals, ownership, or acceptance rules."
+    },
+    {
+      "name": "baseline-convention-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-convention-registry",
+      "content_digest": "0a213e9934aaa16c7de538e0f5447db9aea786be1f4755c7e7ed54a43ec771ca",
+      "description": "Register and compose global, domain, product, element, and topic conventions for vertical contexts without copying rules into behavior instructions. Use when problem-solving must follow architecture, identity, coding, testing, data, compatibility, or operational conventions with explicit precedence and exceptions."
+    },
+    {
+      "name": "baseline-element-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-element-registry",
+      "content_digest": "e3bf4c5f98af2085ab3130c499e17251557d73148a2a308f9a5b4c002655ef8b",
+      "description": "Register system elements as independent, stable objects with identity, purpose, lifecycle, ownership, public surface, and typed relations. Use when horizontal or vertical contexts must refer to products, services, modules, contracts, adapters, data objects, or external systems without making the context their source of identity."
+    },
+    {
+      "name": "baseline-horizontal-context-builder",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-horizontal-context-builder",
+      "content_digest": "e1067cc7464d3d2277881a1fb52822abbc19dc0fb4ecd8bb125456534f1dbabc",
+      "description": "Build immutable horizontal prior-context snapshots that describe exploration scope, available methods and capabilities, method-selection rules, source authority, comparison criteria, topic-selection rules, ownership-discovery methods, and stop conditions. Use before any horizontal topic exploration behavior."
+    },
+    {
+      "name": "baseline-horizontal-exploration-behavior",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-horizontal-exploration-behavior",
+      "content_digest": "ec72f30b1b48b4d4b6373ee2ab13a2a5875797db2163349efdb7a206f21ae683",
+      "description": "Execute horizontal exploration from a published horizontal context: select methods, plan tools, discover and normalize candidate topics, compare evidence and ownership, deduplicate, rank, and select topics for vertical handoff. Use for broad investigation and topic selection, not implementation."
+    },
+    {
+      "name": "baseline-recursive-context-composer",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-recursive-context-composer",
+      "content_digest": "c5c381821da6b57169258af155f1b4f8b2f2e9760dcf1cde98e04488f6038236",
+      "description": "Compose bounded execution contexts across recursively alternating horizontal and vertical frames while preserving parent-child focus paths, responsibility depth, topic identity, and 80,000-token limits. Use when a task drills into subtopics, reopens exploration, or resumes a parent resolution after child work."
+    },
+    {
+      "name": "baseline-responsibility-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-responsibility-registry",
+      "content_digest": "87dc1129a1775f5840d4b36429ed9742ef6a4cb58b703c5990e0599ce34b8181",
+      "description": "Register ownership and maintenance responsibility for elements, relationships, and contracts independently from access or context inclusion. Use when a task must distinguish managed, delegated, boundary-managed, consumed, observed, external, and excluded scope."
+    },
+    {
+      "name": "baseline-task-mode-router",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-task-mode-router",
+      "content_digest": "9189022a9e3a771341c68f7e2df0d002fcc65db4dccbaf5e32a97d487a885eb1",
+      "description": "Classify a maintenance, design, or implementation request by task intent and execution orientation before domain routing. Use when a request may be exploratory, problem-solving, mixed, or recursively switch between horizontal topic discovery and vertical resolution."
+    },
+    {
+      "name": "baseline-topic-handoff-compiler",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-topic-handoff-compiler",
+      "content_digest": "26ed52e32bda334d9ada0ad0071d120cdbcbf50c3f1bfa5ac6cfa57deb66197c",
+      "description": "Compile a minimal, traceable handoff from horizontal exploration into a canonical selected topic and the requirements for its vertical context. Use when moving from discovery and selection to problem resolution without copying the full exploration history."
+    },
+    {
+      "name": "baseline-topic-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-topic-registry",
+      "content_digest": "8df9dd4e48b402a90ce517e79a8c25e2010a237626e2c9e478f0f58844752624",
+      "description": "Register exploration and resolution topics as stable work objects with canonical IDs, roles, parent-child links, subject references, ownership hints, lifecycle state, and duplicate or supersession relations. Use before creating vertical contexts or tracking recursive maintenance work."
+    },
+    {
+      "name": "baseline-vertical-context-builder",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-vertical-context-builder",
+      "content_digest": "5b38c84672283f534cf9503f736d96e186a39726d4af66faf7d563347f6a822b",
+      "description": "Build an immutable vertical prior-context snapshot for exactly one canonical topic, including its role, concrete measurable goal, applicable conventions, current evidence, responsibility envelope, public projections of dependencies, acceptance criteria, and reopen conditions. Use before vertical problem-solving behavior."
+    },
+    {
+      "name": "baseline-vertical-resolution-behavior",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-vertical-resolution-behavior",
+      "content_digest": "5b69886a9bf0417fa89fbb47a803419a07344f4c740c6b4408898f0c69f538b0",
+      "description": "Execute problem resolution for one canonical topic from a published vertical context: reproduce and measure, test hypotheses, choose an owned resolution location, design and apply allowed changes, validate evidence, and produce closure or reopen outputs. Use for implementation and verified problem solving."
+    }
+  ],
+  "presets": [
+    {
+      "id": "mlc-recursive-context",
+      "name": "MLC Recursive Context & Exploration (13-Skill)",
+      "version": 1,
+      "description": "Horizontal exploration, vertical resolution, recursive context composition, and core system registries.",
+      "purpose": "Decompose complex multi-domain maintenance topics through recursive H/V context frames and authoritative element/topic registries.",
+      "work_scope_tags": [
+        "context",
+        "explore",
+        "planning"
+      ],
+      "skills": [
+        {
+          "skill_name": "baseline-element-registry",
+          "source_relative_path": "baseline-element-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-topic-registry",
+          "source_relative_path": "baseline-topic-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-convention-registry",
+          "source_relative_path": "baseline-convention-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-responsibility-registry",
+          "source_relative_path": "baseline-responsibility-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-task-mode-router",
+          "source_relative_path": "baseline-task-mode-router",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-horizontal-context-builder",
+          "source_relative_path": "baseline-horizontal-context-builder",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-horizontal-exploration-behavior",
+          "source_relative_path": "baseline-horizontal-exploration-behavior",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-topic-handoff-compiler",
+          "source_relative_path": "baseline-topic-handoff-compiler",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-vertical-context-builder",
+          "source_relative_path": "baseline-vertical-context-builder",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-vertical-resolution-behavior",
+          "source_relative_path": "baseline-vertical-resolution-behavior",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-recursive-context-composer",
+          "source_relative_path": "baseline-recursive-context-composer",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-context-version-controller",
+          "source_relative_path": "baseline-context-version-controller",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-context-behavior-separation-validator",
+          "source_relative_path": "baseline-context-behavior-separation-validator",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}

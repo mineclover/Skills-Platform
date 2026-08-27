@@ -22,6 +22,8 @@ export type Scope =
   | "review"
   | "curation"
   | "architecture"
+  | "explore"
+  | "specialist"
   | "toolchain"
   | "governance";
 

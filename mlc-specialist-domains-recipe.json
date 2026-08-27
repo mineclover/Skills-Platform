@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "recipe_id": "recipe_d3d96e72-3c8",
+  "name": "Recipe for mlc-specialist-domains",
+  "description": "Automated skill installation recipe generated at 2026-08-27T18:28:52.486Z",
+  "created_at": "2026-08-27T18:28:52.488Z",
+  "created_by": "local",
+  "sources": [
+    {
+      "source_id": "source_local_979b585fd46689d6",
+      "type": "local",
+      "locator": "G:\\Downloads\\bounded-baseline-condenser-suite-v0.3.1\\skills",
+      "ref": "HEAD",
+      "resolved_commit": "a224f2492c93fdf4790eaf47b9b3bcdff8a17d72c2a3594e409acb8e7feb3463"
+    }
+  ],
+  "skills": [
+    {
+      "name": "baseline-domain-ai-agent-systems",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-ai-agent-systems",
+      "content_digest": "6bd9f0156e70a1ff4f5fd09c64d7a2ffe7036f8b0da0a71652a5d3c8f08f7786",
+      "description": "Apply AI-agent-specific retention rules to facts involving agent roles, prompts, skills, tools, context boundaries, memory, model/provider choice, orchestration, human approval, uncertainty, evaluation, observability, safety, privacy, and cost. Use as a specialist overlay for agentic or model-driven systems."
+    },
+    {
+      "name": "baseline-domain-browser-devtools",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-browser-devtools",
+      "content_digest": "ea004fe610cff2e2f3d06eabd7464cd8189745bc01c5258a01102a61fe07441d",
+      "description": "Apply browser-extension and DevTools-specific retention rules to facts involving extension contexts, DevTools panels, content scripts, service workers, browser pages, Workspaces/Overrides, source maps, resource mapping, save attribution, hot reload, iframe/origin constraints, and version history. Use as a specialist overlay."
+    },
+    {
+      "name": "baseline-domain-graphics-3d-motion",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-graphics-3d-motion",
+      "content_digest": "e4bff9a369f4b33908bffeda7d9e284f354dd638df818e89e1ebf56f4df4e338",
+      "description": "Apply graphics, 3D, rigging, animation, pose, retargeting, rendering, coordinate-frame, asset, fidelity, and export-specific retention rules to canonical baseline facts. Use as a specialist overlay for Blender, ControlNet guides, motion capture, rigs, meshes, rendering, or spatial simulation systems."
+    },
+    {
+      "name": "baseline-domain-knowledge-publishing",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-knowledge-publishing",
+      "content_digest": "1ba2ae0a799ab8301e10878d641bd29d3138092c384c628ab4eaee839f17c41e",
+      "description": "Apply metadata, provenance, taxonomy, identifier, JSON-LD/RDF, publication lifecycle, canonical URL, validation, revision, deprecation, and verification-specific retention rules to canonical baseline facts. Use as a specialist overlay for content catalogs, knowledge systems, publishing workflows, and metadata services."
+    },
+    {
+      "name": "baseline-domain-ui-editor",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-ui-editor",
+      "content_digest": "e429cb24b78756f54b8469058555bcfd01868cf86a70d6474969bd35396f5eb3",
+      "description": "Apply UI-editor-specific retention and compression rules to canonical baseline facts involving DOM or Canvas authoring, coordinate systems, layout constraints, selection, overlays, interaction state, history, serialization, publishing, accessibility, and runtime projection. Use as a specialist overlay, not as an independent final-document owner."
+    }
+  ],
+  "presets": [
+    {
+      "id": "mlc-specialist-domains",
+      "name": "MLC Specialist Domain Overlays (5-Skill)",
+      "version": 1,
+      "description": "Specialized domain overlays for AI Agent Systems, Browser DevTools, UI Editors, 3D Graphics, and Knowledge Publishing.",
+      "purpose": "Provide deep domain reduction heuristics for specialized technical stacks on demand.",
+      "work_scope_tags": [
+        "domain",
+        "specialist"
+      ],
+      "skills": [
+        {
+          "skill_name": "baseline-domain-ai-agent-systems",
+          "source_relative_path": "baseline-domain-ai-agent-systems",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-browser-devtools",
+          "source_relative_path": "baseline-domain-browser-devtools",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-ui-editor",
+          "source_relative_path": "baseline-domain-ui-editor",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-graphics-3d-motion",
+          "source_relative_path": "baseline-domain-graphics-3d-motion",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-knowledge-publishing",
+          "source_relative_path": "baseline-domain-knowledge-publishing",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}

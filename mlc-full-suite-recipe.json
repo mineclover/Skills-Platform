@@ -1,0 +1,680 @@
+{
+  "schema_version": 1,
+  "recipe_id": "recipe_984c79aa-7ce",
+  "name": "Recipe for baseline-full-suite",
+  "description": "Automated skill installation recipe generated at 2026-08-27T18:28:52.802Z",
+  "created_at": "2026-08-27T18:28:52.803Z",
+  "created_by": "local",
+  "sources": [
+    {
+      "source_id": "source_local_979b585fd46689d6",
+      "type": "local",
+      "locator": "G:\\Downloads\\bounded-baseline-condenser-suite-v0.3.1\\skills",
+      "ref": "HEAD",
+      "resolved_commit": "a224f2492c93fdf4790eaf47b9b3bcdff8a17d72c2a3594e409acb8e7feb3463"
+    }
+  ],
+  "skills": [
+    {
+      "name": "baseline-boundary-problem-router",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-boundary-problem-router",
+      "content_digest": "0f89fe4859c8ff8e1707b97988844e5d6b9f75b78a71165f60e9e2d7b4a326de",
+      "description": "Route problems located in consumed, observed, or external elements into diagnosis, owned boundary mitigation, handoff, observation, or out-of-scope outcomes without absorbing unowned internal maintenance responsibility. Use when the root cause lies outside the current management envelope."
+    },
+    {
+      "name": "baseline-context-behavior-separation-validator",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-context-behavior-separation-validator",
+      "content_digest": "24cc7c460c06418df0257989ba8aaf332e439dc1388cb37aa5ae51ce79dfb8e3",
+      "description": "Validate that prior context and action behavior remain separate: contexts contain declarative identity, goals, conventions, methods, responsibility, and acceptance; behaviors contain execution, tool calls, changes, and results. Use before publishing contexts, behaviors, or maintenance runs."
+    },
+    {
+      "name": "baseline-context-version-controller",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-context-version-controller",
+      "content_digest": "6fe73fdcd68dfac5b39deebfa9e47941d97f176fa1c7d1aa7a574220fad6ae99",
+      "description": "Publish immutable context snapshots, review context patch proposals, manage supersession and adoption, and prevent behavior runs from mutating prior context in place. Use when exploration or resolution discovers new facts, conventions, goals, ownership, or acceptance rules."
+    },
+    {
+      "name": "baseline-convention-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-convention-registry",
+      "content_digest": "0a213e9934aaa16c7de538e0f5447db9aea786be1f4755c7e7ed54a43ec771ca",
+      "description": "Register and compose global, domain, product, element, and topic conventions for vertical contexts without copying rules into behavior instructions. Use when problem-solving must follow architecture, identity, coding, testing, data, compatibility, or operational conventions with explicit precedence and exceptions."
+    },
+    {
+      "name": "baseline-domain-ai-agent-systems",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-ai-agent-systems",
+      "content_digest": "6bd9f0156e70a1ff4f5fd09c64d7a2ffe7036f8b0da0a71652a5d3c8f08f7786",
+      "description": "Apply AI-agent-specific retention rules to facts involving agent roles, prompts, skills, tools, context boundaries, memory, model/provider choice, orchestration, human approval, uncertainty, evaluation, observability, safety, privacy, and cost. Use as a specialist overlay for agentic or model-driven systems."
+    },
+    {
+      "name": "baseline-domain-browser-devtools",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-browser-devtools",
+      "content_digest": "ea004fe610cff2e2f3d06eabd7464cd8189745bc01c5258a01102a61fe07441d",
+      "description": "Apply browser-extension and DevTools-specific retention rules to facts involving extension contexts, DevTools panels, content scripts, service workers, browser pages, Workspaces/Overrides, source maps, resource mapping, save attribution, hot reload, iframe/origin constraints, and version history. Use as a specialist overlay."
+    },
+    {
+      "name": "baseline-domain-data-state",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-data-state",
+      "content_digest": "3d773bdab7e55393c1c61280cdcfa822e8b68bd4536aeebe0dca545ef164022e",
+      "description": "Extract and compact domain entities, identifiers, relationships, schemas, persistence, derived projections, state machines, invariants, versioning, and migration semantics for a canonical baseline under 80,000 tokens. Use for data models, JSON schemas, database plans, state diagrams, document models, and lifecycle specifications."
+    },
+    {
+      "name": "baseline-domain-delivery-roadmap",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-delivery-roadmap",
+      "content_digest": "1969d6b3fd39118bb7460db1e1c9bccd2138cb33b0cc570ec6bb6aa7adcd9dc6",
+      "description": "Extract and compact dependency-ordered implementation stages, outcomes, deliverables, entry and exit criteria, decision gates, owners, blockers, risks, migration work, and deferred scope for a canonical baseline under 80,000 tokens. Use for roadmaps, TODOs, implementation plans, milestones, handoff plans, and release sequencing."
+    },
+    {
+      "name": "baseline-domain-graphics-3d-motion",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-graphics-3d-motion",
+      "content_digest": "e4bff9a369f4b33908bffeda7d9e284f354dd638df818e89e1ebf56f4df4e338",
+      "description": "Apply graphics, 3D, rigging, animation, pose, retargeting, rendering, coordinate-frame, asset, fidelity, and export-specific retention rules to canonical baseline facts. Use as a specialist overlay for Blender, ControlNet guides, motion capture, rigs, meshes, rendering, or spatial simulation systems."
+    },
+    {
+      "name": "baseline-domain-interfaces",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-interfaces",
+      "content_digest": "0303517e3012a486b383567631f09adc7800301151d126e5ebc88a0f172f0c2a",
+      "description": "Extract and compact API, event, message, file, adapter, plugin, and cross-module contracts—including producer/consumer obligations, payload semantics, errors, versioning, idempotency, ordering, authorization, and validation—into an 80,000-token canonical baseline."
+    },
+    {
+      "name": "baseline-domain-knowledge-publishing",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-knowledge-publishing",
+      "content_digest": "1ba2ae0a799ab8301e10878d641bd29d3138092c384c628ab4eaee839f17c41e",
+      "description": "Apply metadata, provenance, taxonomy, identifier, JSON-LD/RDF, publication lifecycle, canonical URL, validation, revision, deprecation, and verification-specific retention rules to canonical baseline facts. Use as a specialist overlay for content catalogs, knowledge systems, publishing workflows, and metadata services."
+    },
+    {
+      "name": "baseline-domain-product-requirements",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-product-requirements",
+      "content_digest": "2609a4daeb4d9637d081145953ffddf91fac0c5de8808f34639c84a7ceb8b787",
+      "description": "Extract and compact product intent, scope, user-visible behavior, business rules, functional requirements, success conditions, and product acceptance for an implementation-grade baseline under 80,000 tokens. Use for PRDs, feature plans, user stories, stakeholder requirements, scope discussions, and product decision logs."
+    },
+    {
+      "name": "baseline-domain-quality-operations",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-quality-operations",
+      "content_digest": "2a1ada856f9d5f18011aa46bd4d1ee36b668c32ffcb000b5ac6bca59a75e518f",
+      "description": "Extract and compact performance, capacity, security, privacy, reliability, degradation, observability, deployment, configuration, backup, recovery, migration, rollback, and cost constraints for an implementation-grade baseline under 80,000 tokens."
+    },
+    {
+      "name": "baseline-domain-router",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-router",
+      "content_digest": "531e3ad17ca41392ee6b5642a0f0d65483706465f1417440e4e1a41990e30c07",
+      "description": "Route a large project corpus to semantic domain reducers and specialist overlays before an 80,000-token canonical-baseline compilation. Use when plans or designs span product, architecture, data, interfaces, runtime, operations, testing, roadmap, UI editors, browser DevTools, AI agents, 3D graphics, or metadata publishing."
+    },
+    {
+      "name": "baseline-domain-runtime-workflows",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-runtime-workflows",
+      "content_digest": "048d423b0c8117e49c12576e7f403f6c5e4fc956a72e92235e48e926cd4309d8",
+      "description": "Extract and compact triggers, ordered stages, state mutations, asynchronous coordination, retries, timeouts, cancellation, rollback, recovery, and completion conditions into canonical runtime flows under an 80,000-token baseline. Use for pipelines, lifecycle descriptions, sequence diagrams, jobs, synchronization loops, and event-driven orchestration."
+    },
+    {
+      "name": "baseline-domain-system-architecture",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-system-architecture",
+      "content_digest": "c6242e748f466caa100f7badb1e485e2bbd28a6c0c52efa7ea4516d4d87955b7",
+      "description": "Extract and compact components, responsibility boundaries, source-of-truth rules, dependency direction, adapters, runtime and deployment boundaries, failure domains, and architectural decisions for an 80,000-token canonical baseline. Use for architecture documents, module plans, ADRs, platform designs, and integration-boundary discussions."
+    },
+    {
+      "name": "baseline-domain-testing-acceptance",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-testing-acceptance",
+      "content_digest": "777499a97f266b1e8189ab4af7f2cc3ccd99cf3e8413e2ba1879e35ad3517a84",
+      "description": "Extract and compact acceptance criteria, verification methods, test levels, contract tests, fixtures, oracles, failure and edge coverage, non-functional evidence, and release gates for a canonical project baseline under 80,000 tokens."
+    },
+    {
+      "name": "baseline-domain-ui-editor",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-domain-ui-editor",
+      "content_digest": "e429cb24b78756f54b8469058555bcfd01868cf86a70d6474969bd35396f5eb3",
+      "description": "Apply UI-editor-specific retention and compression rules to canonical baseline facts involving DOM or Canvas authoring, coordinate systems, layout constraints, selection, overlays, interaction state, history, serialization, publishing, accessibility, and runtime projection. Use as a specialist overlay, not as an independent final-document owner."
+    },
+    {
+      "name": "baseline-element-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-element-registry",
+      "content_digest": "e3bf4c5f98af2085ab3130c499e17251557d73148a2a308f9a5b4c002655ef8b",
+      "description": "Register system elements as independent, stable objects with identity, purpose, lifecycle, ownership, public surface, and typed relations. Use when horizontal or vertical contexts must refer to products, services, modules, contracts, adapters, data objects, or external systems without making the context their source of identity."
+    },
+    {
+      "name": "baseline-horizontal-context-builder",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-horizontal-context-builder",
+      "content_digest": "e1067cc7464d3d2277881a1fb52822abbc19dc0fb4ecd8bb125456534f1dbabc",
+      "description": "Build immutable horizontal prior-context snapshots that describe exploration scope, available methods and capabilities, method-selection rules, source authority, comparison criteria, topic-selection rules, ownership-discovery methods, and stop conditions. Use before any horizontal topic exploration behavior."
+    },
+    {
+      "name": "baseline-horizontal-exploration-behavior",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-horizontal-exploration-behavior",
+      "content_digest": "ec72f30b1b48b4d4b6373ee2ab13a2a5875797db2163349efdb7a206f21ae683",
+      "description": "Execute horizontal exploration from a published horizontal context: select methods, plan tools, discover and normalize candidate topics, compare evidence and ownership, deduplicate, rank, and select topics for vertical handoff. Use for broad investigation and topic selection, not implementation."
+    },
+    {
+      "name": "baseline-recursive-context-composer",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-recursive-context-composer",
+      "content_digest": "c5c381821da6b57169258af155f1b4f8b2f2e9760dcf1cde98e04488f6038236",
+      "description": "Compose bounded execution contexts across recursively alternating horizontal and vertical frames while preserving parent-child focus paths, responsibility depth, topic identity, and 80,000-token limits. Use when a task drills into subtopics, reopens exploration, or resumes a parent resolution after child work."
+    },
+    {
+      "name": "baseline-reference-pack-builder",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-reference-pack-builder",
+      "content_digest": "7b58c60fee8825064b45a324e75a061ed81acb74b4c459d390d36ff398d20dbc",
+      "description": "Build the auxiliary source, authority, vocabulary, fact, conflict, dependency, archive, and token-budget documents used to safely condense a large project corpus into one canonical baseline under 80,000 tokens. Use for multi-source plans, versioned designs, long chat histories, conflicting PRDs or ADRs, and any condensation task where traceability and semantic-loss control matter."
+    },
+    {
+      "name": "baseline-responsibility-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-responsibility-registry",
+      "content_digest": "87dc1129a1775f5840d4b36429ed9742ef6a4cb58b703c5990e0599ce34b8181",
+      "description": "Register ownership and maintenance responsibility for elements, relationships, and contracts independently from access or context inclusion. Use when a task must distinguish managed, delegated, boundary-managed, consumed, observed, external, and excluded scope."
+    },
+    {
+      "name": "baseline-responsibility-resolution-gate",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-responsibility-resolution-gate",
+      "content_digest": "c487ee6878bc7aa44a5cc1d2d15a20a04503dd7e25547beb7f27b6cd388d207f",
+      "description": "Gate vertical problem solving and mutating tool use against explicit responsibility envelopes. Use before changing code, data, configuration, contracts, infrastructure, or external dependencies to ensure the selected resolution location is managed, delegated, or boundary-managed."
+    },
+    {
+      "name": "baseline-task-mode-router",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-task-mode-router",
+      "content_digest": "9189022a9e3a771341c68f7e2df0d002fcc65db4dccbaf5e32a97d487a885eb1",
+      "description": "Classify a maintenance, design, or implementation request by task intent and execution orientation before domain routing. Use when a request may be exploratory, problem-solving, mixed, or recursively switch between horizontal topic discovery and vertical resolution."
+    },
+    {
+      "name": "baseline-topic-handoff-compiler",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-topic-handoff-compiler",
+      "content_digest": "26ed52e32bda334d9ada0ad0071d120cdbcbf50c3f1bfa5ac6cfa57deb66197c",
+      "description": "Compile a minimal, traceable handoff from horizontal exploration into a canonical selected topic and the requirements for its vertical context. Use when moving from discovery and selection to problem resolution without copying the full exploration history."
+    },
+    {
+      "name": "baseline-topic-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-topic-registry",
+      "content_digest": "8df9dd4e48b402a90ce517e79a8c25e2010a237626e2c9e478f0f58844752624",
+      "description": "Register exploration and resolution topics as stable work objects with canonical IDs, roles, parent-child links, subject references, ownership hints, lifecycle state, and duplicate or supersession relations. Use before creating vertical contexts or tracking recursive maintenance work."
+    },
+    {
+      "name": "baseline-vertical-context-builder",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-vertical-context-builder",
+      "content_digest": "5b38c84672283f534cf9503f736d96e186a39726d4af66faf7d563347f6a822b",
+      "description": "Build an immutable vertical prior-context snapshot for exactly one canonical topic, including its role, concrete measurable goal, applicable conventions, current evidence, responsibility envelope, public projections of dependencies, acceptance criteria, and reopen conditions. Use before vertical problem-solving behavior."
+    },
+    {
+      "name": "baseline-vertical-resolution-behavior",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-vertical-resolution-behavior",
+      "content_digest": "5b69886a9bf0417fa89fbb47a803419a07344f4c740c6b4408898f0c69f538b0",
+      "description": "Execute problem resolution for one canonical topic from a published vertical context: reproduce and measure, test hypotheses, choose an owned resolution location, design and apply allowed changes, validate evidence, and produce closure or reopen outputs. Use for implementation and verified problem solving."
+    },
+    {
+      "name": "bounded-baseline-condenser",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "bounded-baseline-condenser",
+      "content_digest": "e2e25faf8a66f489ceee39a4b1e3e1429099a4f07ee2a5464451038b90f9a658",
+      "description": "Consolidate fragmented project plans, PRDs, architecture notes, ADRs, contracts, TODOs, and change history into one canonical implementation baseline under a strict token budget. Use when a user asks to reduce, merge, freeze, hand off, or keep an entire plan or design within a context limit without losing requirements, accepted decisions, interfaces, invariants, validation criteria, risks, open issues, and source traceability. Default target is 72,000 tokens with a hard cap of 80,000 tokens."
+    },
+    {
+      "name": "maintenance-closure-learning",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-closure-learning",
+      "content_digest": "60d4fa6ba79525aa98ee1051ca0d795b4e2fea734a151ccbd6407730ceebe2d6",
+      "description": "Close maintenance cases with explicit outcomes, residual risks, handoffs, temporary-measure removal conditions, and learning artifacts; propose updates to contexts, conventions, ownership, methods, tools, and baselines without mutating them directly. Use after stabilization or non-resolution routing."
+    },
+    {
+      "name": "maintenance-context-drift-detector",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-context-drift-detector",
+      "content_digest": "8357dde048bce70d1a9e7391e8195740ab643d6d842dd8b76982311c1d7520a9",
+      "description": "Detect divergence among published baselines, context snapshots, conventions, responsibility records, source code, configuration, contracts, tests, and runtime behavior. Use periodically or after major changes to generate signals and patch proposals without silently rewriting authority."
+    },
+    {
+      "name": "maintenance-lifecycle-controller",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-lifecycle-controller",
+      "content_digest": "8d1c5f7aaaca3ec437df649a4ea5d3d8059113c390ce2981bd5642ea9d314adb",
+      "description": "Control the state machine of maintenance cases from signal intake through horizontal exploration, topic selection, responsibility routing, vertical context, resolution, validation, release, stabilization, closure, and reopening. Use for any maintenance workflow requiring auditable transitions and recursive child cases."
+    },
+    {
+      "name": "maintenance-method-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-method-registry",
+      "content_digest": "866621d3425a7d31737160a4865d3560ded20d5d2d037204ad99160995898822",
+      "description": "Register tool-independent exploration, diagnosis, validation, release, and governance methods with suitability rules, required capabilities, procedure phases, outputs, evidence, and lifecycle state. Use when horizontal context must know how to explore or vertical behavior must choose a problem-solving method without naming a concrete tool."
+    },
+    {
+      "name": "maintenance-release-stabilization",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-release-stabilization",
+      "content_digest": "17af3859dfaa241d7c579e0c7143a2c2edfed12018d1dfea36b016844b217b3e",
+      "description": "Plan and control deployment, migration, rollout, rollback, post-release observation, and stabilization windows after validation. Use when a maintenance change must move into real environments without equating test success with operational stability."
+    },
+    {
+      "name": "maintenance-signal-intake",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-signal-intake",
+      "content_digest": "d09d4e9ddecca1dbd7a4d9b89ab254913c8d04273439549fbd09f1e854c6d012",
+      "description": "Normalize logs, metrics, test failures, user reports, security notices, dependency changes, design drift, and manual observations into deduplicated maintenance signals without prematurely declaring defects or resolution ownership. Use at the start of maintenance cases."
+    },
+    {
+      "name": "maintenance-tool-effectiveness-reviewer",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-tool-effectiveness-reviewer",
+      "content_digest": "77fccee887de06141e98b22d90d727862e38a7fd89419eea5b43ddc2d615e9fc",
+      "description": "Evaluate maintenance methods and tools using execution history, success rate, evidence quality, false positives or misses, cost, latency, intrusiveness, failure recovery, security, and operator burden; propose lifecycle or registry changes without editing tool definitions directly. Use periodically and after significant failures."
+    },
+    {
+      "name": "maintenance-tool-invocation-guard",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-tool-invocation-guard",
+      "content_digest": "c2ecad68c009a636b94438188224da7a7b414894bbe5aa6482b124d28f5ba0e6",
+      "description": "Authorize or block each maintenance tool invocation by checking context snapshot, lifecycle stage, method and toolchain membership, responsibility mode, target scope, effect class, approvals, data policy, validation plan, rollback plan, and runtime preconditions. Use immediately before every tool call, especially mutate, control, or govern operations."
+    },
+    {
+      "name": "maintenance-tool-registry",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-tool-registry",
+      "content_digest": "a3c4ddf467ad021ddee08b8b4da48e71b50df64a8d2a0153a46f40d290d9a81a",
+      "description": "Register atomic capabilities and concrete tool bindings with effects, environments, inputs, outputs, side effects, evidence grade, failure modes, responsibility compatibility, mutation policy, reversibility, ownership, and lifecycle state. Use to define the executable tool layer beneath maintenance behaviors."
+    },
+    {
+      "name": "maintenance-tool-result-normalizer",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-tool-result-normalizer",
+      "content_digest": "fa337d3e9915363332c770d00005dc54beb813de40bf84fb206dff6735a7bd56",
+      "description": "Normalize heterogeneous outputs from search, runtime, analysis, mutation, test, deployment, and governance tools into typed evidence, observations, change records, and failure records with provenance and confidence. Use after tool execution so behaviors and lifecycle gates do not depend on vendor-specific output shapes."
+    },
+    {
+      "name": "maintenance-toolchain-planner",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-toolchain-planner",
+      "content_digest": "9903885500a8a07e6eb3410e433d4000df7dfc45524eaee8c04d6f22cea40057",
+      "description": "Convert a selected maintenance method into an executable toolchain by matching required capabilities to available tool bindings and filtering by lifecycle stage, environment, responsibility, authority, evidence quality, reversibility, intrusiveness, cost, and fallback. Use before horizontal exploration, vertical diagnosis, mutation, validation, release, or governance execution."
+    },
+    {
+      "name": "maintenance-validation-gate",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-validation-gate",
+      "content_digest": "77d31616d494869a5b8515da9f48f04956cfb7603533a4a9b4f11909c28fe5dd",
+      "description": "Validate vertical resolution results against explicit acceptance criteria, regression obligations, contract compatibility, safety, security, and evidence requirements before release. Use after a proposed change or mitigation and before deployment or closure."
+    }
+  ],
+  "presets": [
+    {
+      "id": "baseline-full-suite",
+      "name": "Bounded Baseline Condenser Full Suite (43-Skill)",
+      "version": 1,
+      "description": "Complete Bounded Baseline Condenser Suite v0.3.1 including specialist overlays and maintenance lifecycle.",
+      "purpose": "Full suite for recursive H/V context building, element registries, toolchain planning, and maintenance drift detection.",
+      "work_scope_tags": [
+        "curation",
+        "full"
+      ],
+      "skills": [
+        {
+          "skill_name": "baseline-boundary-problem-router",
+          "source_relative_path": "baseline-boundary-problem-router",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-context-behavior-separation-validator",
+          "source_relative_path": "baseline-context-behavior-separation-validator",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-context-version-controller",
+          "source_relative_path": "baseline-context-version-controller",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-convention-registry",
+          "source_relative_path": "baseline-convention-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-ai-agent-systems",
+          "source_relative_path": "baseline-domain-ai-agent-systems",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-browser-devtools",
+          "source_relative_path": "baseline-domain-browser-devtools",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-data-state",
+          "source_relative_path": "baseline-domain-data-state",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-delivery-roadmap",
+          "source_relative_path": "baseline-domain-delivery-roadmap",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-graphics-3d-motion",
+          "source_relative_path": "baseline-domain-graphics-3d-motion",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-interfaces",
+          "source_relative_path": "baseline-domain-interfaces",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-knowledge-publishing",
+          "source_relative_path": "baseline-domain-knowledge-publishing",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-product-requirements",
+          "source_relative_path": "baseline-domain-product-requirements",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-quality-operations",
+          "source_relative_path": "baseline-domain-quality-operations",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-router",
+          "source_relative_path": "baseline-domain-router",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-runtime-workflows",
+          "source_relative_path": "baseline-domain-runtime-workflows",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-system-architecture",
+          "source_relative_path": "baseline-domain-system-architecture",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-testing-acceptance",
+          "source_relative_path": "baseline-domain-testing-acceptance",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-domain-ui-editor",
+          "source_relative_path": "baseline-domain-ui-editor",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-element-registry",
+          "source_relative_path": "baseline-element-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-horizontal-context-builder",
+          "source_relative_path": "baseline-horizontal-context-builder",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-horizontal-exploration-behavior",
+          "source_relative_path": "baseline-horizontal-exploration-behavior",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-recursive-context-composer",
+          "source_relative_path": "baseline-recursive-context-composer",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-reference-pack-builder",
+          "source_relative_path": "baseline-reference-pack-builder",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-responsibility-registry",
+          "source_relative_path": "baseline-responsibility-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-responsibility-resolution-gate",
+          "source_relative_path": "baseline-responsibility-resolution-gate",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-task-mode-router",
+          "source_relative_path": "baseline-task-mode-router",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-topic-handoff-compiler",
+          "source_relative_path": "baseline-topic-handoff-compiler",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-topic-registry",
+          "source_relative_path": "baseline-topic-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-vertical-context-builder",
+          "source_relative_path": "baseline-vertical-context-builder",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-vertical-resolution-behavior",
+          "source_relative_path": "baseline-vertical-resolution-behavior",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "bounded-baseline-condenser",
+          "source_relative_path": "bounded-baseline-condenser",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-closure-learning",
+          "source_relative_path": "maintenance-closure-learning",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-context-drift-detector",
+          "source_relative_path": "maintenance-context-drift-detector",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-lifecycle-controller",
+          "source_relative_path": "maintenance-lifecycle-controller",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-method-registry",
+          "source_relative_path": "maintenance-method-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-release-stabilization",
+          "source_relative_path": "maintenance-release-stabilization",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-signal-intake",
+          "source_relative_path": "maintenance-signal-intake",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-tool-effectiveness-reviewer",
+          "source_relative_path": "maintenance-tool-effectiveness-reviewer",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-tool-invocation-guard",
+          "source_relative_path": "maintenance-tool-invocation-guard",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-tool-registry",
+          "source_relative_path": "maintenance-tool-registry",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-tool-result-normalizer",
+          "source_relative_path": "maintenance-tool-result-normalizer",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-toolchain-planner",
+          "source_relative_path": "maintenance-toolchain-planner",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-validation-gate",
+          "source_relative_path": "maintenance-validation-gate",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}

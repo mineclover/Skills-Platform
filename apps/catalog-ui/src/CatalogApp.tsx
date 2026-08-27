@@ -1120,11 +1120,13 @@ export function CatalogApp() {
                     setNotice(null);
                   }}
                 >
-                  <option value="planning">planning</option>
-                  <option value="implementation">implementation</option>
-                  <option value="review">review</option>
+                  <option value="planning">planning (기본 계획)</option>
+                  <option value="implementation">implementation (기본 구현)</option>
+                  <option value="review">review (코드 리뷰)</option>
+                  <option value="explore">explore (MLC 수평/수직 재귀 탐색 & 레지스트리)</option>
                   <option value="curation">curation (자료 정리 / Baseline Condensation)</option>
                   <option value="architecture">architecture (도메인 아키텍처 정제)</option>
+                  <option value="specialist">specialist (AI 에이전트/DevTools/UI 전문 도메인)</option>
                   <option value="toolchain">toolchain (MLC 툴체인 및 호출 가드)</option>
                   <option value="governance">governance (MLC 케이스 거버넌스 및 게이트)</option>
                 </select>

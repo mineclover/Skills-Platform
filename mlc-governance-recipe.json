@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "recipe_id": "recipe_b1eeb72d-ff6",
+  "name": "Recipe for mlc-lifecycle-governance",
+  "description": "Automated skill installation recipe generated at 2026-08-27T18:28:52.692Z",
+  "created_at": "2026-08-27T18:28:52.694Z",
+  "created_by": "local",
+  "sources": [
+    {
+      "source_id": "source_local_979b585fd46689d6",
+      "type": "local",
+      "locator": "G:\\Downloads\\bounded-baseline-condenser-suite-v0.3.1\\skills",
+      "ref": "HEAD",
+      "resolved_commit": "a224f2492c93fdf4790eaf47b9b3bcdff8a17d72c2a3594e409acb8e7feb3463"
+    }
+  ],
+  "skills": [
+    {
+      "name": "baseline-boundary-problem-router",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-boundary-problem-router",
+      "content_digest": "0f89fe4859c8ff8e1707b97988844e5d6b9f75b78a71165f60e9e2d7b4a326de",
+      "description": "Route problems located in consumed, observed, or external elements into diagnosis, owned boundary mitigation, handoff, observation, or out-of-scope outcomes without absorbing unowned internal maintenance responsibility. Use when the root cause lies outside the current management envelope."
+    },
+    {
+      "name": "baseline-responsibility-resolution-gate",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "baseline-responsibility-resolution-gate",
+      "content_digest": "c487ee6878bc7aa44a5cc1d2d15a20a04503dd7e25547beb7f27b6cd388d207f",
+      "description": "Gate vertical problem solving and mutating tool use against explicit responsibility envelopes. Use before changing code, data, configuration, contracts, infrastructure, or external dependencies to ensure the selected resolution location is managed, delegated, or boundary-managed."
+    },
+    {
+      "name": "maintenance-closure-learning",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-closure-learning",
+      "content_digest": "60d4fa6ba79525aa98ee1051ca0d795b4e2fea734a151ccbd6407730ceebe2d6",
+      "description": "Close maintenance cases with explicit outcomes, residual risks, handoffs, temporary-measure removal conditions, and learning artifacts; propose updates to contexts, conventions, ownership, methods, tools, and baselines without mutating them directly. Use after stabilization or non-resolution routing."
+    },
+    {
+      "name": "maintenance-context-drift-detector",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-context-drift-detector",
+      "content_digest": "8357dde048bce70d1a9e7391e8195740ab643d6d842dd8b76982311c1d7520a9",
+      "description": "Detect divergence among published baselines, context snapshots, conventions, responsibility records, source code, configuration, contracts, tests, and runtime behavior. Use periodically or after major changes to generate signals and patch proposals without silently rewriting authority."
+    },
+    {
+      "name": "maintenance-lifecycle-controller",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-lifecycle-controller",
+      "content_digest": "8d1c5f7aaaca3ec437df649a4ea5d3d8059113c390ce2981bd5642ea9d314adb",
+      "description": "Control the state machine of maintenance cases from signal intake through horizontal exploration, topic selection, responsibility routing, vertical context, resolution, validation, release, stabilization, closure, and reopening. Use for any maintenance workflow requiring auditable transitions and recursive child cases."
+    },
+    {
+      "name": "maintenance-release-stabilization",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-release-stabilization",
+      "content_digest": "17af3859dfaa241d7c579e0c7143a2c2edfed12018d1dfea36b016844b217b3e",
+      "description": "Plan and control deployment, migration, rollout, rollback, post-release observation, and stabilization windows after validation. Use when a maintenance change must move into real environments without equating test success with operational stability."
+    },
+    {
+      "name": "maintenance-signal-intake",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-signal-intake",
+      "content_digest": "d09d4e9ddecca1dbd7a4d9b89ab254913c8d04273439549fbd09f1e854c6d012",
+      "description": "Normalize logs, metrics, test failures, user reports, security notices, dependency changes, design drift, and manual observations into deduplicated maintenance signals without prematurely declaring defects or resolution ownership. Use at the start of maintenance cases."
+    },
+    {
+      "name": "maintenance-validation-gate",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_979b585fd46689d6",
+      "source_relative_path": "maintenance-validation-gate",
+      "content_digest": "77d31616d494869a5b8515da9f48f04956cfb7603533a4a9b4f11909c28fe5dd",
+      "description": "Validate vertical resolution results against explicit acceptance criteria, regression obligations, contract compatibility, safety, security, and evidence requirements before release. Use after a proposed change or mitigation and before deployment or closure."
+    }
+  ],
+  "presets": [
+    {
+      "id": "mlc-lifecycle-governance",
+      "name": "MLC Lifecycle & Governance Plane (8-Skill)",
+      "version": 1,
+      "description": "10-state Maintenance Case state machine, signal intake, responsibility routing, validation, and learning loop.",
+      "purpose": "Enforce closed-loop maintenance from signal intake through responsibility routing, validation, stabilization, and governance.",
+      "work_scope_tags": [
+        "governance",
+        "lifecycle",
+        "review"
+      ],
+      "skills": [
+        {
+          "skill_name": "maintenance-lifecycle-controller",
+          "source_relative_path": "maintenance-lifecycle-controller",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-signal-intake",
+          "source_relative_path": "maintenance-signal-intake",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-validation-gate",
+          "source_relative_path": "maintenance-validation-gate",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-release-stabilization",
+          "source_relative_path": "maintenance-release-stabilization",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-closure-learning",
+          "source_relative_path": "maintenance-closure-learning",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "maintenance-context-drift-detector",
+          "source_relative_path": "maintenance-context-drift-detector",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-responsibility-resolution-gate",
+          "source_relative_path": "baseline-responsibility-resolution-gate",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "baseline-boundary-problem-router",
+          "source_relative_path": "baseline-boundary-problem-router",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}
