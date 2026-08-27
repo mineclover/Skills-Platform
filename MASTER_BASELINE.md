@@ -93,11 +93,38 @@ Maintenance Control Plane (Skills Platform)
 
 ---
 
-## 4. 품질 검증 및 릴리스 게이트
+---
 
-1. **TypeScript 무결성**: `npm run check` -> **0 errors**
-2. **회귀 및 E2E 테스트**: `npm test` -> **100% Pass Rate**
-3. **프로덕션 빌드**: `npm run build` -> 정상 번들링 완료
+## 4. 텔레메트리 훅 엔진 및 수명주기 훅 관리 시스템 (Universal Hooks & Telemetry)
+
+- **Universal Telemetry Hook Engine** (`.skills-platform/hooks/telemetry-hook.js`):
+  - 무의존성 극초고속 (<2ms) 실행으로 모델 인보케이션 및 도구 실행 텔레메트리 자동 수집.
+  - Google Antigravity (`.agents/hooks.json`), Claude (`.claude/hooks.json`), Codex/Ralph-TUI stdio 캡처 지원.
+  - 원자적 `.skills-platform/telemetry/events.ndjson` 및 백엔드 `/api/telemetry/record` 비동기 플러시.
+- **선언적 훅 매니페스트 관리** (`.skills-platform/hooks/manifest.json`, `apps/skills-catalog/src/hooks-manager.js`):
+  - 표준 이벤트 분류: `session_start`, `session_stop`, `on_skill_invoke`, `pre_tool_use`, `post_tool_use`, `on_test_run`, `on_phase_transition`, `custom:*`.
+  - CLI 연동: `skills-platform hook list/add/remove/enable/disable/test/sync`.
+  - `Test Storm Suppression Guard`: Inner Loop 중 무차별 전체 테스트 스위트 실행 시도를 원천 차단.
 
 ---
+
+## 5. 3단계 자율 라이프사이클 루프 러너 (Autonomous Lifecycle Loop)
+
+`skills-platform loop run --prd <path> --project <path> --provider <provider>`
+
+1. **Phase 1 (Plan)**: `task-planning-recipe.json` 장착 $\rightarrow$ PRD를 의존성 정렬된 원자적 `task-queue.json`으로 분해 (코드 수정 금지).
+2. **Phase 2 (Inner Loop)**: `scoped-inner-loop-recipe.json` 심볼릭 링크 핫스왑 $\rightarrow$ 단일 Task 타겟 테스트(`run_scoped_test`)만 실행하여 빠른 TDD 수정 (전체 테스트 스캔 차단).
+3. **Phase 3 (Release Gate)**: `release-governance-recipe.json` 핫스왑 $\rightarrow$ 1회 전수 회귀 테스트 검증 후 `MASTER_BASELINE.md` 정본 갱신.
+
+---
+
+## 6. 품질 검증 및 릴리스 게이트
+
+1. **TypeScript 무결성**: `npm run check` -> **0 errors**
+2. **단위 및 통합 테스트**: `npm test` -> **306/306 Passing (100%)**
+3. **E2E 테스트 스위트**: `node tests/e2e/run-all.js` -> **184/184 Passing across 39 Suites (100%)**
+4. **프로덕션 빌드**: `npm run build` -> 정상 번들링 완료 (`apps/catalog-ui/dist`)
+
+---
+*참조 결정 기록: ADR 0001 ~ ADR 0007 (Telemetry Hook Engine & Lifecycle Loop Architecture).*
 *시스템 유지보수 라이프사이클과 툴 정의 체계 (MLC) 정본 기준선 — Skills Platform Control Plane.*
