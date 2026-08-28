@@ -16,6 +16,10 @@ import type {
   RecipeSkill,
   RecipePreset,
   RecipeProjectBinding,
+  HookDefinition,
+  HookManifest,
+  HookHandler,
+  StandardHookEvent,
 } from "@skills-platform/contracts";
 
 export type Scope =
@@ -331,6 +335,55 @@ export interface TelemetryQueryParams {
   limit?: number;
 }
 
+export interface HookInterceptionResult {
+  allow: boolean;
+  reason?: string;
+  self_correct_hint?: string;
+  violation_type?: string;
+  matched_pattern?: string;
+  details?: Record<string, any>;
+}
+
+export interface HookExecutionResult {
+  hookId: string;
+  event: string;
+  status: "success" | "failed" | "timed_out" | "skipped" | "blocked";
+  allow?: boolean;
+  durationMs: number;
+  stdout?: string;
+  stderr?: string | null;
+  error?: string | null;
+  interception?: HookInterceptionResult | null;
+}
+
+export interface HookSimulationResult {
+  eventName: string;
+  allow: boolean;
+  halted: boolean;
+  blockedBy?: string;
+  reason?: string;
+  self_correct_hint?: string;
+  interception?: HookInterceptionResult | null;
+  triggeredAt: string;
+  totalHooks: number;
+  executedCount: number;
+  results: HookExecutionResult[];
+}
+
+export interface SecurityFeedEvent {
+  id: string;
+  timestamp: string;
+  type: "block" | "warn" | "allow" | "sync" | "error";
+  category: "secret_leak" | "destructive_command" | "context_budget" | "scope_boundary" | "recursion_limit" | "test_storm" | "general";
+  hook_id: string;
+  hook_name: string;
+  tool_name?: string;
+  details: string;
+  reason?: string;
+  self_correct_hint?: string;
+  latency_ms?: number;
+}
+
 export type {
   ArtifactType,
   InvocationMode,
@@ -349,6 +402,10 @@ export type {
   RecipeSkill,
   RecipePreset,
   RecipeProjectBinding,
+  HookDefinition,
+  HookManifest,
+  HookHandler,
+  StandardHookEvent,
 };
 
 

@@ -19,6 +19,7 @@
       "invocation_mode": "model_invoked",
       "source_id": "skills-platform-registry",
       "source_relative_path": "vertical-context-extractor",
+      "content_digest": "428b546d1ea66a5ad6206212719d4d0d794b6727b12f3bd1407ebd6f02476838",
       "description": "Extract strict local context pack, types, and single target test file for isolated vertical execution."
     },
     {
@@ -27,6 +28,7 @@
       "invocation_mode": "model_invoked",
       "source_id": "skills-platform-registry",
       "source_relative_path": "scoped-tdd-executor",
+      "content_digest": "139c27cc1ed2742f7fbfe627a5bfb4a51a8d2f9cedf3d57f9c7e90c45de486bc",
       "description": "Execute pinpoint unit test runner on single test target, preventing full regression scans during inner loops."
     },
     {
@@ -35,6 +37,7 @@
       "invocation_mode": "model_invoked",
       "source_id": "skills-platform-registry",
       "source_relative_path": "context-patch-synthesizer",
+      "content_digest": "3801bddebf64e1e6e5cc70a628484760e0ded465fa419168557c7591b0080845",
       "description": "Generate structured Context Patch Proposal with test evidence instead of raw unverified mutations."
     }
   ],
@@ -67,5 +70,39 @@
       ]
     }
   ],
-  "projects": []
+  "projects": [],
+  "hooks": [
+    {
+      "id": "secret-leak-guard",
+      "name": "Secret Leak Guard",
+      "event": "pre_tool_use",
+      "description": "Detects and blocks API keys, private tokens, and credentials in commands and payloads.",
+      "enabled": true,
+      "matcher": "run_command|write_to_file|replace_file_content|send_message|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/secret-leak-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 5,
+      "providers": ["antigravity", "claude", "codex"],
+      "metadata": { "system": true, "category": "security" }
+    },
+    {
+      "id": "scope-boundary-enforcer",
+      "name": "Scope Boundary Enforcer",
+      "event": "post_tool_use",
+      "description": "Audits file modifications against active topic scope and detects out-of-bounds mutations.",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/scope-boundary-enforcer.js",
+        "timeout_ms": 5000
+      },
+      "priority": 20,
+      "providers": ["antigravity", "claude", "codex"],
+      "metadata": { "system": true, "category": "governance" }
+    }
+  ]
 }

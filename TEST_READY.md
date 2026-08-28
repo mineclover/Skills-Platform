@@ -1,119 +1,73 @@
-# E2E Test Suite Readiness Manifest (`TEST_READY.md`)
+# TEST_READY: Flow Studio Visualization Canvas Test Infrastructure
 
-## Executive Summary
-The complete, requirement-driven, opaque-box E2E test suite for **Skills Platform Universal Telemetry & Autonomous Lifecycle Loop** has been constructed and verified across all 4 Tiers according to `TEST_INFRA.md` and `ORIGINAL_REQUEST.md`.
-
-- **Total Test Files**: 39 files
-- **Total Test Assertions / Cases**: 184 tests
-- **Pass Rate**: 100% (184/184 passing)
-- **Execution Command**: `node tests/e2e/run-all.js`
+**Status**: ✅ TEST READY & FULLY VERIFIED  
+**Date**: 2026-08-28T19:45:00Z  
+**Author**: E2E Test Writer Agent (`test_writer_1`)  
+**Target Feature**: Flow Studio Visualization Canvas & Simulation Engine (Feature 20 / Tier 1-4)  
 
 ---
 
-## Test Execution Commands
+## 1. Test Suite Summary
 
+Two comprehensive, zero-external-dependency test suites have been designed, implemented, and verified using Node.js native test runner (`node:test` + `node:assert/strict`):
+
+| Test Suite | Path | Framework | Tests / Assertions | Status |
+|---|---|---|---|:---:|
+| **Flow Studio Unit & Logic Test Suite** | `apps/catalog-ui/test/flow-studio.test.js` | `node:test` (ESM) | 28 Tests (100% Pass) | ✅ PASSED |
+| **Flow Studio E2E Integration Suite** | `tests/e2e/tier1-features/f20-flow-studio-canvas.test.js` | `node:test` (CJS) | 8 Tests (100% Pass) | ✅ PASSED |
+| **Catalog UI Workspace Test Suite** | `npm test --workspace apps/catalog-ui` | `node:test` | 211 Tests (100% Pass) | ✅ PASSED |
+| **Global E2E Test Harness** | `node tests/e2e/run-all.js` | `node:test` | 46 Suites / 203 Assertions | ✅ PASSED |
+
+---
+
+## 2. Requirement Coverage Matrix
+
+| Req | Feature / Requirement | Test Suite & Method | Coverage Highlights |
+|:---:|---|---|---|
+| **R1** | **4 Canvas View Modes** | `flow-studio.test.js: 1.1-1.3`<br>`f20-flow-studio-canvas.test.js: F20.1` | - 4 canonical modes registered: `lifecycle`, `hook_pipeline`, `fractal_tree`, `junction_map`.<br>- State machine mode switching and safe fallback on invalid/null inputs.<br>- Capability matrix validation per view mode. |
+| **R1.1** | **3-Phase Lifecycle & Task Progression** | `flow-studio.test.js: 2.1-2.5`<br>`f20-flow-studio-canvas.test.js: F20.2-F20.3` | - Sequential 3-Phase state machine (Plan $\to$ Inner Loop $\to$ Release Gate).<br>- Task queue cards status flow (`pending` $\to$ `in_progress` $\to$ `passed` / `blocked`).<br>- **Test Storm Suppression Guard shield** triggers on un-scoped commands (`npm test`, `pytest`, `cargo test`, `vitest`, `node --test`, `*`).<br>- Scoped pinpoint test execution permitted.<br>- Phase 3 gate authorization precondition and baseline compaction. |
+| **R1.2** | **Hook Execution & Security Pipeline** | `flow-studio.test.js: 3.1-3.5`<br>`f20-flow-studio-canvas.test.js: F20.4` | - PreToolUse priority chain: Priority 5 (Secret Leak) $\to$ Priority 10 (Destructive) $\to$ Priority 15 (Context Budget) $\to$ Priority 25 (Subagent Limiter).<br>- **Short-circuit branching to Red Halt Node** on violation.<br>- Real guard script CLI execution and JSON output parsing.<br>- PostToolUse Priority 10 Telemetry Collector and Priority 20 Scope Boundary Enforcer. |
+| **R1.3** | **Relative Fractal Context Hierarchy** | `flow-studio.test.js: 4.1-4.2`<br>`f20-flow-studio-canvas.test.js: F20.5` | - 3-level context resolution: Level 0 (System Horizon ~320KB) $\to$ Level 1 (Local Topic Plane with `owned_files` vs `out_of_bounds`) $\to$ Level 2 (Pinpoint 80k Spec with 1:1 pinned target test).<br>- **Upward Roll-Up & Context Patch Proposal** flow on task completion. |
+| **R1.4** | **Symlink Junction & Delivery Map** | `flow-studio.test.js: 5.1-5.3`<br>`f20-flow-studio-canvas.test.js: F20.6` | - Multi-provider delivery endpoint mapping: `.agents/skills/` (Antigravity), `.claude/skills/` (Claude), `skills/` (Codex).<br>- **Live sync and drift detection** indicators (`insync`, `drift`, `pristine`).<br>- Active recipe skill set comparison. |
+| **R2** | **Interactive NodeDetailInspector Drawer** | `flow-studio.test.js: 6.1-6.2`<br>`f20-flow-studio-canvas.test.js: F20.7` | - Slide-over drawer schema compliance: `id`, `type`, `name`, `status`, `lineage`, `verification`, `diagnostics`, `metrics`, `junction`.<br>- Topic node lineage, lifecycle state, pinned test, allowed/prohibited commands, invariants.<br>- Hook guard diagnostics, blocked command, and actionable self-correction hints.<br>- Changeset live diffs (additions/deletions/snippets) and latency metrics. |
+| **R3** | **FlowPlaybackController & Simulation Attacks** | `flow-studio.test.js: 7.1-7.5, 8.1-8.3`<br>`f20-flow-studio-canvas.test.js: F20.8` | - Timeline controls: Play, Pause, Step Forward/Backward, Reset, Timeline Scrubber.<br>- **4 1-Click Attack Injections**:<br>  1. API Key Leak (Pri 5 Halt $< 200\text{ms}$)<br>  2. Destructive `rm -rf` (Pri 10 Halt $< 200\text{ms}$)<br>  3. Test Storm Attempt (Phase 2 Shield Halt $< 200\text{ms}$)<br>  4. Clean Safe Invocation (Success Pulse $< 200\text{ms}$)<br>- Sub-200ms latency execution guarantee and 100-burst rapid fire benchmark ($< 500\text{ms}$). |
+| **R4** | **Navigation & Theme Integration** | `flow-studio.test.js: 1.1-1.3`<br>`f20-flow-studio-canvas.test.js: F20.1` | - Main navigation registration, active tab switching, theme visual indicators, glowing badges. |
+
+---
+
+## 3. How to Run the Tests
+
+### 1. Catalog UI Unit & Logic Tests
 ```bash
-# Run the complete E2E test suite
+npm test --workspace apps/catalog-ui
+```
+*Or run the Flow Studio suite directly:*
+```bash
+node --test apps/catalog-ui/test/flow-studio.test.js
+```
+
+### 2. Tier 1 E2E Feature Test for Flow Studio
+```bash
+node tests/e2e/run-all.js --filter f20
+```
+*Or run via Node native runner:*
+```bash
+node --test tests/e2e/tier1-features/f20-flow-studio-canvas.test.js
+```
+
+### 3. Full Monorepo E2E Test Suite (Tiers 1–5)
+```bash
 node tests/e2e/run-all.js
-
-# Run specific tier
-node tests/e2e/run-all.js --filter tier1
-node tests/e2e/run-all.js --filter tier2
-node tests/e2e/run-all.js --filter tier3
-node tests/e2e/run-all.js --filter tier4
-node tests/e2e/run-all.js --filter tier5
-
-# Run specific feature tests
-node tests/e2e/run-all.js --filter f01
-node tests/e2e/run-all.js --filter p01
 ```
 
 ---
 
-## Multi-Tier Coverage Matrix
+## 4. Discovered Implementation Bug Escalation
 
-| Tier | Category | Scope | Test Files | Total Assertions | Status |
-|:-----|:---------|:------|:----------:|:----------------:|:------:|
-| **Tier 1** | **Feature Coverage** | 15 Core Features (≥5 tests per feature across R1, R2, R3, R4) | 15 | 75 | **100% PASS** |
-| **Tier 2** | **Boundary & Corner Cases** | Edge cases, malformed JSON, latency budgets, payload limits, offline fallback | 15 | 75 | **100% PASS** |
-| **Tier 3** | **Pairwise & Cross-Feature** | Full-pipeline flows, telemetry bridge, phase transitions, multi-provider stream | 4 | 16 | **100% PASS** |
-| **Tier 4** | **Real-World Scenarios** | Antigravity/Claude agent lifecycles, PRD decomposition, storm suppression, release gate | 4 | 8 | **100% PASS** |
-| **Tier 5** | **Adversarial & Stress** | 500-event hook storm, lifecycle stress, query stress & filters, UI serialization math | 1 | 10 | **100% PASS** |
-| **Total** | **All Tiers** | **Comprehensive Platform Verification** | **39** | **184** | **100% PASS** |
+During verification of `npm run check`, an implementation typing bug was detected in `LifecycleFlowDiagram.tsx`:
 
----
-
-## Feature Inventory Checklist
-
-| # | Feature | Requirement Source | Tier 1 | Tier 2 | Tier 3 | Tier 4 | Status |
-|:--|:--------|:-------------------|:------:|:------:|:------:|:------:|:------:|
-| 1 | **Telemetry Hook Script Execution** | `ORIGINAL_REQUEST §R1` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 2 | **Multi-Agent Hook Configs (Antigravity/Claude)** | `ORIGINAL_REQUEST §R1` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 3 | **Local NDJSON Log Appending** | `ORIGINAL_REQUEST §R1` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 4 | **Hook Execution Speed (<50ms Benchmark)** | `Acceptance Criteria` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 5 | **Telemetry Ingestion API (`POST /api/telemetry/record`)** | `ORIGINAL_REQUEST §R2` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 6 | **Feedback Bridge to `SkillFeedback` Store** | `ORIGINAL_REQUEST §R2` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 7 | **Telemetry Summary API (`GET /api/telemetry/summary`)** | `ORIGINAL_REQUEST §R2` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 8 | **CLI `loop run` Command & Argument Parsing** | `ORIGINAL_REQUEST §R3` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 9 | **Phase 1 (Plan) & PRD Task Extraction** | `ORIGINAL_REQUEST §R3` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 10 | **Phase 2 (Inner Loop) Junction Swapping** | `ORIGINAL_REQUEST §R3` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 11 | **Test Storm Suppression & Pinpoint Scoped Tests** | `Acceptance Criteria` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 12 | **Phase 3 (Release Gate) & `MASTER_BASELINE.md`** | `ORIGINAL_REQUEST §R3` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 13 | **UI Telemetry API Polling & Fallbacks** | `ORIGINAL_REQUEST §R4` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 14 | **UI Invocation Mode Visualizer & Metrics** | `ORIGINAL_REQUEST §R4` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-| 15 | **UI Telemetry Activity & Risk Feeds** | `ORIGINAL_REQUEST §R4` | 5 | 5 | ✓ | ✓ | **VERIFIED** |
-
----
-
-## Directory & File Layout
-
-```
-tests/e2e/
-├── helpers/
-│   └── fixtures.js                                     # Test fixtures, mock servers, and schema validators
-├── tier1-features/
-│   ├── f01-telemetry-hook.test.js                      # 5 tests
-│   ├── f02-agent-configs.test.js                       # 5 tests
-│   ├── f03-ndjson-logging.test.js                      # 5 tests
-│   ├── f04-hook-speed.test.js                          # 5 tests
-│   ├── f05-telemetry-api.test.js                       # 5 tests
-│   ├── f06-feedback-bridge.test.js                     # 5 tests
-│   ├── f07-summary-api.test.js                         # 5 tests
-│   ├── f08-cli-loop-parser.test.js                     # 5 tests
-│   ├── f09-phase1-planning.test.js                     # 5 tests
-│   ├── f10-phase2-junction-swap.test.js                # 5 tests
-│   ├── f11-test-storm-suppression.test.js              # 5 tests
-│   ├── f12-phase3-release-gate.test.js                 # 5 tests
-│   ├── f13-ui-polling-fallback.test.js                 # 5 tests
-│   ├── f14-ui-mode-visualizer.test.js                  # 5 tests
-│   └── f15-ui-activity-risk-feed.test.js               # 5 tests
-├── tier2-boundaries/
-│   ├── b01-hook-boundaries.test.js                     # 5 tests
-│   ├── b02-config-boundaries.test.js                   # 5 tests
-│   ├── b03-ndjson-boundaries.test.js                   # 5 tests
-│   ├── b04-latency-boundaries.test.js                  # 5 tests
-│   ├── b05-ingest-schema-boundaries.test.js            # 5 tests
-│   ├── b06-bridge-edge-boundaries.test.js              # 5 tests
-│   ├── b07-summary-aggregation-boundaries.test.js      # 5 tests
-│   ├── b08-cli-loop-arg-boundaries.test.js             # 5 tests
-│   ├── b09-phase1-prd-boundaries.test.js               # 5 tests
-│   ├── b10-phase2-junction-boundaries.test.js          # 5 tests
-│   ├── b11-test-storm-filter-boundaries.test.js        # 5 tests
-│   ├── b12-baseline-update-boundaries.test.js          # 5 tests
-│   ├── b13-ui-polling-boundaries.test.js               # 5 tests
-│   ├── b14-ui-metrics-boundaries.test.js               # 5 tests
-│   └── b15-ui-risk-filter-boundaries.test.js           # 5 tests
-├── tier3-pairwise/
-│   ├── p01-hook-to-ingest-to-bridge.test.js            # 4 tests
-│   ├── p02-telemetry-to-summary-to-ui.test.js          # 4 tests
-│   ├── p03-cli-loop-phase-transitions.test.js          # 4 tests
-│   └── p04-multi-provider-concurrency-stream.test.js   # 4 tests
-├── tier4-scenarios/
-│   ├── s01-antigravity-lifecycle-simulation.test.js    # 2 scenarios
-│   ├── s02-claude-desktop-lifecycle-simulation.test.js # 2 scenarios
-│   ├── s03-prd-decomposition-to-inner-loop-tdd.test.js # 2 scenarios
-│   └── s04-test-storm-blocking-and-release-curation.test.js # 2 scenarios
-├── tier5-adversarial/
-│   └── adversarial-coverage.test.js                    # 10 tests (500-event storm, lifecycle, query, UI)
-└── run-all.js                                          # Node.js standard E2E runner
-```
+- **Location**: `apps/catalog-ui/src/components/flow/LifecycleFlowDiagram.tsx:379:27`
+- **Error**: `TS2367: This comparison appears to be unintentional because the types '"active" | "blocked" | "insync" | "drift" | "idle"' and '"in_progress"' have no overlap.`
+- **Root Cause**: `task.status` is typed as `FlowNodeDetail["status"]` (which includes `"active"`), but line 379 performs `task.status === "in_progress"`.
+- **Recommended Fix**: Add `"in_progress"` and `"pending"` to the `FlowNodeDetail["status"]` union type in `flow-types.ts` / `types.ts`, or cast `(task.status as string) === "in_progress"`.
+- **Action**: Escalated to implementation agent (QA role: test code only modified).

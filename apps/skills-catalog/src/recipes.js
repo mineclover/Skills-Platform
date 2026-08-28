@@ -6,7 +6,7 @@ const { createProjectPlan, resolveProjectSelection } = require("./catalog-workfl
 const { getRegistrySkills, importGitSource, listRegistrySkills, loadRegistry } = require("./registry");
 const { updateSkillProfile } = require("./skill-management");
 
-async function exportRecipe({ catalogRoot, registryRoot, projectId, presetId, name, description }) {
+async function exportRecipe({ catalogRoot, registryRoot, projectId, presetId, name, description, hooks, projectPath }) {
   const [catalog, registry] = await Promise.all([loadCatalog(catalogRoot), loadRegistry(registryRoot)]);
 
   let targetPresets = [];
@@ -90,6 +90,16 @@ async function exportRecipe({ catalogRoot, registryRoot, projectId, presetId, na
     default_preset_version: p.default_preset_version,
   }));
 
+  let exportHooks = hooks;
+  if (!exportHooks && projectPath) {
+    try {
+      const { listHooks } = require("./hooks-manager");
+      exportHooks = listHooks({ projectPath });
+    } catch {
+      exportHooks = undefined;
+    }
+  }
+
   const recipeName = name || (presetId ? `Recipe for ${presetId}` : projectId ? `Recipe for ${projectId}` : "Catalog Skills Recipe");
 
   return createSkillRecipe({
@@ -99,6 +109,7 @@ async function exportRecipe({ catalogRoot, registryRoot, projectId, presetId, na
     skills: recipeSkills,
     presets: recipePresets,
     projects: recipeProjects,
+    hooks: exportHooks,
   });
 }
 
@@ -136,6 +147,7 @@ async function inspectRecipe({ recipePath, recipeContent }) {
       skills_count: recipe.skills?.length ?? 0,
       presets_count: recipe.presets?.length ?? 0,
       projects_count: recipe.projects?.length ?? 0,
+      hooks_count: recipe.hooks?.length ?? 0,
       by_invocation_mode: byInvocationMode,
       by_artifact_type: byArtifactType,
     },
@@ -152,6 +164,7 @@ async function inspectRecipe({ recipePath, recipeContent }) {
       skills_count: p.skills?.length ?? 0,
     })),
     projects: recipe.projects ?? [],
+    hooks: recipe.hooks ?? [],
   };
 }
 
@@ -322,12 +335,36 @@ async function applyRecipe({
     }
   }
 
+  const hookResults = [];
+  let hooksSyncResult = null;
+  if (Array.isArray(recipe.hooks) && recipe.hooks.length > 0) {
+    const hooksTarget = projectPath
+      ? path.resolve(projectPath)
+      : catalogRoot
+        ? path.resolve(catalogRoot, "..")
+        : process.cwd();
+    const { registerHook, compileProviderConfigs } = require("./hooks-manager");
+    for (const hook of recipe.hooks) {
+      const registered = registerHook({ projectPath: hooksTarget, hook, sync: false });
+      hookResults.push({
+        id: registered.id,
+        name: registered.name,
+        event: registered.event,
+        enabled: registered.enabled,
+        priority: registered.priority,
+      });
+    }
+    hooksSyncResult = compileProviderConfigs({ projectPath: hooksTarget });
+  }
+
   return {
     recipe_id: recipe.recipe_id,
     name: recipe.name,
     sources_imported: sourceResults,
     presets_reconciled: presetResults,
     delivery: deliveryResult,
+    hooks_applied: hookResults,
+    hooks_synced: hooksSyncResult,
   };
 }
 

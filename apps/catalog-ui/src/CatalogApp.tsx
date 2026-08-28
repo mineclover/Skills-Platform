@@ -14,6 +14,8 @@ import { ReviewQueue, SourceChangeQueue } from "./components/ReviewQueue";
 import { SideNavigation } from "./components/SideNavigation";
 import { SkillWorkspace } from "./components/SkillWorkspace";
 import { TemplateWorkspace } from "./components/TemplateWorkspace";
+import { HookWorkspace } from "./components/HookWorkspace";
+import { FlowStudioCanvas } from "./components/flow/FlowStudioCanvas";
 import {
   calculateProjectStatus,
   ProjectStatusPill,
@@ -1073,6 +1075,16 @@ export function CatalogApp() {
             catalogSkills={catalogSkills}
             selectedProjectId={selectedProjectId}
             onSelectProject={setSelectedProjectId}
+          />
+        ) : activePage === "Governance" ? (
+          <HookWorkspace
+            projectPath={projects.find((p) => p.id === selectedProjectId)?.project_path ?? undefined}
+            providerId={activeProviderId}
+          />
+        ) : activePage === "Flow Studio" ? (
+          <FlowStudioCanvas
+            providerId={activeProviderId}
+            projectPath={projects.find((p) => p.id === selectedProjectId)?.project_path ?? undefined}
           />
         ) : (
           <>

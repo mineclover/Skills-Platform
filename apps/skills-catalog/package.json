@@ -8,7 +8,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit && node --check src/index.js",
-    "test": "node --test"
+    "test": "node --test --test-concurrency=1"
   },
   "dependencies": {
     "@skills-platform/contracts": "*"

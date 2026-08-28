@@ -480,6 +480,7 @@ export interface SkillRecipe {
   skills: RecipeSkill[];
   presets: RecipePreset[];
   projects?: RecipeProjectBinding[];
+  hooks?: HookDefinition[];
 }
 
 // Standard Hook Event Taxonomy & Contract Types

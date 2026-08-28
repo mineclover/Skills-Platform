@@ -11,4 +11,4 @@ coverage/
 !.skills-platform/registry/
 skills/
 *.tsbuildinfo
-
+.agents/

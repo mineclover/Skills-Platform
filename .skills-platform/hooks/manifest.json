@@ -1,7 +1,122 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-27T22:49:39.364Z",
+  "updated_at": "2026-08-28T12:52:44.951Z",
   "hooks": [
+    {
+      "id": "secret-leak-guard",
+      "name": "Secret Leak Guard",
+      "event": "pre_tool_use",
+      "description": "Detects and blocks API keys, private tokens, and credentials in commands and payloads.",
+      "enabled": true,
+      "matcher": "run_command|write_to_file|replace_file_content|send_message|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/secret-leak-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 5,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "metadata": {
+        "system": true,
+        "category": "security"
+      }
+    },
+    {
+      "id": "destructive-command-blocker",
+      "name": "Destructive Command Blocker",
+      "event": "pre_tool_use",
+      "description": "Blocks catastrophic shell commands, destructive file deletions, and database wipes.",
+      "enabled": true,
+      "matcher": "run_command",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/destructive-command-blocker.js",
+        "timeout_ms": 5000
+      },
+      "priority": 10,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "metadata": {
+        "system": true,
+        "category": "safety"
+      }
+    },
+    {
+      "id": "context-budget-guard",
+      "name": "Context Budget Guard",
+      "event": "pre_tool_use",
+      "description": "Enforces 80k token density budget to prevent excessive file writes and context bloat.",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content|run_command|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/context-budget-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 15,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "metadata": {
+        "system": true,
+        "category": "governance"
+      }
+    },
+    {
+      "id": "scope-boundary-enforcer",
+      "name": "Scope Boundary Enforcer",
+      "event": "post_tool_use",
+      "description": "Audits file modifications against active topic scope and detects out-of-bounds mutations.",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/scope-boundary-enforcer.js",
+        "timeout_ms": 5000
+      },
+      "priority": 20,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "metadata": {
+        "system": true,
+        "category": "governance"
+      }
+    },
+    {
+      "id": "subagent-recursion-limiter",
+      "name": "Subagent Recursion Limiter",
+      "event": "pre_tool_use",
+      "description": "Enforces recursion depth and concurrency ceilings on subagent invocations.",
+      "enabled": true,
+      "matcher": "invoke_subagent|send_message",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/subagent-recursion-limiter.js",
+        "timeout_ms": 5000
+      },
+      "priority": 25,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "metadata": {
+        "system": true,
+        "category": "governance"
+      }
+    },
     {
       "id": "telemetry-collector",
       "name": "Universal Telemetry Collector",

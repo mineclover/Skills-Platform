@@ -229,6 +229,21 @@ export function validateSkillRecipe(recipe: unknown): ValidationResult {
     });
   }
 
+  if (r.hooks !== undefined) {
+    if (!Array.isArray(r.hooks)) {
+      issues.push({ field: "hooks", message: "must be an array" });
+    } else {
+      r.hooks.forEach((hook: any, index: number) => {
+        const hookValidation = validateHookDefinition(hook);
+        if (!hookValidation.valid) {
+          hookValidation.issues.forEach((issue) => {
+            issues.push({ field: `hooks[${index}].${issue.field}`, message: issue.message });
+          });
+        }
+      });
+    }
+  }
+
   return { valid: issues.length === 0, issues };
 }
 
@@ -244,6 +259,7 @@ export function createSkillRecipe(recipe: Partial<SkillRecipe> & { name: string;
     skills: recipe.skills ?? [],
     presets: recipe.presets ?? [],
     projects: recipe.projects ?? [],
+    hooks: recipe.hooks,
   };
   const validation = validateSkillRecipe(result);
   if (!validation.valid) {

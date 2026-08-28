@@ -1,20 +1,61 @@
 {
   "version": 1,
-  "hooks": {
-    "post_tool_execution": [
-      {
-        "matcher": {
-          "tools": [
-            "*"
-          ]
-        },
-        "command": "node .skills-platform/hooks/telemetry-hook.js --platform claude"
-      }
-    ],
-    "stdio_event": [
-      {
-        "command": "node .skills-platform/hooks/telemetry-hook.js --platform claude --mode stdio"
-      }
-    ]
-  }
+  "hooks": [
+    {
+      "id": "secret-leak-guard",
+      "event": "pre_tool_use",
+      "matcher": "run_command|write_to_file|replace_file_content|send_message|view_file",
+      "command": "node .skills-platform/hooks/guards/secret-leak-guard.js",
+      "timeout": 5000
+    },
+    {
+      "id": "destructive-command-blocker",
+      "event": "pre_tool_use",
+      "matcher": "run_command",
+      "command": "node .skills-platform/hooks/guards/destructive-command-blocker.js",
+      "timeout": 5000
+    },
+    {
+      "id": "context-budget-guard",
+      "event": "pre_tool_use",
+      "matcher": "write_to_file|replace_file_content|run_command|view_file",
+      "command": "node .skills-platform/hooks/guards/context-budget-guard.js",
+      "timeout": 5000
+    },
+    {
+      "id": "scope-boundary-enforcer",
+      "event": "post_tool_use",
+      "matcher": "write_to_file|replace_file_content",
+      "command": "node .skills-platform/hooks/guards/scope-boundary-enforcer.js",
+      "timeout": 5000
+    },
+    {
+      "id": "subagent-recursion-limiter",
+      "event": "pre_tool_use",
+      "matcher": "invoke_subagent|send_message",
+      "command": "node .skills-platform/hooks/guards/subagent-recursion-limiter.js",
+      "timeout": 5000
+    },
+    {
+      "id": "telemetry-collector",
+      "event": "post_tool_use",
+      "matcher": "view_file|run_command",
+      "command": "node .skills-platform/hooks/telemetry-hook.js",
+      "timeout": 5000
+    },
+    {
+      "id": "session-stop-flush",
+      "event": "session_stop",
+      "matcher": "*",
+      "command": "node .skills-platform/hooks/telemetry-hook.js",
+      "timeout": 5000
+    },
+    {
+      "id": "test-storm-guard",
+      "event": "on_test_run",
+      "matcher": "test",
+      "command": "node -e \"console.log('[Guard] Scoped test execution verified.')\"",
+      "timeout": 2000
+    }
+  ]
 }

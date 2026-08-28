@@ -19,6 +19,7 @@
       "invocation_mode": "model_invoked",
       "source_id": "skills-platform-registry",
       "source_relative_path": "task-decomposer",
+      "content_digest": "7e7f6b059587970eaf59957754a72d3c03781697b0e1c2590ea90e5b132d4f21",
       "description": "Decompose user requirements into dependency-ordered atomic tasks with quality gates."
     },
     {
@@ -27,6 +28,7 @@
       "invocation_mode": "model_invoked",
       "source_id": "skills-platform-registry",
       "source_relative_path": "horizontal-topic-scanner",
+      "content_digest": "18d0af66255176a0de86d2e7f5d88ade6542fbac7ec35e8a48b82d97e88683ed",
       "description": "Scan system registry and blast radius to produce isolated topic handoffs without mutating code."
     }
   ],
@@ -54,5 +56,39 @@
       ]
     }
   ],
-  "projects": []
+  "projects": [],
+  "hooks": [
+    {
+      "id": "subagent-recursion-limiter",
+      "name": "Subagent Recursion Limiter",
+      "event": "pre_tool_use",
+      "description": "Enforces recursion depth and concurrency ceilings on subagent invocations.",
+      "enabled": true,
+      "matcher": "invoke_subagent|send_message",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/subagent-recursion-limiter.js",
+        "timeout_ms": 5000
+      },
+      "priority": 25,
+      "providers": ["antigravity", "claude", "codex"],
+      "metadata": { "system": true, "category": "governance" }
+    },
+    {
+      "id": "context-budget-guard",
+      "name": "Context Budget Guard",
+      "event": "pre_tool_use",
+      "description": "Enforces 80k token density budget to prevent excessive file writes and context bloat.",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content|run_command|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/context-budget-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 15,
+      "providers": ["antigravity", "claude", "codex"],
+      "metadata": { "system": true, "category": "governance" }
+    }
+  ]
 }

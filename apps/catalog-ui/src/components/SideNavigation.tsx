@@ -5,7 +5,9 @@ import {
   FileText,
   Layers,
   Settings,
+  Shield,
   Sparkles,
+  Workflow,
 } from "lucide-react";
 
 export interface NavItemDef {
@@ -35,6 +37,16 @@ export const navigation: NavItemDef[] = [
     label: "Recipes",
     icon: Layers,
     tooltip: "Recipe hub, export/import & multi-provider apply",
+  },
+  {
+    label: "Governance",
+    icon: Shield,
+    tooltip: "Hook Ecosystem, Guard Interceptors & Live Security Feed",
+  },
+  {
+    label: "Flow Studio",
+    icon: Workflow,
+    tooltip: "Visual Canvas, Lifecycle State Machine & Guard Simulation",
   },
 ];
 
