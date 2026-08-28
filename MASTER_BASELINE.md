@@ -128,3 +128,39 @@ Maintenance Control Plane (Skills Platform)
 ---
 *참조 결정 기록: ADR 0001 ~ ADR 0007 (Telemetry Hook Engine & Lifecycle Loop Architecture).*
 *시스템 유지보수 라이프사이클과 툴 정의 체계 (MLC) 정본 기준선 — Skills Platform Control Plane.*
+---
+
+## 7. 프로덕션 보안 가드 훅 & 쇼트서킷 엔진 (Production Guard Hook Engine)
+
+### 7.1 5대 빌트인 가드 훅 팩 (`.skills-platform/hooks/guards/`)
+1. **`secret-leak-guard.js` (P:5)**: AWS, OpenAI, Claude, GitHub, Google API 키 및 프라이빗 인증 정보 유출 감지 시 `pre_tool_use`에서 **도구 실행 즉각 차단**.
+2. **`destructive-command-blocker.js` (P:10)**: `rm -rf /`, PowerShell `Remove-Item -Recurse -Force`, `del /s /q`, `DROP TABLE`, 디스크 포맷 등 **파괴 명령어 차단**.
+3. **`context-budget-guard.js` (P:15)**: 80k 토큰 밀도(~320KB) 초과 거대 파일 생성 차단.
+4. **`scope-boundary-enforcer.js` (P:20)**: `VerticalTopicSpec.owned_files` 외의 파일 무단 수정 시 드리프트 경고 등록.
+5. **`subagent-recursion-limiter.js` (P:25)**: 서브에이전트 재귀 호출 깊이(Depth > 3) 및 동시 실행 수(> 4) 제한.
+
+### 7.2 듀얼 프로토콜 규격 (Dual Protocol Compatibility)
+* **Google Antigravity Proto**: `{ decision: "allow" }` / `{ decision: "deny", reason: "..." }`
+* **Claude / Codex / Platform Standard**: `{ allow: true }` / `{ allow: false, reason: "..." }`
+
+---
+
+## 8. Web UI Flow Studio & Governance Studio 시각화 캔버스
+
+### 8.1 4대 시각화 다이어그램 (`apps/catalog-ui/src/components/flow/`)
+1. **3-Phase Lifecycle Diagram**: 기획(Plan) $ightarrow$ Scoped Inner Loop(TDD) $ightarrow$ 릴리즈 게이트 상태 머신 및 Test Storm Shield 차단 애니메이션.
+2. **Hook Pipeline Graph**: 우선순위 기반 Pre-Tool 체인 및 Red Halt 노드 쇼트서킷 분기 다이어그램.
+3. **Fractal Context Tree**: $L_0 ightarrow L_1 ightarrow L_2$ 상대적 계층 드릴다운 및 Roll-Up 파티클 시각화.
+4. **Junction Delivery Map**: 프로바이더별 심볼릭 링크 전달 경로 및 드리프트 상태 맵.
+
+### 8.2 시뮬레이션 및 노드 인스펙터
+* **Node Detail Inspector**: 노드 클릭 시 토픽 계층, 타겟 테스트, 차단 사유, Diff 패치 표출.
+* **Flow Playback Controller**: 타임라인 스크러버 복기 및 1-Click 공격 시뮬레이션 패킷 애니메이션 (< 200ms).
+
+---
+
+## 9. 80k 정보 선별 압축 가이드라인 (3-Tier Condensation Rubric)
+
+* **Tier 1 (100% 원본 보존)**: `Topic ID`, `lineage_path`, 공개 AST 시그니처, 불변식, 1:1 타겟 테스트 파일.
+* **Tier 2 (구조적 축약)**: 전체 코드 $ightarrow$ 인터페이스 선언 + Diff 패치, 수십 턴 대화 $ightarrow$ 단일 결정 요약, 장황한 로그 $ightarrow$ 통과/실패 테이블.
+* **Tier 3 (완전 배제)**: 디버깅 잡음, Out-of-bounds 구현 상세, 중복 Lockfile.
