@@ -12,3 +12,5 @@ coverage/
 skills/
 *.tsbuildinfo
 .agents/
+
+.workspaces/
