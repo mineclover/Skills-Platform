@@ -350,7 +350,8 @@ async function run(argv) {
     if (area === "init") {
       const skillName = action ?? subject ?? flags.name;
       if (!skillName) throw new Error("skill init requires a skill name: skills-platform skill init <name>");
-      const targetDir = path.resolve(flags.out ?? flags.dir ?? path.join(process.cwd(), "skills", skillName));
+      const baseDir = flags.out ?? flags.dir ?? path.join(process.cwd(), "skills");
+      const targetDir = path.basename(baseDir) === skillName ? path.resolve(baseDir) : path.resolve(baseDir, skillName);
       await fs.mkdir(path.join(targetDir, "references"), { recursive: true });
       await fs.mkdir(path.join(targetDir, "examples"), { recursive: true });
       const scaffoldSkillMd = `---
