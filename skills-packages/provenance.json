@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-30T00:00:00.000Z",
+  "packages": [
+    {
+      "package_id": "platform-core",
+      "display_name": "Skills Platform Core",
+      "origin_type": "first_party",
+      "maintainer": "Skills Platform Team",
+      "description": "Core architectural standards, worktree lifecycle orchestration, and spec compilation",
+      "license": "Apache-2.0",
+      "skills_count": 4
+    },
+    {
+      "package_id": "antigravity-builtin",
+      "display_name": "Google Antigravity Builtin & Extensions",
+      "origin_type": "vendor_builtin",
+      "upstream_provider": "Google DeepMind / Antigravity Team",
+      "upstream_url": "https://antigravity.google/docs",
+      "description": "Official Antigravity CLI, teamwork multi-agent swarm, rules/hooks customization, and generative UI",
+      "license": "Proprietary / Builtin",
+      "skills_count": 6
+    },
+    {
+      "package_id": "skills-manager",
+      "display_name": "Skills Manager Control Plane Tools",
+      "origin_type": "first_party_app",
+      "maintainer": "Skills Manager Core Team",
+      "description": "Skills Manager desktop backend, Orca runtime bridge, testing conventions, and UI component kit",
+      "license": "Apache-2.0",
+      "skills_count": 5
+    },
+    {
+      "package_id": "shared-agents",
+      "display_name": "Shared Global Agent Skills",
+      "origin_type": "local_shared_pool",
+      "source_path": "~/.agents/skills",
+      "description": "Shared environment agent skills including computer-use, find-skills, and orchestration",
+      "license": "Custom / Internal",
+      "skills_count": 4
+    },
+    {
+      "package_id": "community-codex",
+      "display_name": "Community & Codex Development Skills",
+      "origin_type": "community_imported",
+      "spec_format": "Open Agent Skills Specification",
+      "upstream_sources": [
+        "https://developers.openai.com/codex/skills",
+        "https://agentskills.io/specification",
+        "https://github.com/mattpocock"
+      ],
+      "description": "Extensive community development skills for TDD, code review, refactoring, bug diagnosis, and architecture",
+      "license": "MIT / Apache-2.0",
+      "skills_count": 47
+    }
+  ]
+}
