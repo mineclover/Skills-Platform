@@ -18,6 +18,7 @@ import { HookPipelineGraph } from "./HookPipelineGraph";
 import { JunctionDeliveryMap } from "./JunctionDeliveryMap";
 import { LifecycleFlowDiagram } from "./LifecycleFlowDiagram";
 import { NodeDetailInspector } from "./NodeDetailInspector";
+import { ProcedureWorkspacesView } from "./ProcedureWorkspacesView";
 import {
   INITIAL_LIFECYCLE_TASKS,
   VIEW_MODE_DEFS,
@@ -128,8 +129,10 @@ export function FlowStudioCanvas({
                 <Zap size={16} />
               ) : mode.id === "fractal_tree" ? (
                 <Dna size={16} />
-              ) : (
+              ) : mode.id === "junction_map" ? (
                 <Link2 size={16} />
+              ) : (
+                <GitBranch size={16} />
               )}
               <span className="mode-tab-label">{mode.label}</span>
             </button>
@@ -157,8 +160,14 @@ export function FlowStudioCanvas({
             selectedNodeId={selectedNode?.id ?? null}
             onSelectNode={handleSelectNode}
           />
-        ) : (
+        ) : activeViewMode === "junction_map" ? (
           <JunctionDeliveryMap
+            selectedNodeId={selectedNode?.id ?? null}
+            onSelectNode={handleSelectNode}
+          />
+        ) : (
+          <ProcedureWorkspacesView
+            projectPath={projectPath}
             selectedNodeId={selectedNode?.id ?? null}
             onSelectNode={handleSelectNode}
           />
@@ -166,11 +175,13 @@ export function FlowStudioCanvas({
       </div>
 
       {/* Bottom Docked Simulation Playback Controller */}
-      <FlowPlaybackController
-        onAttackTrigger={handleAttackTrigger}
-        onReset={handleReset}
-        activeHaltedNodeId={activeHaltedNodeId}
-      />
+      {activeViewMode !== "procedure_workspaces" && (
+        <FlowPlaybackController
+          onAttackTrigger={handleAttackTrigger}
+          onReset={handleReset}
+          activeHaltedNodeId={activeHaltedNodeId}
+        />
+      )}
 
       {/* Slide-Over Node Detail Inspector Drawer */}
       <NodeDetailInspector

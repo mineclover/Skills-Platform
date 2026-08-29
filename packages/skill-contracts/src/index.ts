@@ -8,6 +8,8 @@ import {
   DESIRED_STATES,
   INVOCATION_MODES,
   PLAN_MODES,
+  PROCEDURE_TYPES,
+  PROCEDURE_WORKSPACE_STATUSES,
   type ActivationOperation,
   type ActivationPlan,
   type ActivationPlanDistribution,
@@ -33,6 +35,11 @@ import {
   type ConcreteBehavioralInvariants,
   type TargetedVerificationMechanism,
   type VerticalTopicSpec,
+  type ProcedureType,
+  type ProcedureWorkspaceStatus,
+  type ResponsibilityInvariants,
+  type ProcedureWorkspace,
+  type CreateProcedureWorkspaceOptions,
 } from "./types";
 
 export * from "./types";
@@ -533,5 +540,117 @@ ${strict}
 ${criteria}
 `;
 }
+
+export const PROCEDURE_WORKSPACE_SCHEMA_VERSION = 1;
+
+export function validateProcedureWorkspace(workspace: unknown): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  if (!workspace || typeof workspace !== "object" || Array.isArray(workspace)) {
+    return { valid: false, issues: [{ field: "workspace", message: "must be an object" }] };
+  }
+
+  const w = workspace as Record<string, any>;
+  if (w.schema_version !== PROCEDURE_WORKSPACE_SCHEMA_VERSION) {
+    issues.push({ field: "schema_version", message: `must equal ${PROCEDURE_WORKSPACE_SCHEMA_VERSION}` });
+  }
+
+  requiredString(w.workspace_id, "workspace_id", issues);
+
+  if (!w.procedure_type || !PROCEDURE_TYPES.has(w.procedure_type)) {
+    issues.push({
+      field: "procedure_type",
+      message: `must be one of ${[...PROCEDURE_TYPES].join(", ")}`,
+    });
+  }
+
+  requiredString(w.git_branch, "git_branch", issues);
+  requiredString(w.git_worktree_path, "git_worktree_path", issues);
+
+  if (!w.status || !PROCEDURE_WORKSPACE_STATUSES.has(w.status)) {
+    issues.push({
+      field: "status",
+      message: `must be one of ${[...PROCEDURE_WORKSPACE_STATUSES].join(", ")}`,
+    });
+  }
+
+  requiredString(w.created_at, "created_at", issues);
+
+  if (w.completed_at !== undefined && w.completed_at !== null) {
+    if (typeof w.completed_at !== "string" || w.completed_at.trim() === "") {
+      issues.push({ field: "completed_at", message: "must be a non-empty string or null" });
+    }
+  }
+
+  if (!w.responsibility_invariants || typeof w.responsibility_invariants !== "object" || Array.isArray(w.responsibility_invariants)) {
+    issues.push({ field: "responsibility_invariants", message: "must be an object" });
+  } else {
+    const inv = w.responsibility_invariants;
+    if (inv.target_test_file !== undefined && inv.target_test_file !== null) {
+      if (typeof inv.target_test_file !== "string" || inv.target_test_file.trim() === "") {
+        issues.push({ field: "responsibility_invariants.target_test_file", message: "must be a non-empty string" });
+      }
+    }
+    if (!Array.isArray(inv.owned_files)) {
+      issues.push({ field: "responsibility_invariants.owned_files", message: "must be an array" });
+    }
+    if (!Array.isArray(inv.prohibited_actions)) {
+      issues.push({ field: "responsibility_invariants.prohibited_actions", message: "must be an array" });
+    }
+    if (!Array.isArray(inv.acceptance_criteria)) {
+      issues.push({ field: "responsibility_invariants.acceptance_criteria", message: "must be an array" });
+    }
+  }
+
+  if (!Array.isArray(w.active_skills)) {
+    issues.push({ field: "active_skills", message: "must be an array" });
+  }
+
+  if (!Array.isArray(w.active_guards)) {
+    issues.push({ field: "active_guards", message: "must be an array" });
+  }
+
+  if (w.metadata !== undefined && w.metadata !== null) {
+    if (typeof w.metadata !== "object" || Array.isArray(w.metadata)) {
+      issues.push({ field: "metadata", message: "must be an object" });
+    }
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
+export function createProcedureWorkspace(options: CreateProcedureWorkspaceOptions): ProcedureWorkspace {
+  const workspaceId = options.workspace_id ?? `ws_${randomUUID()}`;
+  const nowStr = options.created_at ?? (options.now ? options.now.toISOString() : new Date().toISOString());
+
+  const workspace: ProcedureWorkspace = {
+    schema_version: PROCEDURE_WORKSPACE_SCHEMA_VERSION,
+    workspace_id: workspaceId,
+    procedure_type: options.procedure_type,
+    git_branch: options.git_branch ?? `worktree/${workspaceId}`,
+    git_worktree_path: options.git_worktree_path ?? `.workspaces/${workspaceId}`,
+    responsibility_invariants: {
+      target_test_file: options.responsibility_invariants?.target_test_file,
+      owned_files: options.responsibility_invariants?.owned_files ?? [],
+      prohibited_actions: options.responsibility_invariants?.prohibited_actions ?? [],
+      acceptance_criteria: options.responsibility_invariants?.acceptance_criteria ?? [],
+    },
+    active_skills: options.active_skills ?? [],
+    active_guards: options.active_guards ?? [],
+    status: options.status ?? "pending",
+    created_at: nowStr,
+    completed_at: options.completed_at ?? null,
+    metadata: options.metadata ?? {},
+  };
+
+  const validation = validateProcedureWorkspace(workspace);
+  if (!validation.valid) {
+    const error: any = new Error("Procedure workspace is invalid");
+    error.issues = validation.issues;
+    throw error;
+  }
+
+  return workspace;
+}
+
 
 

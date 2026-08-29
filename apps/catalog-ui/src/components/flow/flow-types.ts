@@ -1,6 +1,17 @@
-import type { InvocationMode } from "../../types";
+import type {
+  InvocationMode,
+  ProcedureType,
+  ProcedureWorkspaceStatus,
+  ResponsibilityInvariants,
+  ProcedureWorkspace,
+} from "../../types";
 
-export type FlowViewMode = "lifecycle" | "hook_pipeline" | "fractal_tree" | "junction_map";
+export type FlowViewMode =
+  | "lifecycle"
+  | "hook_pipeline"
+  | "fractal_tree"
+  | "junction_map"
+  | "procedure_workspaces";
 
 export type TopicLifecycleState = "OPEN" | "IN_PROGRESS" | "VERIFIED" | "REOPENED" | "CLOSED";
 
@@ -87,6 +98,21 @@ export interface FlowNodeDetail {
     managedCount?: number;
     activePreset?: string;
   };
+
+  worktree?: {
+    workspaceId: string;
+    procedureType: ProcedureType;
+    gitBranch: string;
+    gitWorktreePath: string;
+    status: ProcedureWorkspaceStatus;
+    invariants: ResponsibilityInvariants;
+    activeSkills: string[];
+    activeGuards: string[];
+    createdAt: string;
+    completedAt?: string | null;
+    commitHash?: string | null;
+    metadata?: Record<string, any>;
+  };
 }
 
 export interface FlowEdge {
@@ -162,6 +188,12 @@ export const VIEW_MODE_DEFS: Array<{
     label: "Symlink Junction Delivery",
     iconName: "Link2",
     description: "Multi-provider delivery paths (.agents, .claude, skills) with live sync & drift monitor",
+  },
+  {
+    id: "procedure_workspaces",
+    label: "Procedure Workspaces & Merge Queue",
+    iconName: "GitBranch",
+    description: "Isolated Git Worktrees, procedure invariants & sequential merge queue timeline",
   },
 ];
 

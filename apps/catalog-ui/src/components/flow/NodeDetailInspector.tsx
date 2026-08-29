@@ -17,11 +17,14 @@ import {
   ShieldAlert,
   Sparkles,
   Terminal,
+  Trash2,
   X,
+  XCircle,
   Zap,
 } from "lucide-react";
 import { copyText } from "../../api/catalog-api";
 import type { FlowNodeDetail } from "./flow-types";
+import { getProcedureBadgeColor } from "./ProcedureWorkspaceVisualizer";
 
 interface NodeDetailInspectorProps {
   node: FlowNodeDetail | null;
@@ -363,6 +366,103 @@ export function NodeDetailInspector({ node, isOpen, onClose }: NodeDetailInspect
                   <span>Active Recipe:</span>
                   <span>{node.junction.activePreset ?? "mlc-scoped-inner-loop"}</span>
                 </div>
+              </div>
+            </section>
+          ) : null}
+
+          {/* Procedure Worktree Details (If Worktree Node) */}
+          {node.worktree ? (
+            <section className="inspector-section">
+              <div className="section-heading-row">
+                <GitBranch size={16} className="mint" />
+                <h3 className="section-heading">Procedure Worktree Specifications</h3>
+              </div>
+
+              <div className="worktree-spec-card">
+                <div className="spec-item-row">
+                  <span className="spec-k">Procedure Type:</span>
+                  <span className={`procedure-badge ${getProcedureBadgeColor(node.worktree.procedureType).badgeClass}`}>
+                    {node.worktree.procedureType}
+                  </span>
+                </div>
+
+                <div className="spec-item-row">
+                  <span className="spec-k">Worktree Branch:</span>
+                  <code className="spec-code">{node.worktree.gitBranch}</code>
+                  <button
+                    type="button"
+                    className="copy-chip-btn"
+                    onClick={() => handleCopy(node.worktree!.gitBranch, "worktreeBranch")}
+                  >
+                    {copiedTarget === "worktreeBranch" ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                </div>
+
+                <div className="spec-item-row">
+                  <span className="spec-k">Filesystem Path:</span>
+                  <code className="spec-code">{node.worktree.gitWorktreePath}</code>
+                  <button
+                    type="button"
+                    className="copy-chip-btn"
+                    onClick={() => handleCopy(node.worktree!.gitWorktreePath, "worktreePath")}
+                  >
+                    {copiedTarget === "worktreePath" ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                </div>
+
+                {node.worktree.invariants.target_test_file && (
+                  <div className="spec-item-row">
+                    <span className="spec-k">Target Test File:</span>
+                    <code className="spec-code test-code">{node.worktree.invariants.target_test_file}</code>
+                  </div>
+                )}
+
+                {node.worktree.invariants.owned_files.length > 0 && (
+                  <div className="spec-list-block">
+                    <span className="spec-k">Owned Files ({node.worktree.invariants.owned_files.length}):</span>
+                    <div className="files-chip-list">
+                      {node.worktree.invariants.owned_files.map((file, idx) => (
+                        <span key={idx} className="file-chip">{file}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {node.worktree.invariants.prohibited_actions.length > 0 && (
+                  <div className="spec-list-block">
+                    <span className="spec-k">Prohibited Actions:</span>
+                    <div className="prohibited-chip-list">
+                      {node.worktree.invariants.prohibited_actions.map((act, idx) => (
+                        <span key={idx} className="prohibited-chip">{act}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="spec-list-block">
+                  <span className="spec-k">Active Skills Mounted:</span>
+                  <div className="roster-chips">
+                    {node.worktree.activeSkills.map((s, idx) => (
+                      <span key={idx} className="skill-roster-pill">{s}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="spec-list-block">
+                  <span className="spec-k">Active Guards Mounted:</span>
+                  <div className="roster-chips">
+                    {node.worktree.activeGuards.map((g, idx) => (
+                      <span key={idx} className="guard-roster-pill">{g}</span>
+                    ))}
+                  </div>
+                </div>
+
+                {node.worktree.commitHash && (
+                  <div className="spec-item-row">
+                    <span className="spec-k">Merged Commit Hash:</span>
+                    <code className="commit-code">{node.worktree.commitHash}</code>
+                  </div>
+                )}
               </div>
             </section>
           ) : null}

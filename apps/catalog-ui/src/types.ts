@@ -20,6 +20,11 @@ import type {
   HookManifest,
   HookHandler,
   StandardHookEvent,
+  ProcedureType,
+  ProcedureWorkspaceStatus,
+  ResponsibilityInvariants,
+  ProcedureWorkspace,
+  CreateProcedureWorkspaceOptions,
 } from "@skills-platform/contracts";
 
 export type Scope =
@@ -384,6 +389,80 @@ export interface SecurityFeedEvent {
   latency_ms?: number;
 }
 
+export interface VerifyWorkspaceResult {
+  verified: boolean;
+  workspace_id?: string;
+  test_output?: string;
+  invariant_checks?: Record<string, boolean>;
+  issues?: Array<{ field: string; message: string }>;
+  error?: string;
+}
+
+export interface MergeWorkspaceResult {
+  merged: boolean;
+  workspace_id?: string;
+  commit_hash?: string;
+  status?: string;
+  error?: string;
+  code?: string;
+}
+
+export interface PruneWorkspaceResult {
+  pruned: boolean;
+  workspace_id?: string;
+  completed_at?: string;
+  error?: string;
+}
+
+export interface DiscardWorkspaceResult {
+  discarded: boolean;
+  workspace_id?: string;
+  status?: string;
+  reason?: string;
+  error?: string;
+}
+
+export interface MergeQueueItem {
+  workspace_id: string;
+  task_id?: string;
+  dependencies: string[];
+  status: ProcedureWorkspaceStatus | "pending" | "in_verification" | "verified" | "merged" | "failed" | "discarded" | string;
+  position?: number;
+  enqueued_at?: string;
+  verified_at?: string | null;
+  merged_at?: string | null;
+  discarded_at?: string | null;
+  commit_hash?: string | null;
+  reason?: string | null;
+  procedure_type?: ProcedureType | null;
+}
+
+export interface MergeQueueStatus {
+  queue: MergeQueueItem[];
+  current?: MergeQueueItem | null;
+  pending?: MergeQueueItem[];
+  in_verification?: MergeQueueItem[];
+  verified?: MergeQueueItem[];
+  merged?: MergeQueueItem[];
+  failed?: MergeQueueItem[];
+  discarded?: MergeQueueItem[];
+}
+
+export interface ProcessQueueResult {
+  processed: Array<{
+    workspace_id: string;
+    success: boolean;
+    merged: boolean;
+    commit_hash?: string;
+    error?: string;
+  }>;
+  queue: MergeQueueItem[];
+  merged: MergeQueueItem[];
+  failed: MergeQueueItem[];
+  discarded: MergeQueueItem[];
+  pending: MergeQueueItem[];
+}
+
 export type {
   ArtifactType,
   InvocationMode,
@@ -406,6 +485,12 @@ export type {
   HookManifest,
   HookHandler,
   StandardHookEvent,
+  ProcedureType,
+  ProcedureWorkspaceStatus,
+  ResponsibilityInvariants,
+  ProcedureWorkspace,
+  CreateProcedureWorkspaceOptions,
 };
+
 
 

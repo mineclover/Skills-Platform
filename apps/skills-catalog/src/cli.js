@@ -62,6 +62,10 @@ const {
 const MULTI_VALUE_FLAGS = new Set([
   "skill", "use-when", "avoid-when", "tag", "domain", "work-scope",
   "maintainer", "provider", "runtime", "criterion",
+  "owned", "owned-file", "owned-files",
+  "prohibited", "prohibited-action", "prohibited-actions",
+  "acceptance", "acceptance-criterion", "acceptance-criteria",
+  "dependency", "dependencies", "guard",
 ]);
 
 function parseArguments(argv) {
@@ -98,6 +102,12 @@ function usage() {
     "  skills-catalog source review approve|reject <source-revision-id> --summary <text>",
     "  skills-catalog serve [--catalog <path>] [--registry <path>] [--host <host>] [--port <n>]",
     "  skills-catalog list [--registry <path>]",
+    "  skills-catalog workspace spawn --procedure <type> --task <id> --recipe <recipe_path>",
+    "      [--preset <preset_id>] [--test <target_test>] [--owned <file>]... [--prohibited <action>]... [--acceptance <crit>]...",
+    "  skills-catalog workspace list [--status <status>]",
+    "  skills-catalog workspace verify --task <id>",
+    "  skills-catalog workspace merge --task <id> [--force]",
+    "  skills-catalog workspace prune --task <id>",
     "  skills-catalog project add <id> --name <name> --path <path> --provider <id> [--delivery-root <path>] [--upstream-project-id <id>]",
     "  skills-catalog project list | project resolve <id> [--preset <id>] [--work-scope <tag>]...",
     "  skills-catalog project apply <id> [--confirm] [--preset <id>] [--work-scope <tag>]... [--copy]",
@@ -817,6 +827,163 @@ async function run(argv) {
       }
       return { valid: true, topic_id: raw.topic_id };
     }
+  }
+
+  if (command === "workspace") {
+    const [action, targetSubject] = positional.slice(1);
+    const projectPath = path.resolve(flags.project ?? flags.path ?? process.cwd());
+    const {
+      spawnProcedureWorkspace,
+      pruneProcedureWorkspace,
+      listProcedureWorkspaces,
+      getProcedureWorkspace,
+      verifyWorkspace,
+      mergeWorkspace,
+      enqueueWorkspace,
+      discardWorkspace,
+      getQueueStatus,
+    } = require(".");
+
+    if (action === "spawn") {
+      const taskId = flags.task ?? flags["task-id"] ?? flags.workspace ?? flags["workspace-id"] ?? targetSubject;
+      if (!taskId) {
+        throw new Error("workspace spawn requires --task <id>");
+      }
+      const procedureType = flags.procedure ?? flags["procedure-type"] ?? flags.type ?? "INNER_LOOP_TDD";
+      let recipeId = flags.recipe ?? flags["recipe-id"] ?? flags["recipe-path"];
+      let activeSkills = flags.skill ? (Array.isArray(flags.skill) ? flags.skill : [flags.skill]) : undefined;
+      let activeGuards = flags.guard ? (Array.isArray(flags.guard) ? flags.guard : [flags.guard]) : undefined;
+
+      if (recipeId) {
+        try {
+          const recipeFilePath = path.resolve(recipeId);
+          const st = await fs.stat(recipeFilePath);
+          if (st.isFile()) {
+            const rawRecipe = JSON.parse(await fs.readFile(recipeFilePath, "utf8"));
+            if (rawRecipe.recipe_id) recipeId = rawRecipe.recipe_id;
+            if (!activeSkills && Array.isArray(rawRecipe.skills)) {
+              activeSkills = rawRecipe.skills.map((s) => s.name || s.skill_name).filter(Boolean);
+            }
+          }
+        } catch {}
+      }
+
+      const ownedFiles = flags.owned
+        ? (Array.isArray(flags.owned) ? flags.owned : [flags.owned])
+        : flags["owned-files"]
+          ? (Array.isArray(flags["owned-files"]) ? flags["owned-files"] : [flags["owned-files"]])
+          : flags["owned-file"]
+            ? (Array.isArray(flags["owned-file"]) ? flags["owned-file"] : [flags["owned-file"]])
+            : [];
+
+      const prohibitedActions = flags.prohibited
+        ? (Array.isArray(flags.prohibited) ? flags.prohibited : [flags.prohibited])
+        : flags["prohibited-actions"]
+          ? (Array.isArray(flags["prohibited-actions"]) ? flags["prohibited-actions"] : [flags["prohibited-actions"]])
+          : flags["prohibited-action"]
+            ? (Array.isArray(flags["prohibited-action"]) ? flags["prohibited-action"] : [flags["prohibited-action"]])
+            : [];
+
+      const acceptanceCriteria = flags.acceptance
+        ? (Array.isArray(flags.acceptance) ? flags.acceptance : [flags.acceptance])
+        : flags["acceptance-criteria"]
+          ? (Array.isArray(flags["acceptance-criteria"]) ? flags["acceptance-criteria"] : [flags["acceptance-criteria"]])
+          : flags["acceptance-criterion"]
+            ? (Array.isArray(flags["acceptance-criterion"]) ? flags["acceptance-criterion"] : [flags["acceptance-criterion"]])
+            : [];
+
+      const targetTestFile = flags.test ?? flags["target-test"] ?? flags["target-test-file"];
+      const presetId = flags.preset ?? flags["preset-id"];
+
+      return await spawnProcedureWorkspace({
+        procedure_type: procedureType,
+        task_id: taskId,
+        recipe_id: recipeId,
+        preset_id: presetId,
+        target_test_file: targetTestFile,
+        owned_files: ownedFiles,
+        prohibited_actions: prohibitedActions,
+        acceptance_criteria: acceptanceCriteria,
+        project_path: projectPath,
+        active_skills: activeSkills,
+        active_guards: activeGuards,
+      });
+    }
+
+    if (action === "list") {
+      const status = flags.status ?? targetSubject;
+      return await listProcedureWorkspaces({
+        project_path: projectPath,
+        status,
+      });
+    }
+
+    if (action === "verify") {
+      const taskId = flags.task ?? flags["task-id"] ?? flags.workspace ?? flags["workspace-id"] ?? targetSubject;
+      if (!taskId) {
+        throw new Error("workspace verify requires --task <id>");
+      }
+      return await verifyWorkspace(taskId, {
+        project_path: projectPath,
+      });
+    }
+
+    if (action === "merge") {
+      const taskId = flags.task ?? flags["task-id"] ?? flags.workspace ?? flags["workspace-id"] ?? targetSubject;
+      if (!taskId) {
+        throw new Error("workspace merge requires --task <id>");
+      }
+      return await mergeWorkspace(taskId, {
+        project_path: projectPath,
+        force: flags.force === true,
+      });
+    }
+
+    if (action === "prune") {
+      const taskId = flags.task ?? flags["task-id"] ?? flags.workspace ?? flags["workspace-id"] ?? targetSubject;
+      if (!taskId) {
+        throw new Error("workspace prune requires --task <id>");
+      }
+      return await pruneProcedureWorkspace(taskId, {
+        project_path: projectPath,
+        delete_branch: flags["delete-branch"] !== false,
+      });
+    }
+
+    if (action === "enqueue") {
+      const taskId = flags.task ?? flags["task-id"] ?? flags.workspace ?? flags["workspace-id"] ?? targetSubject;
+      if (!taskId) {
+        throw new Error("workspace enqueue requires --task <id>");
+      }
+      const dependencies = flags.dependency
+        ? (Array.isArray(flags.dependency) ? flags.dependency : [flags.dependency])
+        : flags.dependencies
+          ? (Array.isArray(flags.dependencies) ? flags.dependencies : [flags.dependencies])
+          : [];
+      return await enqueueWorkspace(taskId, {
+        project_path: projectPath,
+        dependencies,
+      });
+    }
+
+    if (action === "discard") {
+      const taskId = flags.task ?? flags["task-id"] ?? flags.workspace ?? flags["workspace-id"] ?? targetSubject;
+      if (!taskId) {
+        throw new Error("workspace discard requires --task <id>");
+      }
+      return await discardWorkspace(taskId, {
+        project_path: projectPath,
+        reason: flags.reason,
+      });
+    }
+
+    if (action === "status" || action === "queue") {
+      return await getQueueStatus({
+        project_path: projectPath,
+      });
+    }
+
+    throw new Error(`Unknown workspace action: ${action}`);
   }
 
   throw new Error(usage());

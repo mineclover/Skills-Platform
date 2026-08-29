@@ -11,4 +11,6 @@ module.exports = {
   ...require("./skill-management"),
   ...require("./recipes"),
   ...require("./server"),
+  ...require("./workspace-manager"),
+  ...require("./sequential-merger"),
 };

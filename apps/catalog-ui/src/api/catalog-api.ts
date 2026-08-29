@@ -12,6 +12,18 @@ import type {
   TelemetryEvent,
   TelemetryQueryParams,
   TelemetrySummary,
+  ProcedureType,
+  ProcedureWorkspaceStatus,
+  ResponsibilityInvariants,
+  ProcedureWorkspace,
+  CreateProcedureWorkspaceOptions,
+  VerifyWorkspaceResult,
+  MergeWorkspaceResult,
+  PruneWorkspaceResult,
+  DiscardWorkspaceResult,
+  MergeQueueItem,
+  MergeQueueStatus,
+  ProcessQueueResult,
 } from "../types";
 
 export const catalogApi = import.meta.env.VITE_CATALOG_API?.replace(/\/$/, "") ?? "";
@@ -1177,5 +1189,652 @@ export async function fetchSecurityFeedApi(params?: {
 
   return { events: baseEvents.slice(0, params?.limit ?? 20) };
 }
+
+// ---------------------------------------------------------------------------
+// Procedure Workspaces & Sequential Merge Queue REST API Client & Mock State
+// ---------------------------------------------------------------------------
+
+export function createMockProcedureWorkspaces(): ProcedureWorkspace[] {
+  return [
+    {
+      schema_version: 1,
+      workspace_id: "ws-plan-01",
+      procedure_type: "PLANNING",
+      git_branch: "worktree/task-01-prd-decomp",
+      git_worktree_path: ".workspaces/task-01-prd-decomp",
+      responsibility_invariants: {
+        target_test_file: "apps/skills-catalog/test/lifecycle-loop.test.js",
+        owned_files: ["docs/PRD.md", "task-queue.json"],
+        prohibited_actions: ["modify_source_code", "npm test", "full_test_sweep"],
+        acceptance_criteria: [
+          "Extract requirements from PRD.md into atomic task-queue.json",
+          "Read-only filesystem access for source files",
+        ],
+      },
+      active_skills: ["planning", "spec-decomposition", "dependency-mapper"],
+      active_guards: ["read-only-source-guard", "context-budget-guard"],
+      status: "merged",
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      completed_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+      metadata: {
+        task_id: "task-01-prd-decomp",
+        commit_hash: "c8f2a1b",
+        author: "planner-agent",
+        description: "PRD decomposition & atomic task breakdown",
+      },
+    },
+    {
+      schema_version: 1,
+      workspace_id: "ws-tdd-02",
+      procedure_type: "INNER_LOOP_TDD",
+      git_branch: "worktree/task-02-flow-studio",
+      git_worktree_path: ".workspaces/task-02-flow-studio",
+      responsibility_invariants: {
+        target_test_file: "apps/catalog-ui/test/procedure-workspaces.test.js",
+        owned_files: [
+          "apps/catalog-ui/src/components/flow/",
+          "apps/catalog-ui/src/api/catalog-api.ts",
+        ],
+        prohibited_actions: ["npm test", "pytest", "jest", "modify_root_contracts"],
+        acceptance_criteria: [
+          "100% target test pass on procedure-workspaces.test.js",
+          "Strict isolated worktree boundary with scoped active skills",
+        ],
+      },
+      active_skills: ["tdd-inner-loop", "code-authoring", "pinpoint-test-runner"],
+      active_guards: ["test-storm-suppression-guard", "scope-boundary-guard"],
+      status: "verified",
+      created_at: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
+      completed_at: null,
+      metadata: {
+        task_id: "task-02-flow-studio",
+        dependencies: ["ws-plan-01"],
+        author: "implementer-agent",
+        description: "Flow Studio Visualizer & live merge timeline implementation",
+      },
+    },
+    {
+      schema_version: 1,
+      workspace_id: "ws-sec-03",
+      procedure_type: "SECURITY_AUDIT",
+      git_branch: "worktree/task-03-security-guard",
+      git_worktree_path: ".workspaces/task-03-security-guard",
+      responsibility_invariants: {
+        target_test_file: "test/security-audit.test.js",
+        owned_files: [
+          "packages/skill-contracts/src/",
+          "apps/skills-catalog/src/hooks-manager.js",
+        ],
+        prohibited_actions: ["bypass_secret_filter", "delete_audit_log", "disable_hooks"],
+        acceptance_criteria: [
+          "Zero secret leaks in command payloads",
+          "Sub-200ms guard interception latency with self-correct hints",
+        ],
+      },
+      active_skills: ["security-audit", "vulnerability-scanner", "hook-validator"],
+      active_guards: ["secret-leak-guard", "destructive-command-blocker"],
+      status: "in_verification",
+      created_at: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
+      completed_at: null,
+      metadata: {
+        task_id: "task-03-security-guard",
+        dependencies: ["ws-tdd-02"],
+        author: "security-specialist",
+        description: "Pre/post tool execution hooks & threat model verification",
+      },
+    },
+    {
+      schema_version: 1,
+      workspace_id: "ws-rel-04",
+      procedure_type: "RELEASE_GATE",
+      git_branch: "worktree/task-04-release-gate",
+      git_worktree_path: ".workspaces/task-04-release-gate",
+      responsibility_invariants: {
+        target_test_file: "tests/e2e/run-all.js",
+        owned_files: ["MASTER_BASELINE.md", "CHANGELOG.md", "package.json"],
+        prohibited_actions: ["skip_regression_tests", "force_push_main"],
+        acceptance_criteria: [
+          "All 5 E2E tiers pass 100%",
+          "MASTER_BASELINE.md compaction verified and signed off",
+        ],
+      },
+      active_skills: ["release-gate", "baseline-compaction", "e2e-orchestrator"],
+      active_guards: ["regression-gate-guard", "context-budget-guard"],
+      status: "pending",
+      created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+      completed_at: null,
+      metadata: {
+        task_id: "task-04-release-gate",
+        dependencies: ["ws-sec-03"],
+        author: "qa-agent",
+        description: "Release gate regression verification and documentation compaction",
+      },
+    },
+  ];
+}
+
+export function createMockMergeQueue(): MergeQueueStatus {
+  const queue: MergeQueueItem[] = [
+    {
+      workspace_id: "ws-plan-01",
+      task_id: "task-01-prd-decomp",
+      dependencies: [],
+      status: "merged",
+      position: 1,
+      enqueued_at: new Date(Date.now() - 1000 * 60 * 55).toISOString(),
+      verified_at: new Date(Date.now() - 1000 * 60 * 50).toISOString(),
+      merged_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+      commit_hash: "c8f2a1b",
+      procedure_type: "PLANNING",
+    },
+    {
+      workspace_id: "ws-tdd-02",
+      task_id: "task-02-flow-studio",
+      dependencies: ["ws-plan-01"],
+      status: "verified",
+      position: 2,
+      enqueued_at: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+      verified_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+      merged_at: null,
+      commit_hash: null,
+      procedure_type: "INNER_LOOP_TDD",
+    },
+    {
+      workspace_id: "ws-sec-03",
+      task_id: "task-03-security-guard",
+      dependencies: ["ws-tdd-02"],
+      status: "in_verification",
+      position: 3,
+      enqueued_at: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+      verified_at: null,
+      merged_at: null,
+      commit_hash: null,
+      procedure_type: "SECURITY_AUDIT",
+    },
+    {
+      workspace_id: "ws-rel-04",
+      task_id: "task-04-release-gate",
+      dependencies: ["ws-sec-03"],
+      status: "pending",
+      position: 4,
+      enqueued_at: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+      verified_at: null,
+      merged_at: null,
+      commit_hash: null,
+      procedure_type: "RELEASE_GATE",
+    },
+  ];
+
+  const pending = queue.filter((i) => i.status === "pending");
+  const in_verification = queue.filter((i) => i.status === "in_verification");
+  const verified = queue.filter((i) => i.status === "verified");
+  const merged = queue.filter((i) => i.status === "merged");
+  const failed = queue.filter((i) => i.status === "failed");
+  const discarded = queue.filter((i) => i.status === "discarded");
+
+  const mergedIds = new Set(merged.map((m) => m.workspace_id));
+  let current: MergeQueueItem | null = in_verification[0] ?? null;
+  if (!current) {
+    current =
+      verified.concat(pending).find((item) => item.dependencies.every((d) => mergedIds.has(d))) ??
+      null;
+  }
+
+  return {
+    queue,
+    current,
+    pending,
+    in_verification,
+    verified,
+    merged,
+    failed,
+    discarded,
+  };
+}
+
+let localWorkspacesMemory: ProcedureWorkspace[] = createMockProcedureWorkspaces();
+let localMergeQueueMemory: MergeQueueItem[] = createMockMergeQueue().queue;
+
+export async function fetchProcedureWorkspaces(projectPath?: string): Promise<ProcedureWorkspace[]> {
+  if (catalogApi) {
+    try {
+      const query = new URLSearchParams();
+      if (projectPath) query.set("project_path", projectPath);
+      const response = await fetch(`${catalogApi}/api/workspaces?${query}`);
+      if (response.ok) {
+        const body = await response.json();
+        if (Array.isArray(body.workspaces)) {
+          return body.workspaces;
+        }
+      }
+    } catch {
+      // Fallback to local memory on connection error
+    }
+  }
+
+  return [...localWorkspacesMemory];
+}
+
+export async function fetchMergeQueue(projectPath?: string): Promise<MergeQueueStatus> {
+  if (catalogApi) {
+    try {
+      const query = new URLSearchParams();
+      if (projectPath) query.set("project_path", projectPath);
+      const response = await fetch(`${catalogApi}/api/workspaces/queue?${query}`);
+      if (response.ok) {
+        const body = await response.json();
+        return body;
+      }
+      // Alternate endpoint
+      const wsResp = await fetch(`${catalogApi}/api/workspaces?${query}`);
+      if (wsResp.ok) {
+        const wsBody = await wsResp.json();
+        if (wsBody.queue_status) {
+          return wsBody.queue_status;
+        }
+      }
+    } catch {
+      // Fallback to local memory
+    }
+  }
+
+  const queue = [...localMergeQueueMemory];
+  const pending = queue.filter((i) => i.status === "pending");
+  const in_verification = queue.filter((i) => i.status === "in_verification");
+  const verified = queue.filter((i) => i.status === "verified");
+  const merged = queue.filter((i) => i.status === "merged");
+  const failed = queue.filter((i) => i.status === "failed");
+  const discarded = queue.filter((i) => i.status === "discarded");
+
+  const mergedIds = new Set(merged.map((m) => m.workspace_id));
+  let current: MergeQueueItem | null = in_verification[0] ?? null;
+  if (!current) {
+    current =
+      verified.concat(pending).find((item) => item.dependencies.every((d) => mergedIds.has(d))) ??
+      null;
+  }
+
+  return {
+    queue,
+    current,
+    pending,
+    in_verification,
+    verified,
+    merged,
+    failed,
+    discarded,
+  };
+}
+
+export async function spawnProcedureWorkspaceApi(
+  payload: CreateProcedureWorkspaceOptions & { project_path?: string; [key: string]: any },
+): Promise<ProcedureWorkspace> {
+  if (catalogApi) {
+    try {
+      const response = await fetch(`${catalogApi}/api/workspaces/spawn`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) {
+        const body = await response.json();
+        return body.workspace;
+      }
+      const errBody = await response.json().catch(() => ({ error: "Failed to spawn workspace" }));
+      throw new Error(errBody.error || "Failed to spawn procedure workspace");
+    } catch (e: any) {
+      if (catalogApi && !e.message?.includes("fetch")) {
+        throw e;
+      }
+    }
+  }
+
+  // Client-side fallback generator
+  const taskId =
+    payload.metadata?.task_id ||
+    payload.workspace_id ||
+    `task-${Date.now().toString(36).slice(-4)}`;
+  const workspaceId = payload.workspace_id || `ws-${taskId}`;
+  const procedureType: ProcedureType = payload.procedure_type || "INNER_LOOP_TDD";
+
+  const defaultSkills: Record<ProcedureType, string[]> = {
+    PLANNING: ["planning", "spec-decomposition", "dependency-mapper"],
+    INNER_LOOP_TDD: ["tdd-inner-loop", "code-authoring", "pinpoint-test-runner"],
+    SECURITY_AUDIT: ["security-audit", "vulnerability-scanner", "hook-validator"],
+    RELEASE_GATE: ["release-gate", "baseline-compaction", "e2e-orchestrator"],
+  };
+
+  const defaultGuards: Record<ProcedureType, string[]> = {
+    PLANNING: ["read-only-source-guard", "context-budget-guard"],
+    INNER_LOOP_TDD: ["test-storm-suppression-guard", "scope-boundary-guard"],
+    SECURITY_AUDIT: ["secret-leak-guard", "destructive-command-blocker"],
+    RELEASE_GATE: ["regression-gate-guard", "context-budget-guard"],
+  };
+
+  const newWorkspace: ProcedureWorkspace = {
+    schema_version: 1,
+    workspace_id: workspaceId,
+    procedure_type: procedureType,
+    git_branch: payload.git_branch || `worktree/${taskId}`,
+    git_worktree_path: payload.git_worktree_path || `.workspaces/${taskId}`,
+    responsibility_invariants: {
+      target_test_file:
+        payload.responsibility_invariants?.target_test_file ||
+        payload.target_test_file ||
+        (procedureType === "INNER_LOOP_TDD"
+          ? "apps/catalog-ui/test/procedure-workspaces.test.js"
+          : "tests/e2e/run-all.js"),
+      owned_files:
+        payload.responsibility_invariants?.owned_files ||
+        payload.owned_files || [
+          `apps/catalog-ui/src/components/${taskId}/`,
+        ],
+      prohibited_actions:
+        payload.responsibility_invariants?.prohibited_actions ||
+        payload.prohibited_actions || [
+          "npm test",
+          "pytest",
+          "modify_root_contracts",
+        ],
+      acceptance_criteria:
+        payload.responsibility_invariants?.acceptance_criteria ||
+        payload.acceptance_criteria || [
+          "100% target test verification passage",
+          "Preserve isolated worktree boundary",
+        ],
+    },
+    active_skills: payload.active_skills || defaultSkills[procedureType],
+    active_guards: payload.active_guards || defaultGuards[procedureType],
+    status: payload.status || "active",
+    created_at: payload.created_at || new Date().toISOString(),
+    completed_at: payload.completed_at || null,
+    metadata: {
+      task_id: taskId,
+      author: "catalog-ui-operator",
+      ...(payload.metadata || {}),
+    },
+  };
+
+  localWorkspacesMemory = [newWorkspace, ...localWorkspacesMemory.filter((w) => w.workspace_id !== workspaceId)];
+
+  const newQueueItem: MergeQueueItem = {
+    workspace_id: workspaceId,
+    task_id: taskId,
+    dependencies: payload.metadata?.dependencies || [],
+    status: newWorkspace.status,
+    position: localMergeQueueMemory.length + 1,
+    enqueued_at: new Date().toISOString(),
+    verified_at: null,
+    merged_at: null,
+    commit_hash: null,
+    procedure_type: procedureType,
+  };
+
+  localMergeQueueMemory = [...localMergeQueueMemory, newQueueItem];
+  return newWorkspace;
+}
+
+export async function verifyProcedureWorkspaceApi(
+  workspaceId: string,
+  projectPath?: string,
+): Promise<VerifyWorkspaceResult> {
+  if (catalogApi) {
+    try {
+      const response = await fetch(`${catalogApi}/api/workspaces/verify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          task_id: workspaceId,
+          project_path: projectPath,
+        }),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      const err = await response.json().catch(() => ({ error: "Verification failed" }));
+      return { verified: false, workspace_id: workspaceId, error: err.error || "Verification failed" };
+    } catch {
+      // Fallback
+    }
+  }
+
+  // Update in-memory workspace
+  localWorkspacesMemory = localWorkspacesMemory.map((ws) =>
+    ws.workspace_id === workspaceId || ws.metadata?.task_id === workspaceId
+      ? { ...ws, status: "verified" }
+      : ws,
+  );
+
+  localMergeQueueMemory = localMergeQueueMemory.map((item) =>
+    item.workspace_id === workspaceId || item.task_id === workspaceId
+      ? { ...item, status: "verified", verified_at: new Date().toISOString() }
+      : item,
+  );
+
+  return {
+    verified: true,
+    workspace_id: workspaceId,
+    test_output: `✔ 1/1 target test file passed in isolated worktree for ${workspaceId}\n✔ Responsibility invariants verified: 100% compliance\n✔ Zero prohibited actions detected.`,
+    invariant_checks: {
+      target_test_passed: true,
+      owned_files_valid: true,
+      prohibited_actions_respected: true,
+      branch_clean: true,
+    },
+  };
+}
+
+export async function mergeProcedureWorkspaceApi(
+  workspaceId: string,
+  projectPath?: string,
+): Promise<MergeWorkspaceResult> {
+  if (catalogApi) {
+    try {
+      const response = await fetch(`${catalogApi}/api/workspaces/merge`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          task_id: workspaceId,
+          project_path: projectPath,
+        }),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      const err = await response.json().catch(() => ({ error: "Merge failed" }));
+      return {
+        merged: false,
+        workspace_id: workspaceId,
+        error: err.error || "Merge failed",
+        code: err.code,
+      };
+    } catch {
+      // Fallback
+    }
+  }
+
+  const randomHash = "a" + Math.random().toString(16).slice(2, 8);
+  const now = new Date().toISOString();
+
+  localWorkspacesMemory = localWorkspacesMemory.map((ws) =>
+    ws.workspace_id === workspaceId || ws.metadata?.task_id === workspaceId
+      ? {
+          ...ws,
+          status: "merged",
+          completed_at: now,
+          metadata: { ...ws.metadata, commit_hash: randomHash },
+        }
+      : ws,
+  );
+
+  localMergeQueueMemory = localMergeQueueMemory.map((item) =>
+    item.workspace_id === workspaceId || item.task_id === workspaceId
+      ? { ...item, status: "merged", merged_at: now, commit_hash: randomHash }
+      : item,
+  );
+
+  return {
+    merged: true,
+    workspace_id: workspaceId,
+    commit_hash: randomHash,
+    status: "merged",
+  };
+}
+
+export async function pruneProcedureWorkspaceApi(
+  workspaceId: string,
+  projectPath?: string,
+): Promise<PruneWorkspaceResult> {
+  if (catalogApi) {
+    try {
+      const response = await fetch(`${catalogApi}/api/workspaces/prune`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          task_id: workspaceId,
+          project_path: projectPath,
+        }),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      const err = await response.json().catch(() => ({ error: "Prune failed" }));
+      return { pruned: false, workspace_id: workspaceId, error: err.error || "Prune failed" };
+    } catch {
+      // Fallback
+    }
+  }
+
+  const now = new Date().toISOString();
+  localWorkspacesMemory = localWorkspacesMemory.map((ws) =>
+    ws.workspace_id === workspaceId || ws.metadata?.task_id === workspaceId
+      ? { ...ws, status: "pruned", completed_at: now }
+      : ws,
+  );
+
+  localMergeQueueMemory = localMergeQueueMemory.filter(
+    (item) => item.workspace_id !== workspaceId && item.task_id !== workspaceId,
+  );
+
+  return {
+    pruned: true,
+    workspace_id: workspaceId,
+    completed_at: now,
+  };
+}
+
+export async function discardProcedureWorkspaceApi(
+  workspaceId: string,
+  reason?: string,
+  projectPath?: string,
+): Promise<DiscardWorkspaceResult> {
+  if (catalogApi) {
+    try {
+      const response = await fetch(`${catalogApi}/api/workspaces/discard`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          task_id: workspaceId,
+          reason,
+          project_path: projectPath,
+        }),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      const err = await response.json().catch(() => ({ error: "Discard failed" }));
+      return { discarded: false, workspace_id: workspaceId, error: err.error || "Discard failed" };
+    } catch {
+      // Fallback
+    }
+  }
+
+  const now = new Date().toISOString();
+  localWorkspacesMemory = localWorkspacesMemory.map((ws) =>
+    ws.workspace_id === workspaceId || ws.metadata?.task_id === workspaceId
+      ? {
+          ...ws,
+          status: "discarded",
+          completed_at: now,
+          metadata: { ...ws.metadata, discard_reason: reason || "User discarded" },
+        }
+      : ws,
+  );
+
+  localMergeQueueMemory = localMergeQueueMemory.map((item) =>
+    item.workspace_id === workspaceId || item.task_id === workspaceId
+      ? {
+          ...item,
+          status: "discarded",
+          discarded_at: now,
+          reason: reason || "User discarded",
+        }
+      : item,
+  );
+
+  return {
+    discarded: true,
+    workspace_id: workspaceId,
+    status: "discarded",
+    reason: reason || "User discarded",
+  };
+}
+
+export async function processMergeQueueApi(projectPath?: string): Promise<ProcessQueueResult> {
+  const status = await fetchMergeQueue(projectPath);
+  const mergedIds = new Set(status.merged?.map((m) => m.workspace_id) || []);
+  const processed: Array<{
+    workspace_id: string;
+    success: boolean;
+    merged: boolean;
+    commit_hash?: string;
+    error?: string;
+  }> = [];
+
+  for (const item of status.queue) {
+    if (item.status !== "pending" && item.status !== "verified") {
+      continue;
+    }
+    const depsSatisfied = item.dependencies.every((d) => mergedIds.has(d));
+    if (depsSatisfied) {
+      if (item.status === "pending") {
+        await verifyProcedureWorkspaceApi(item.workspace_id, projectPath);
+      }
+      const mergeRes = await mergeProcedureWorkspaceApi(item.workspace_id, projectPath);
+      if (mergeRes.merged) {
+        mergedIds.add(item.workspace_id);
+        processed.push({
+          workspace_id: item.workspace_id,
+          success: true,
+          merged: true,
+          commit_hash: mergeRes.commit_hash,
+        });
+      } else {
+        processed.push({
+          workspace_id: item.workspace_id,
+          success: false,
+          merged: false,
+          error: mergeRes.error,
+        });
+        break;
+      }
+    }
+  }
+
+  const finalStatus = await fetchMergeQueue(projectPath);
+  return {
+    processed,
+    queue: finalStatus.queue,
+    merged: finalStatus.merged || [],
+    failed: finalStatus.failed || [],
+    discarded: finalStatus.discarded || [],
+    pending: finalStatus.pending || [],
+  };
+}
+
 
 

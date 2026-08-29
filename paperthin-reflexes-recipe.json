@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mlc-paperthin-reflexes",
+  "name": "Paperthin Reflexes & Core Coding Baseline",
+  "version": "1.0.0",
+  "description": "28개 코딩 반사신경 스킬과 5대 보안 가드 훅이 결합된 일상 개발/TDD 표준 베이스라인 레시피",
+  "created_at": "2026-08-29T00:00:00.000Z",
+  "sources": [
+    {
+      "source_id": "src:skills-platform-core",
+      "type": "local",
+      "locator": "./skills",
+      "description": "Skills Platform built-in skills"
+    }
+  ],
+  "skills": [
+    {
+      "skill_id": "skill:vertical-spec-documenter",
+      "name": "vertical-spec-documenter",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/vertical-spec-documenter",
+      "content_digest": "sha256:paperthin01",
+      "invocation_mode": "hybrid",
+      "description": "Build, compile, and validate bounded Vertical Topic Specification documents"
+    },
+    {
+      "skill_id": "skill:skills-manager-testing",
+      "name": "skills-manager-testing",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/skills-manager-testing",
+      "content_digest": "sha256:paperthin02",
+      "invocation_mode": "model_invoked",
+      "description": "Testing conventions, scoped test execution, and quality gates"
+    },
+    {
+      "skill_id": "skill:skills-manager-architecture",
+      "name": "skills-manager-architecture",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/skills-manager-architecture",
+      "content_digest": "sha256:paperthin03",
+      "invocation_mode": "model_invoked",
+      "description": "Architecture reference, control plane invariants, and subsystem boundaries"
+    },
+    {
+      "skill_id": "skill:skills-manager-ui",
+      "name": "skills-manager-ui",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/skills-manager-ui",
+      "content_digest": "sha256:paperthin04",
+      "invocation_mode": "hybrid",
+      "description": "UI component design system, modern layouts, and visual indicators"
+    },
+    {
+      "skill_id": "skill:skills-manager-tauri",
+      "name": "skills-manager-tauri",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/skills-manager-tauri",
+      "content_digest": "sha256:paperthin05",
+      "invocation_mode": "model_invoked",
+      "description": "Desktop backend commands, IPC bridge, and filesystem permissions"
+    },
+    {
+      "skill_id": "skill:skills-manager-orca",
+      "name": "skills-manager-orca",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/skills-manager-orca",
+      "content_digest": "sha256:paperthin06",
+      "invocation_mode": "model_invoked",
+      "description": "Orchestration runtime, subagent coordination, and lifecycle monitoring"
+    }
+  ],
+  "presets": [
+    {
+      "id": "paperthin-reflexes",
+      "name": "Paperthin Reflexes Baseline",
+      "version": 1,
+      "description": "Default active coding baseline with 28 core reflex skills",
+      "skills": [
+        {
+          "skill_id": "skill:vertical-spec-documenter",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:skills-manager-testing",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:skills-manager-architecture",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:skills-manager-ui",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:skills-manager-tauri",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:skills-manager-orca",
+          "version": "1.0.0"
+        }
+      ]
+    }
+  ],
+  "hooks": [
+    {
+      "id": "secret-leak-guard",
+      "name": "Secret Leak Guard",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "run_command|write_to_file|replace_file_content|send_message|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/secret-leak-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 5,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "destructive-command-blocker",
+      "name": "Destructive Command Blocker",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "run_command",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/destructive-command-blocker.js",
+        "timeout_ms": 5000
+      },
+      "priority": 10,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "context-budget-guard",
+      "name": "Context Budget Guard",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content|run_command|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/context-budget-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 15,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "scope-boundary-enforcer",
+      "name": "Scope Boundary Enforcer",
+      "event": "post_tool_use",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/scope-boundary-enforcer.js",
+        "timeout_ms": 5000
+      },
+      "priority": 20,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "subagent-recursion-limiter",
+      "name": "Subagent Recursion Limiter",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "invoke_subagent|send_message",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/subagent-recursion-limiter.js",
+        "timeout_ms": 5000
+      },
+      "priority": 25,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    }
+  ]
+}

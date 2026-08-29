@@ -1,37 +1,53 @@
-# E2E Test Infra: Flow Studio Visualization Canvas
+# E2E Test Infra: Skills-Platform
 
 ## Test Philosophy
-- Opaque-box, requirement-driven testing. Derived directly from `ORIGINAL_REQUEST.md`.
-- Methodology: Category-Partition + Boundary Value Analysis + Pairwise Combinations + Real-World Scenarios.
-- Zero external runtime test dependencies (`node:test` + `node:assert/strict`).
+- **Opaque-box & Requirement-driven**: Derived directly from `ORIGINAL_REQUEST.md` and user-facing specifications.
+- **Root Protection Assertion**: The root `main` workspace must remain pristine and unpolluted. All work occurs in isolated Git worktrees (`.workspaces/<task_id>`).
+- **Methodology**: Category-Partition + Boundary Value Analysis (BVA) + Pairwise Interaction Testing + Real-World Lifecycle Scenarios + Adversarial Stress Testing.
+- **Zero Heavy Frameworks**: Pure native Node.js test runner (`node:test` + `node:assert/strict`) via `node tests/e2e/run-all.js`.
 
-## Feature Inventory
-| # | Feature | Source (requirement) | Tier 1 | Tier 2 | Tier 3 |
-|---|---------|---------------------|:------:|:------:|:------:|
-| 1 | Flow Studio Canvas Workspace | ORIGINAL_REQUEST §R1 | 5 | 5 | ✓ |
-| 2 | 3-Phase Lifecycle Flow Diagram | ORIGINAL_REQUEST §R1.1 | 5 | 5 | ✓ |
-| 3 | Hook Execution & Pipeline Graph | ORIGINAL_REQUEST §R1.2 | 5 | 5 | ✓ |
-| 4 | Relative Fractal Context Tree | ORIGINAL_REQUEST §R1.3 | 5 | 5 | ✓ |
-| 5 | Symlink Junction & Delivery Map | ORIGINAL_REQUEST §R1.4 | 5 | 5 | ✓ |
-| 6 | Interactive Node Detail Inspector | ORIGINAL_REQUEST §R2 | 5 | 5 | ✓ |
-| 7 | Simulation & Playback Engine | ORIGINAL_REQUEST §R3 | 5 | 5 | ✓ |
-| 8 | App Navigation & Theme Integration | ORIGINAL_REQUEST §R4 | 5 | 5 | ✓ |
+---
+
+## Feature Inventory & Test Coverage Mapping
+
+| # | Feature | Requirement | Tier 1 (Features) | Tier 2 (Boundaries) | Tier 3 (Pairwise) | Tier 4 (Scenarios) |
+|---|---------|-------------|:-----------------:|:-------------------:|:-----------------:|:------------------:|
+| 1 | Procedure Contracts & Validation | R1 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 2 | Isolated Git Worktree Creation | R2 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 3 | Procedure Skill & Guard Mounting | R2 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 4 | Worktree Pruning & Cleanup | R2 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 5 | Ordered Dependency Merge Queue | R3 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 6 | 1:1 Target Test Verification Gate | R3 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 7 | Responsibility Invariant Auditing | R3 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 8 | Atomic Fast-Forward / Rebase Merge | R3 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 9 | Fault Isolation & Discard | R3 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 10 | CLI Workspace Subcommands | R4 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 11 | REST API Workspace Endpoints | R4 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+| 12 | Flow Studio Procedure Visualizer | R5 | ≥5 cases | ≥5 cases | ✓ | ✓ |
+
+---
 
 ## Test Architecture
-- Unit Test Runner: `npm test --workspace apps/catalog-ui` (`apps/catalog-ui/test/flow-studio.test.js`)
-- E2E Test Runner: `node tests/e2e/run-all.js` (`tests/e2e/tier1-features/f20-flow-studio-canvas.test.js`)
-- Pass/Fail semantics: Exit code 0, 0 unhandled rejections, 100% assertions passed.
+- **Runner**: `node tests/e2e/run-all.js`
+- **Output**: TAP / formatted summary with exit code 0 on all tests passing.
+- **Fixtures**: `tests/e2e/helpers/fixtures.js` (sandboxes, Git repos, mock HTTP servers, assertion helpers).
+
+---
 
 ## Real-World Application Scenarios (Tier 4)
 | # | Scenario | Features Exercised | Complexity |
 |---|----------|--------------------|------------|
-| 1 | Full Lifecycle: PRD ingest -> Inner loop TDD -> Release gate compaction | F1, F2, F6, F7, F8 | High |
-| 2 | Security Pipeline: 4 Attack Injections -> Sub-200ms Short-Circuit Halt -> Self-Correct Remediation | F1, F3, F6, F7 | High |
-| 3 | Relative Fractal Context Drill-Down & Upward Roll-Up Patch Proposal | F1, F4, F6 | Medium |
-| 4 | Multi-Provider Symlink Delivery Junction & Live Drift Sync | F1, F5, F6, F8 | Medium |
+| 1 | Concurrent Multi-Procedure Isolation | F1, F2, F3, F4 (Concurrent planning + inner loop + security audit) | High |
+| 2 | Ordered Linear Dependency Merge Pipeline | F5, F6, F8 (`task-01` ➔ `task-02` ➔ `task-03` fast-forward into `main`) | High |
+| 3 | Broken Target Test Rejection & Discard | F6, F7, F9 (Fault isolation without polluting `main`) | Medium |
+| 4 | End-to-End CLI & REST API Control Plane | F10, F11 (CLI spawn ➔ server query ➔ verify ➔ merge) | Medium |
+| 5 | Flow Studio Procedure Workspaces & Live Queue | F12 (Card rendering, inspector details, fast-forward animation) | Medium |
+
+---
 
 ## Coverage Thresholds
-- Tier 1: ≥5 test cases per feature (40+ assertions)
-- Tier 2: ≥5 boundary test cases per feature (40+ assertions)
-- Tier 3: Pairwise interaction coverage across view modes, inspector drawer, and attack injections
-- Tier 4: Realistic end-to-end user workflows
+- **Tier 1 (Feature Coverage)**: ≥5 test cases per feature covering happy paths and basic isolation.
+- **Tier 2 (Boundary & Corner Cases)**: ≥5 test cases per feature (e.g. invalid enums, non-existent branches, locked files, missing tests, rebase conflicts).
+- **Tier 3 (Cross-Feature Combinations)**: Pairwise integration across CLI, REST API, Worktree Manager, Sequential Merger, and Contracts.
+- **Tier 4 (Real-World Application Scenarios)**: ≥5 comprehensive multi-step workflow scenarios.
+- **Tier 5 (Adversarial Stress Testing)**: High concurrency, rapid spawns, dirty working tree simulations.

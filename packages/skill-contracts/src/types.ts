@@ -584,4 +584,77 @@ export interface VerticalTopicSpec {
   updated_at: string;
 }
 
+// Procedure-Responsible Workspace & Sequential Merge Pipeline Contracts
+export type ProcedureType =
+  | "PLANNING"
+  | "INNER_LOOP_TDD"
+  | "SECURITY_AUDIT"
+  | "RELEASE_GATE";
+
+export const PROCEDURE_TYPES: ReadonlySet<ProcedureType> = new Set([
+  "PLANNING",
+  "INNER_LOOP_TDD",
+  "SECURITY_AUDIT",
+  "RELEASE_GATE",
+]);
+
+export type ProcedureWorkspaceStatus =
+  | "pending"
+  | "active"
+  | "in_verification"
+  | "verified"
+  | "merged"
+  | "failed"
+  | "discarded"
+  | "pruned";
+
+export const PROCEDURE_WORKSPACE_STATUSES: ReadonlySet<ProcedureWorkspaceStatus> = new Set([
+  "pending",
+  "active",
+  "in_verification",
+  "verified",
+  "merged",
+  "failed",
+  "discarded",
+  "pruned",
+]);
+
+export interface ResponsibilityInvariants {
+  target_test_file?: string;
+  owned_files: string[];
+  prohibited_actions: string[];
+  acceptance_criteria: string[];
+}
+
+export interface ProcedureWorkspace {
+  schema_version: number;
+  workspace_id: string;
+  procedure_type: ProcedureType;
+  git_branch: string;
+  git_worktree_path: string;
+  responsibility_invariants: ResponsibilityInvariants;
+  active_skills: string[];
+  active_guards: string[];
+  status: ProcedureWorkspaceStatus;
+  created_at: string;
+  completed_at?: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface CreateProcedureWorkspaceOptions {
+  workspace_id?: string;
+  procedure_type: ProcedureType;
+  git_branch?: string;
+  git_worktree_path?: string;
+  responsibility_invariants?: Partial<ResponsibilityInvariants>;
+  active_skills?: string[];
+  active_guards?: string[];
+  status?: ProcedureWorkspaceStatus;
+  created_at?: string;
+  completed_at?: string | null;
+  metadata?: Record<string, any>;
+  now?: Date;
+}
+
+
 

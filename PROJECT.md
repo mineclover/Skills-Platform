@@ -1,144 +1,265 @@
-# Project: Flow Studio Visualization Canvas
+# Project: Skills-Platform Procedure-Responsible Workspaces & Git-Native Sequential Merge Engine
 
 ## Architecture
-Flow Studio is a comprehensive visualization workspace integrated into the Skills Platform Web UI (`apps/catalog-ui`). It provides real-time visual monitoring, interactive state machine inspection, relative fractal context drill-down, and hook interception pipeline simulation.
+
+The Skills Platform is transitioning from legacy physical NTFS junction hot-swapping on the root workspace to an **Isolated Git Worktree & Sequential Merge Pipeline** architecture.
 
 ```
-+----------------------------------------------------------------------------------------------------+
-|                                    FLOW STUDIO ARCHITECTURE                                         |
-+----------------------------------------------------------------------------------------------------+
-|  [ SideNavigation.tsx ] ──► [ CatalogApp.tsx ] ──► [ FlowStudioCanvas.tsx ]                        |
-|                                                          │                                         |
-|         ┌──────────────────────┬─────────────────────────┼────────────────────────┐                |
-|         ▼                      ▼                         ▼                        ▼                |
-|  [ LifecycleFlow ]      [ HookPipeline ]         [ FractalContext ]       [ JunctionDelivery ]      |
-|  Phase 1: Plan          PreToolUse Chain:        Level 0: System Horizon  Multi-Provider:          |
-|  Phase 2: Inner Loop    (Pri 5, 10, 15, 25)      Level 1: Topic Plane     - .agents/skills/        |
-|  [Test Storm Shield]    Red Halt Node (Branch)   Level 2: 80k Spec        - .claude/skills/        |
-|  Phase 3: Release Gate  PostToolUse Chain        Roll-Up Patch Proposal   - skills/                |
-|         │                      │                         │                        │                |
-|         └──────────────────────┴─────────────────────────┴────────────────────────┘                |
-|                                                          │                                         |
-|         ┌────────────────────────────────────────────────┴────────────────────────┐                |
-|         ▼                                                                         ▼                |
-|  [ FlowPlaybackController.tsx ]                                    [ NodeDetailInspector.tsx ]     |
-|  Timeline Controls & 1-Click Attacks (<200ms)                      Slide-Over Drawer:              |
-|  - API Key Leak (Pri 5 Halt)                                       - Canonical Topic ID & Lineage  |
-|  - Destructive Command (Pri 10 Halt)                               - Target Test & Commands        |
-|  - Test Storm Suppress (Phase 2 Shield)                            - Diagnostics & Hints           |
-|  - Clean Safe Invocation (Success Pulse)                           - Live Diffs & Latency Metrics  |
-+----------------------------------------------------------------------------------------------------+
+                                +-----------------------------------+
+                                |    @skills-platform/contracts     |
+                                |  - ProcedureWorkspace Interface   |
+                                |  - ProcedureType & Invariants     |
+                                |  - Validation Utilities (R1 / M1) |
+                                +-----------------+-----------------+
+                                                  |
+                    ┌─────────────────────────────┴─────────────────────────────┐
+                    ▼                                                           ▼
++---------------------------------------+                   +---------------------------------------+
+|  apps/skills-catalog/                 |                   |  apps/skills-catalog/                 |
+|  src/workspace-manager.js (R2 / M2)   |                   |  src/sequential-merger.js (R3 / M3)   |
+|  -----------------------------------  |                   |  -----------------------------------  |
+|  - spawnProcedureWorkspace()          | ── (Worktrees) ─► |  - Ordered Merge Queue                |
+|  - .workspaces/<task_id>              |                   |  - 1:1 Target Test Verification Gate  |
+|  - Isolated .agents/skills/ mounts    |                   |  - Responsibility Invariant Check     |
+|  - Root main pinned & pristine        |                   |  - Atomic Fast-Forward / Rebase Merge |
+|  - pruneProcedureWorkspace()          |                   |  - Fault Isolation & Clean Discard    |
++-------------------+-------------------+                   +-------------------+-------------------+
+                    |                                                           |
+                    └─────────────────────────────┬─────────────────────────────┘
+                                                  ▼
+                                +-----------------------------------+
+                                |  apps/skills-catalog/             |
+                                |  - src/cli.js (workspace cmds)    |
+                                |  - src/server.js (/api/workspaces)|
+                                |  - src/index.js (re-exports) (R4) |
+                                +-----------------+-----------------+
+                                                  |
+                                                  ▼
+                                +-----------------------------------+
+                                |  apps/catalog-ui/ (R5 / M5)       |
+                                |  - Procedure Workspaces Canvas    |
+                                |  - Live Merge Queue Visualizer    |
+                                +-----------------------------------+
 ```
+
+### Key Principles:
+1. **Root Main Workspace Isolation**: The root `main` workspace remains pinned, clean, and pristine. No junction swaps or symlink mutations occur on root `.agents/skills/`.
+2. **Procedure Responsibility Invariants**: Each workspace has a designated `ProcedureType` (`PLANNING`, `INNER_LOOP_TDD`, `SECURITY_AUDIT`, `RELEASE_GATE`) with scoped active skills and guards mounted into `.workspaces/<task_id>/.agents/skills/`.
+3. **Deterministic Sequential Merging**: Workspaces are queued and merged into `main` strictly in dependency order (`task-01` ➔ `task-02` ➔ `task-03`) via atomic fast-forward / rebase after 100% target test verification.
+4. **Fault Isolation**: Failing or unverified task branches are rejected and cleanly discarded without polluting `main`.
+
+---
 
 ## Feature Inventory
+
+Every feature from the survey and requirements is assigned to a milestone:
+
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | Flow Studio Canvas Workspace | Top-level container in `apps/catalog-ui/src/components/flow/FlowStudioCanvas.tsx` supporting 4 interactive visualization mode tabs. | M2 | ORIGINAL_REQUEST §R1 |
-| 2 | 3-Phase Lifecycle Flow Diagram | `LifecycleFlowDiagram.tsx` visualizes Phase 1 (Plan/PRD), Phase 2 (Inner Loop TDD), Phase 3 (Release Gate), animated pulse, status pills, and Test Storm Suppression Guard shield. | M2 | ORIGINAL_REQUEST §R1.1 |
-| 3 | Hook Execution & Security Pipeline Graph | `HookPipelineGraph.tsx` visualizes PreToolUse priority chain (5 -> 10 -> 15 -> 25), short-circuit branching to Red Halt Node with self-correction hints, and PostToolUse chain. | M2 | ORIGINAL_REQUEST §R1.2 |
-| 4 | Relative Fractal Context Hierarchy Tree | `FractalContextTree.tsx` visualizes Level 0 Horizon, Level 1 Topic Plane (owned vs out-of-bounds), Level 2 Pinpoint 80k Spec (1:1 Target Test), and Upward Roll-Up & Context Patch Proposal flow. | M2 | ORIGINAL_REQUEST §R1.3 |
-| 5 | Symlink Junction & Delivery Map | `JunctionDeliveryMap.tsx` visualizes multi-provider paths (`.agents/skills/`, `.claude/skills/`, `skills/`) with live sync and drift detection indicators. | M2 | ORIGINAL_REQUEST §R1.4 |
-| 6 | Interactive Node Detail Inspector Panel | `NodeDetailInspector.tsx` slide-over drawer showing Topic ID, lineage, lifecycle state, target test, allowed/prohibited commands, hook diagnostics, self-correction hints, live diffs, and execution metrics. | M3 | ORIGINAL_REQUEST §R2 |
-| 7 | Flow Simulation & Playback Engine | `FlowPlaybackController.tsx` provides timeline controls (Play, Step, Reset, Scrubber) and 1-Click Simulation Attack Injections (API key leak, destructive rm -rf, test storm attempt, clean invocation) with packet flow animation < 200ms. | M1 | ORIGINAL_REQUEST §R3 |
-| 8 | App Navigation & Theme Integration | `SideNavigation.tsx`, `CatalogApp.tsx`, `styles.css` integrate "Flow Studio" into navigation and routing with harmonized dark theme styling, glowing status badges, and SVG canvas styles. | M4 | ORIGINAL_REQUEST §R4 |
-| 9 | Flow Studio Unit & Logic Test Suite | `apps/catalog-ui/test/flow-studio.test.js` comprehensive tests covering all 4 view modes, state transitions, inspector data extraction, and attack simulation timing. | E2E | Acceptance Criteria |
-| 10 | E2E Integration Test Suite | `tests/e2e/tier1-features/f20-flow-studio-canvas.test.js` covering opaque-box feature behaviors, boundary conditions, pairwise combinations, and scenario flows. | E2E | Acceptance Criteria |
-| 11 | Full Verification & Adversarial Hardening | Verification of `npm run check`, `npm test`, `node tests/e2e/run-all.js`, `npm run build`, and forensic integrity audit. | M5 | Acceptance Criteria |
+| 1 | `ProcedureWorkspace` & `ProcedureType` contracts | Interface, type definitions, and status enums (`PLANNING`, `INNER_LOOP_TDD`, `SECURITY_AUDIT`, `RELEASE_GATE`) | M1 | ORIGINAL_REQUEST §R1 |
+| 2 | `ResponsibilityInvariants` contract | Target test file, owned files, prohibited actions, acceptance criteria | M1 | ORIGINAL_REQUEST §R1 |
+| 3 | `validateProcedureWorkspace` & `createProcedureWorkspace` | Runtime schema validation, UUID generation, ISO timestamps, default invariant initializers | M1 | ORIGINAL_REQUEST §R1 |
+| 4 | Git Worktree Lifecycle Engine | `spawnProcedureWorkspace` creates `.workspaces/<task_id>` on `worktree/<task_id>` branch | M2 | ORIGINAL_REQUEST §R2 |
+| 5 | Procedure Skill & Guard Mounting | Mounts active skills & hooks directly inside worktree without mutating root `main` | M2 | ORIGINAL_REQUEST §R2 |
+| 6 | Worktree Pruning & Cleanup | `pruneProcedureWorkspace` removes worktree folder and prunes Git worktree metadata | M2 | ORIGINAL_REQUEST §R2 |
+| 7 | Catalog Preset Baseline Fix | Reconcile `paperthin-reflexes` in `catalog.json` to ensure clean baseline test pass | M2 | Survey 2 & 3 |
+| 8 | Ordered Merge Queue | Queue sorting workspaces by dependency lineage (`task-01` ➔ `task-02` ➔ `task-03`) | M3 | ORIGINAL_REQUEST §R3 |
+| 9 | 1:1 Target Test Verification Gate | Execute `target_test_file` inside worktree with 100% pass requirement before merge | M3 | ORIGINAL_REQUEST §R3 |
+| 10 | Responsibility Invariant Enforcement | Check `owned_files` boundaries, prohibited commands, and test storm suppression | M3 | ORIGINAL_REQUEST §R3 |
+| 11 | Atomic Fast-Forward / Rebase Merge | `git merge --ff-only` or rebase into `main` after verification passes | M3 | ORIGINAL_REQUEST §R3 |
+| 12 | Fault Isolation & Discard | Reject failed branches cleanly without leaving dangling Git worktrees or dirty commits | M3 | ORIGINAL_REQUEST §R3 |
+| 13 | CLI Workspace Subcommands | `skills-platform workspace spawn|list|verify|merge|prune` in `src/cli.js` | M4 | ORIGINAL_REQUEST §R4 |
+| 14 | REST API Workspace Endpoints | `GET /api/workspaces`, `POST /api/workspaces/spawn`, `verify`, `merge`, `prune` in `server.js` | M4 | ORIGINAL_REQUEST §R4 |
+| 15 | Flow Studio Procedure Workspaces View | Interactive visual cards with procedure badges, target tests, active skill roster | M5 | ORIGINAL_REQUEST §R5 |
+| 16 | Live Git Merge Queue Timeline | Visual timeline with pending, in-verification, merged stages and fast-forward animation | M5 | ORIGINAL_REQUEST §R5 |
+| 17 | UI REST API Client & Inspector Integration | `catalog-api.ts` workspace methods and `NodeDetailInspector.tsx` workspace inspector | M5 | ORIGINAL_REQUEST §R5 |
+| 18 | E2E Test Suite (Tiers 1–5) & Verification | Requirement-driven opaque-box E2E test cases, full checks across all workspaces | M6 | ORIGINAL_REQUEST §Acceptance Criteria |
+
+---
 
 ## Milestones
+
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| E2E | E2E Testing Track | Design & implement comprehensive E2E test suites (Tiers 1-4) in parallel -> publish `TEST_READY.md`. | none | DONE |
-| M1 | Core Flow Data Types & Playback / Simulation Engine | Implement `flow-types.ts` and `FlowPlaybackController.tsx` with simulation attack injection engine (<200ms latency). | none | DONE |
-| M2 | 4 Flow Visualization Canvas View Modes | Implement `FlowStudioCanvas.tsx`, `LifecycleFlowDiagram.tsx`, `HookPipelineGraph.tsx`, `FractalContextTree.tsx`, `JunctionDeliveryMap.tsx`. | M1 | DONE |
-| M3 | Interactive Node Detail Inspector Drawer | Implement `NodeDetailInspector.tsx` with slide-over animation, diagnostics, live diffs, and metrics. | M2 | DONE |
-| M4 | Navigation, App Routing & Theme Integration | Update `SideNavigation.tsx`, `CatalogApp.tsx`, and `styles.css` for clean integration. | M2, M3 | DONE |
-| M5 | 100% E2E Pass, Adversarial Coverage Hardening (Tier 5) & Forensic Audit | Verify all E2E tiers, perform Tier 5 adversarial stress testing, run forensic audit, and confirm all build checks. | E2E, M4 | DONE |
+| M1 | Contracts & Data Model | `packages/skill-contracts/src/types.ts`, `src/index.ts`, `test/procedure-workspace.test.js` | none | DONE |
+| M2 | Git-Native Worktree Manager | `apps/skills-catalog/src/workspace-manager.js`, `test/workspace-manager.test.js`, `catalog.json` fix | M1 | DONE |
+| M3 | Sequential Merge Orchestrator | `apps/skills-catalog/src/sequential-merger.js`, `test/sequential-merger.test.js` | M1, M2 | DONE |
+| M4 | CLI & REST API Integration | `apps/skills-catalog/src/cli.js`, `src/server.js`, `src/index.js`, `test/workspace-cli-server.test.js` | M1, M2, M3 | DONE |
+| M5 | Flow Studio Visualizer | `apps/catalog-ui/src/components/flow/`, `src/api/catalog-api.ts`, `test/procedure-workspaces.test.js` | M1, M4 | PLANNED |
+| M6 | E2E Testing & Full Verification | `tests/e2e/`, `npm run check`, `npm test`, `node tests/e2e/run-all.js`, `npm run build` | M1–M5 | PLANNED |
+
+---
 
 ## Interface Contracts
-### FlowNodeDetail & Canvas Interaction
-```typescript
-export type FlowViewMode = "lifecycle" | "hook_pipeline" | "fractal_tree" | "junction_map";
 
-export interface FlowNodeDetail {
-  id: string;
-  type: "lifecycle_phase" | "task_card" | "hook_guard" | "halt_node" | "topic_node" | "junction_node" | "shield_guard";
-  name: string;
-  category?: string;
-  status: "idle" | "active" | "passed" | "blocked" | "drift" | "insync" | "pending" | "in_progress";
-  lineage: {
-    topicId?: string;
-    canonicalName?: string;
-    path: string[];
-    lifecycleState?: "OPEN" | "IN_PROGRESS" | "VERIFIED" | "REOPENED" | "CLOSED";
-  };
-  verification?: {
-    targetTestFile: string;
-    allowedCommand: string;
-    prohibitedCommands: string[];
-    invariants: {
-      preConditions: string[];
-      strictInvariants: string[];
-      postConditions: string[];
-    };
-  };
-  diagnostics?: {
-    hookId?: string;
-    priority?: number;
-    violationType?: string;
-    blockedCommand?: string;
-    reason?: string;
-    selfCorrectHint?: string;
-    matchedPattern?: string;
-  };
-  metrics?: {
-    durationMs: number;
-    latencyMs?: number;
-    toolCallsCount?: number;
-    tokensDensityKb?: number;
-    liveDiff?: {
-      targetFile: string;
-      additions: number;
-      deletions: number;
-      diffSnippet: string;
-    };
-  };
-  junction?: {
-    providerId: "antigravity" | "codex" | "claude";
-    deliveryPath: string;
-    syncState: "insync" | "drift" | "pristine";
-    symlinkTarget: string;
-  };
+### 1. `@skills-platform/contracts` ↔ Downstream Packages
+
+#### `ProcedureType`
+```typescript
+export type ProcedureType =
+  | "PLANNING"
+  | "INNER_LOOP_TDD"
+  | "SECURITY_AUDIT"
+  | "RELEASE_GATE";
+```
+
+#### `ProcedureWorkspace`
+```typescript
+export interface ResponsibilityInvariants {
+  target_test_file?: string;
+  owned_files: string[];
+  prohibited_actions: string[];
+  acceptance_criteria: string[];
+}
+
+export type ProcedureWorkspaceStatus =
+  | "pending"
+  | "active"
+  | "in_verification"
+  | "verified"
+  | "merged"
+  | "failed"
+  | "discarded"
+  | "pruned";
+
+export interface ProcedureWorkspace {
+  schema_version: number;
+  workspace_id: string;
+  procedure_type: ProcedureType;
+  git_branch: string;
+  git_worktree_path: string;
+  responsibility_invariants: ResponsibilityInvariants;
+  active_skills: string[];
+  active_guards: string[];
+  status: ProcedureWorkspaceStatus;
+  created_at: string;
+  completed_at?: string | null;
+  metadata?: Record<string, any>;
 }
 ```
 
-### Simulation Attack Payloads
+#### Validator & Factory
 ```typescript
-export interface SimulationAttack {
-  id: "attack_secret_leak" | "attack_destructive_command" | "attack_test_storm" | "attack_clean_invocation";
-  title: string;
-  description: string;
-  command: string;
-  expectedHaltNode: string;
-  expectedLatencyMaxMs: number; // 200ms
-  expectedHint: string;
+export function validateProcedureWorkspace(workspace: unknown): ValidationResult;
+export function createProcedureWorkspace(options: CreateProcedureWorkspaceOptions): ProcedureWorkspace;
+```
+
+---
+
+### 2. `workspace-manager.js` Contract
+
+```javascript
+/**
+ * Spawns an isolated Git worktree on a dedicated branch with procedure skills mounted.
+ */
+async function spawnProcedureWorkspace({
+  procedure_type,
+  task_id,
+  recipe_id,
+  preset_id,
+  target_test_file,
+  owned_files = [],
+  prohibited_actions = [],
+  acceptance_criteria = [],
+  project_path = process.cwd(),
+}) -> Promise<ProcedureWorkspace>;
+
+/**
+ * Prunes worktree directory and removes Git worktree reference.
+ */
+async function pruneProcedureWorkspace(workspace_id, { project_path = process.cwd() } = {}) -> Promise<{ pruned: boolean, workspace_id: string }>;
+
+/**
+ * Lists all active and historical procedure workspaces.
+ */
+async function listProcedureWorkspaces({ project_path = process.cwd(), status } = {}) -> Promise<ProcedureWorkspace[]>;
+
+/**
+ * Retrieves a single procedure workspace by ID or task ID.
+ */
+async function getProcedureWorkspace(workspace_id, { project_path = process.cwd() } = {}) -> Promise<ProcedureWorkspace | null>;
+```
+
+---
+
+### 3. `sequential-merger.js` Contract
+
+```javascript
+/**
+ * Enqueues a workspace or executes sequential dependency merge.
+ */
+class SequentialMerger {
+  constructor({ project_path, workspace_manager }) { ... }
+  
+  enqueue(workspace_id, { dependencies = [] }) -> Promise<{ queue_position: number, status: string }>;
+  
+  verifyWorkspace(workspace_id) -> Promise<{ verified: boolean, test_output: string, invariant_checks: Record<string, boolean> }>;
+  
+  mergeNext() -> Promise<{ merged: boolean, workspace_id: string, commit_hash: string }>;
+  
+  mergeWorkspace(workspace_id) -> Promise<{ merged: boolean, workspace_id: string, commit_hash: string }>;
+  
+  discardWorkspace(workspace_id, reason) -> Promise<{ discarded: boolean, workspace_id: string }>;
+  
+  getQueueStatus() -> Promise<{ queue: Array<{ workspace_id: string, dependencies: string[], status: string }> }>;
 }
 ```
+
+---
+
+### 4. REST API Contract (`apps/skills-catalog/src/server.js`)
+
+- `GET /api/workspaces`: returns `{ workspaces: ProcedureWorkspace[], merge_queue: [...] }`
+- `POST /api/workspaces/spawn`: payload `{ procedure_type, task_id, recipe_id, preset_id, target_test_file, owned_files }` ➔ `201 { workspace: ProcedureWorkspace }`
+- `POST /api/workspaces/verify`: payload `{ task_id }` or `{ workspace_id }` ➔ `200 { verified: boolean, test_output, invariant_checks }`
+- `POST /api/workspaces/merge`: payload `{ task_id }` or `{ workspace_id }` ➔ `200 { merged: boolean, commit_hash, status }`
+- `POST /api/workspaces/prune`: payload `{ task_id }` or `{ workspace_id }` ➔ `200 { pruned: boolean, workspace_id }`
+
+---
 
 ## Code Layout
-- `apps/catalog-ui/src/components/flow/`:
-  - `flow-types.ts`
-  - `FlowStudioCanvas.tsx`
-  - `LifecycleFlowDiagram.tsx`
-  - `HookPipelineGraph.tsx`
-  - `FractalContextTree.tsx`
-  - `JunctionDeliveryMap.tsx`
-  - `NodeDetailInspector.tsx`
-  - `FlowPlaybackController.tsx`
-- `apps/catalog-ui/src/components/SideNavigation.tsx`
-- `apps/catalog-ui/src/CatalogApp.tsx`
-- `apps/catalog-ui/src/styles.css`
-- `apps/catalog-ui/test/flow-studio.test.js`
-- `tests/e2e/tier1-features/f20-flow-studio-canvas.test.js`
-- `tests/e2e/tier5-adversarial/challenger-flow-studio.test.js`
-- `apps/catalog-ui/test/challenger2-empirical.test.js`
+
+```
+Skills-Platform/
+├── package.json
+├── PROJECT.md
+├── TEST_INFRA.md
+├── packages/
+│   ├── skill-contracts/
+│   │   ├── src/
+│   │   │   ├── types.ts              # ProcedureType, ProcedureWorkspace, ResponsibilityInvariants (M1)
+│   │   │   └── index.ts              # validateProcedureWorkspace, createProcedureWorkspace (M1)
+│   │   └── test/
+│   │       └── procedure-workspace.test.js # Unit test suite for R1 (M1)
+│   └── skills-manager-adapter/
+├── apps/
+│   ├── skills-catalog/
+│   │   ├── src/
+│   │   │   ├── workspace-manager.js  # Git worktree lifecycle engine (M2)
+│   │   │   ├── sequential-merger.js  # Sequential merge queue & fast-forward engine (M3)
+│   │   │   ├── cli.js                # CLI workspace commands (M4)
+│   │   │   ├── server.js             # REST API /api/workspaces routes (M4)
+│   │   │   └── index.js              # Module exports (M4)
+│   │   └── test/
+│   │       ├── workspace-manager.test.js
+│   │       ├── sequential-merger.test.js
+│   │       └── workspace-cli-server.test.js
+│   └── catalog-ui/
+│       ├── src/
+│       │   ├── api/
+│       │   │   └── catalog-api.ts    # Workspace REST API client methods (M5)
+│       │   └── components/
+│       │       └── flow/
+│       │           ├── flow-types.ts # Procedure workspace UI types (M5)
+│       │           ├── FlowStudioCanvas.tsx # View mode registration (M5)
+│       │           ├── ProcedureWorkspacesView.tsx # Visual cards & live merge queue (M5)
+│       │           └── NodeDetailInspector.tsx # Worktree inspector drawer (M5)
+│       └── test/
+│           └── procedure-workspaces.test.js # UI unit & visual logic tests (M5)
+└── tests/
+    └── e2e/                          # 5-Tier E2E verification suite (M6)
+        ├── run-all.js
+        └── tier1-features/
+            ├── f21-workspace-isolation.test.js # R1 & R2 E2E
+            └── f22-sequential-merge.test.js    # R3 & R4 E2E
+```

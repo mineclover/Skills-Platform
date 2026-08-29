@@ -46,7 +46,7 @@ export const navigation: NavItemDef[] = [
   {
     label: "Flow Studio",
     icon: Workflow,
-    tooltip: "Visual Canvas, Lifecycle State Machine & Guard Simulation",
+    tooltip: "Visual Canvas, Lifecycle Flow, Procedure Workspaces & Merge Queue",
   },
 ];
 

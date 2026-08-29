@@ -19,6 +19,20 @@ const {
   compileProviderConfigs,
   triggerHookEvent,
 } = require("./hooks-manager");
+const {
+  spawnProcedureWorkspace,
+  pruneProcedureWorkspace,
+  listProcedureWorkspaces,
+  getProcedureWorkspace,
+} = require("./workspace-manager");
+const {
+  enqueueWorkspace,
+  verifyWorkspace,
+  discardWorkspace,
+  mergeWorkspace,
+  getQueueStatus,
+  processQueue,
+} = require("./sequential-merger");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -556,6 +570,132 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
           eventName: body.event ?? "post_tool_use",
           payload: body.payload ?? {},
         }));
+      }
+      if (request.method === "GET" && url.pathname === "/api/workspaces") {
+        const projectPath = url.searchParams.get("project_path") ?? process.cwd();
+        const status = url.searchParams.get("status") ?? undefined;
+        const [workspaces, queueStatus] = await Promise.all([
+          listProcedureWorkspaces({ project_path: projectPath, status }),
+          getQueueStatus({ project_path: projectPath }),
+        ]);
+        return json(response, 200, {
+          workspaces,
+          merge_queue: queueStatus.queue,
+          queue_status: queueStatus,
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/api/workspaces/queue") {
+        const projectPath = url.searchParams.get("project_path") ?? process.cwd();
+        const queueStatus = await getQueueStatus({ project_path: projectPath });
+        return json(response, 200, queueStatus);
+      }
+      if (request.method === "POST" && url.pathname === "/api/workspaces/spawn") {
+        const body = await parseJsonBody(request);
+        const projectPath = body.project_path ?? body.projectPath ?? url.searchParams.get("project_path") ?? process.cwd();
+        const workspace = await spawnProcedureWorkspace({
+          procedure_type: body.procedure_type ?? body.procedureType,
+          task_id: body.task_id ?? body.taskId ?? body.workspace_id ?? body.workspaceId,
+          recipe_id: body.recipe_id ?? body.recipeId,
+          preset_id: body.preset_id ?? body.presetId,
+          target_test_file: body.target_test_file ?? body.targetTestFile,
+          owned_files: body.owned_files ?? body.ownedFiles,
+          prohibited_actions: body.prohibited_actions ?? body.prohibitedActions,
+          acceptance_criteria: body.acceptance_criteria ?? body.acceptanceCriteria,
+          project_path: projectPath,
+          base_ref: body.base_ref ?? body.baseRef,
+          active_skills: body.active_skills ?? body.activeSkills,
+          active_guards: body.active_guards ?? body.activeGuards,
+          metadata: body.metadata,
+        });
+        return json(response, 201, { workspace });
+      }
+      if (request.method === "POST" && url.pathname === "/api/workspaces/verify") {
+        const body = await parseJsonBody(request);
+        const workspaceId = body.task_id ?? body.taskId ?? body.workspace_id ?? body.workspaceId;
+        if (!workspaceId) {
+          return json(response, 400, { error: "task_id or workspace_id is required" });
+        }
+        const projectPath = body.project_path ?? body.projectPath ?? url.searchParams.get("project_path") ?? process.cwd();
+        const result = await verifyWorkspace(workspaceId, { project_path: projectPath });
+        return json(response, 200, {
+          verified: result.verified,
+          workspace_id: result.workspace_id,
+          test_output: result.test_output,
+          invariant_checks: result.invariant_checks,
+          issues: result.issues,
+        });
+      }
+      if (request.method === "POST" && url.pathname === "/api/workspaces/merge") {
+        const body = await parseJsonBody(request);
+        const workspaceId = body.task_id ?? body.taskId ?? body.workspace_id ?? body.workspaceId;
+        if (!workspaceId) {
+          return json(response, 400, { error: "task_id or workspace_id is required" });
+        }
+        const projectPath = body.project_path ?? body.projectPath ?? url.searchParams.get("project_path") ?? process.cwd();
+        try {
+          const result = await mergeWorkspace(workspaceId, {
+            project_path: projectPath,
+            force: body.force === true,
+          });
+          return json(response, 200, {
+            merged: result.merged,
+            workspace_id: result.workspace_id,
+            commit_hash: result.commit_hash,
+            status: result.status,
+          });
+        } catch (mergeErr) {
+          const status = mergeErr.code === "DEPENDENCY_NOT_MERGED" || mergeErr.code === "VERIFICATION_FAILED" ? 409 : 400;
+          return json(response, status, {
+            error: mergeErr.message,
+            code: mergeErr.code,
+            dependency: mergeErr.dependency,
+            verification_result: mergeErr.verificationResult,
+          });
+        }
+      }
+      if (request.method === "POST" && url.pathname === "/api/workspaces/prune") {
+        const body = await parseJsonBody(request);
+        const workspaceId = body.task_id ?? body.taskId ?? body.workspace_id ?? body.workspaceId;
+        if (!workspaceId) {
+          return json(response, 400, { error: "task_id or workspace_id is required" });
+        }
+        const projectPath = body.project_path ?? body.projectPath ?? url.searchParams.get("project_path") ?? process.cwd();
+        const result = await pruneProcedureWorkspace(workspaceId, {
+          project_path: projectPath,
+          delete_branch: body.delete_branch !== false && body.deleteBranch !== false,
+        });
+        return json(response, 200, {
+          pruned: result.pruned,
+          workspace_id: result.workspace_id,
+          completed_at: result.completed_at,
+        });
+      }
+      if (request.method === "POST" && url.pathname === "/api/workspaces/enqueue") {
+        const body = await parseJsonBody(request);
+        const workspaceId = body.task_id ?? body.taskId ?? body.workspace_id ?? body.workspaceId;
+        if (!workspaceId) {
+          return json(response, 400, { error: "task_id or workspace_id is required" });
+        }
+        const projectPath = body.project_path ?? body.projectPath ?? url.searchParams.get("project_path") ?? process.cwd();
+        const result = await enqueueWorkspace(workspaceId, {
+          project_path: projectPath,
+          dependencies: body.dependencies ?? [],
+          task_id: body.task_id ?? body.taskId,
+        });
+        return json(response, 201, result);
+      }
+      if (request.method === "POST" && url.pathname === "/api/workspaces/discard") {
+        const body = await parseJsonBody(request);
+        const workspaceId = body.task_id ?? body.taskId ?? body.workspace_id ?? body.workspaceId;
+        if (!workspaceId) {
+          return json(response, 400, { error: "task_id or workspace_id is required" });
+        }
+        const projectPath = body.project_path ?? body.projectPath ?? url.searchParams.get("project_path") ?? process.cwd();
+        const result = await discardWorkspace(workspaceId, {
+          project_path: projectPath,
+          reason: body.reason,
+        });
+        return json(response, 200, result);
       }
       return json(response, 404, { error: "Not found" });
     } catch (error) {
