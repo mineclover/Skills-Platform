@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mlc-agy-lifecycle",
+  "name": "Antigravity Native Lifecycle & Worktree Pipeline Recipe",
+  "version": "1.0.0",
+  "description": "Antigravity 전용 절차적 책임 워크스페이스, Git 순차 병합 및 5대 보안 가드 훅 통합 레시피",
+  "created_at": "2026-08-30T00:00:00.000Z",
+  "sources": [
+    {
+      "source_id": "src:skills-platform-core",
+      "type": "local",
+      "locator": "./skills",
+      "description": "Skills Platform core skills"
+    }
+  ],
+  "skills": [
+    {
+      "skill_id": "skill:worktree-lifecycle-orchestrator",
+      "name": "worktree-lifecycle-orchestrator",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/worktree-lifecycle-orchestrator",
+      "content_digest": "sha256:agy01",
+      "invocation_mode": "hybrid",
+      "description": "Coordinate the procedure-responsible Git worktree lifecycle for Antigravity agents"
+    },
+    {
+      "skill_id": "skill:vertical-spec-documenter",
+      "name": "vertical-spec-documenter",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/vertical-spec-documenter",
+      "content_digest": "sha256:agy02",
+      "invocation_mode": "hybrid",
+      "description": "Build, compile, and validate bounded Vertical Topic Specification documents"
+    },
+    {
+      "skill_id": "skill:skills-manager-testing",
+      "name": "skills-manager-testing",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/skills-manager-testing",
+      "content_digest": "sha256:agy03",
+      "invocation_mode": "model_invoked",
+      "description": "Testing conventions, scoped test execution, and quality gates"
+    },
+    {
+      "skill_id": "skill:skills-manager-architecture",
+      "name": "skills-manager-architecture",
+      "version": "1.0.0",
+      "source_id": "src:skills-platform-core",
+      "source_relative_path": "skills/skills-manager-architecture",
+      "content_digest": "sha256:agy04",
+      "invocation_mode": "model_invoked",
+      "description": "Architecture reference, control plane invariants, and subsystem boundaries"
+    }
+  ],
+  "presets": [
+    {
+      "id": "agy-lifecycle",
+      "name": "Antigravity Lifecycle Preset",
+      "version": 1,
+      "description": "Native Antigravity lifecycle control plane with worktree orchestration and 5 guard hooks",
+      "skills": [
+        {
+          "skill_id": "skill:worktree-lifecycle-orchestrator",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:vertical-spec-documenter",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:skills-manager-testing",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:skills-manager-architecture",
+          "version": "1.0.0"
+        }
+      ]
+    }
+  ],
+  "hooks": [
+    {
+      "id": "secret-leak-guard",
+      "name": "Secret Leak Guard",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "run_command|write_to_file|replace_file_content|send_message|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/secret-leak-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 5,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "destructive-command-blocker",
+      "name": "Destructive Command Blocker",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "run_command",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/destructive-command-blocker.js",
+        "timeout_ms": 5000
+      },
+      "priority": 10,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "context-budget-guard",
+      "name": "Context Budget Guard",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content|run_command|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/context-budget-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 15,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "scope-boundary-enforcer",
+      "name": "Scope Boundary Enforcer",
+      "event": "post_tool_use",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/scope-boundary-enforcer.js",
+        "timeout_ms": 5000
+      },
+      "priority": 20,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "subagent-recursion-limiter",
+      "name": "Subagent Recursion Limiter",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "invoke_subagent|send_message",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/subagent-recursion-limiter.js",
+        "timeout_ms": 5000
+      },
+      "priority": 25,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    }
+  ]
+}
