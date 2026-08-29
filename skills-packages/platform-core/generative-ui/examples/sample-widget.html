@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+</head>
+<body class="bg-transparent text-[var(--foreground)] antialiased p-4">
+  <div class="bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] rounded-xl p-5 shadow-sm max-w-md mx-auto">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-[var(--foreground)] font-semibold text-base flex items-center gap-2">
+        <span>⚡</span> Interactive Metric Widget
+      </h2>
+      <span class="text-xs px-2 py-0.5 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">Live</span>
+    </div>
+    <p class="text-[var(--muted-foreground)] text-xs mb-4">
+      Self-contained generative UI widget using semantic design system tokens.
+    </p>
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]/50">
+        <div class="text-xs text-[var(--muted-foreground)]">Events Processed</div>
+        <div id="counter" class="text-lg font-bold text-[var(--foreground)]">1,420</div>
+      </div>
+      <div class="p-3 rounded-lg border border-[var(--border)] bg-[var(--background)]/50">
+        <div class="text-xs text-[var(--muted-foreground)]">Latency Avg</div>
+        <div class="text-lg font-bold text-[var(--foreground)]">24ms</div>
+      </div>
+    </div>
+    <button onclick="increment()" class="w-full py-2 px-4 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-semibold hover:opacity-90 transition shadow-sm">
+      Simulate Burst Event
+    </button>
+  </div>
+  <script>
+    let count = 1420;
+    function increment() {
+      count += Math.floor(Math.random() * 50) + 1;
+      document.getElementById('counter').innerText = count.toLocaleString();
+    }
+  </script>
+</body>
+</html>

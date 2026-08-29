@@ -9,8 +9,8 @@
     {
       "source_id": "src:skills-platform-core",
       "type": "local",
-      "locator": "./skills",
-      "description": "Skills Platform core skills"
+      "locator": "./skills-packages",
+      "description": "Skills Platform core packages"
     }
   ],
   "skills": [
@@ -19,7 +19,7 @@
       "name": "worktree-lifecycle-orchestrator",
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
-      "source_relative_path": "skills/worktree-lifecycle-orchestrator",
+      "source_relative_path": "platform-core/worktree-lifecycle-orchestrator",
       "content_digest": "sha256:agy01",
       "invocation_mode": "hybrid",
       "description": "Coordinate the procedure-responsible Git worktree lifecycle for Antigravity agents"
@@ -29,7 +29,7 @@
       "name": "vertical-spec-documenter",
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
-      "source_relative_path": "skills/vertical-spec-documenter",
+      "source_relative_path": "platform-core/vertical-spec-documenter",
       "content_digest": "sha256:agy02",
       "invocation_mode": "hybrid",
       "description": "Build, compile, and validate bounded Vertical Topic Specification documents"
@@ -39,7 +39,7 @@
       "name": "skills-manager-testing",
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
-      "source_relative_path": "skills/skills-manager-testing",
+      "source_relative_path": "skills-manager/skills-manager-testing",
       "content_digest": "sha256:agy03",
       "invocation_mode": "model_invoked",
       "description": "Testing conventions, scoped test execution, and quality gates"
@@ -49,7 +49,7 @@
       "name": "skills-manager-architecture",
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
-      "source_relative_path": "skills/skills-manager-architecture",
+      "source_relative_path": "skills-manager/skills-manager-architecture",
       "content_digest": "sha256:agy04",
       "invocation_mode": "model_invoked",
       "description": "Architecture reference, control plane invariants, and subsystem boundaries"
