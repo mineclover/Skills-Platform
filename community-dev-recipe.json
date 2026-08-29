@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mlc-community-dev-suite",
+  "name": "Community & Codex Full-Stack Development Suite",
+  "version": "1.0.0",
+  "description": "TDD, Code Review, Bug Diagnosis, Spec Synthesis, and Conflict Resolution skills imported from Codex & Community",
+  "created_at": "2026-08-30T00:00:00.000Z",
+  "sources": [
+    {
+      "source_id": "src:community-codex",
+      "type": "local",
+      "locator": "./skills-packages/community-codex",
+      "description": "Community and Codex engineering skills"
+    }
+  ],
+  "skills": [
+    {
+      "skill_id": "skill:tdd",
+      "name": "tdd",
+      "version": "1.0.0",
+      "source_id": "src:community-codex",
+      "source_relative_path": "tdd",
+      "content_digest": "sha256:com01",
+      "invocation_mode": "hybrid",
+      "description": "Test-driven development (red-green-refactor)"
+    },
+    {
+      "skill_id": "skill:code-review",
+      "name": "code-review",
+      "version": "1.0.0",
+      "source_id": "src:community-codex",
+      "source_relative_path": "code-review",
+      "content_digest": "sha256:com02",
+      "invocation_mode": "hybrid",
+      "description": "Rigorous multi-agent code review"
+    },
+    {
+      "skill_id": "skill:diagnosing-bugs",
+      "name": "diagnosing-bugs",
+      "version": "1.0.0",
+      "source_id": "src:community-codex",
+      "source_relative_path": "diagnosing-bugs",
+      "content_digest": "sha256:com03",
+      "invocation_mode": "hybrid",
+      "description": "Systematic root-cause bug diagnosis"
+    },
+    {
+      "skill_id": "skill:resolving-merge-conflicts",
+      "name": "resolving-merge-conflicts",
+      "version": "1.0.0",
+      "source_id": "src:community-codex",
+      "source_relative_path": "resolving-merge-conflicts",
+      "content_digest": "sha256:com04",
+      "invocation_mode": "hybrid",
+      "description": "Atomic resolution of Git merge and rebase conflicts"
+    },
+    {
+      "skill_id": "skill:to-spec",
+      "name": "to-spec",
+      "version": "1.0.0",
+      "source_id": "src:community-codex",
+      "source_relative_path": "to-spec",
+      "content_digest": "sha256:com05",
+      "invocation_mode": "hybrid",
+      "description": "Synthesize conversation into clear technical specifications"
+    },
+    {
+      "skill_id": "skill:grill-me",
+      "name": "grill-me",
+      "version": "1.0.0",
+      "source_id": "src:community-codex",
+      "source_relative_path": "grill-me",
+      "content_digest": "sha256:com06",
+      "invocation_mode": "user_invoked",
+      "description": "Interactive architectural interview to stress-test plans"
+    }
+  ],
+  "presets": [
+    {
+      "id": "community-dev-preset",
+      "name": "Community Development Preset",
+      "version": 1,
+      "description": "Core community developer toolset",
+      "skills": [
+        {
+          "skill_id": "skill:tdd",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:code-review",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:diagnosing-bugs",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:resolving-merge-conflicts",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:to-spec",
+          "version": "1.0.0"
+        },
+        {
+          "skill_id": "skill:grill-me",
+          "version": "1.0.0"
+        }
+      ]
+    }
+  ],
+  "hooks": []
+}
