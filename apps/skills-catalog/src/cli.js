@@ -347,6 +347,84 @@ async function run(argv) {
         });
       }
     }
+    if (area === "init") {
+      const skillName = action ?? subject ?? flags.name;
+      if (!skillName) throw new Error("skill init requires a skill name: skills-platform skill init <name>");
+      const targetDir = path.resolve(flags.out ?? flags.dir ?? path.join(process.cwd(), "skills", skillName));
+      await fs.mkdir(path.join(targetDir, "references"), { recursive: true });
+      await fs.mkdir(path.join(targetDir, "examples"), { recursive: true });
+      const scaffoldSkillMd = `---
+name: ${skillName}
+description: >-
+  Concise 3rd-person summary of what this skill does and the exact scenarios when the agent should activate it. Use when...
+---
+
+# ${skillName}
+
+Step-by-step procedural runbook for ${skillName}.
+
+## 1. Prerequisites
+- Confirm environment and tools are ready.
+
+## 2. Steps
+1. Execute core workflow step.
+2. Verify output.
+
+For detailed manuals and schemas, see [references/guide.md](./references/guide.md).
+`;
+      await fs.writeFile(path.join(targetDir, "SKILL.md"), scaffoldSkillMd, "utf8");
+      await fs.writeFile(path.join(targetDir, "references", "guide.md"), `# ${skillName} Reference Manual\n\nDeep specifications and schemas go here.\n`, "utf8");
+      await fs.writeFile(path.join(targetDir, "examples", "example.md"), `# ${skillName} Example Walkthrough\n\nSample inputs and outputs go here.\n`, "utf8");
+      return { initialized: true, skill_name: skillName, path: targetDir };
+    }
+    if (area === "validate") {
+      const skillPath = path.resolve(action ?? subject ?? flags.path ?? process.cwd());
+      const skillMdPath = path.join(skillPath, "SKILL.md");
+      const issues = [];
+      try {
+        const content = await fs.readFile(skillMdPath, "utf8");
+        const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        if (!fmMatch) {
+          issues.push("SKILL.md is missing YAML frontmatter (--- ... ---)");
+        } else {
+          const fmText = fmMatch[1];
+          const nameMatch = fmText.match(/^name:\s*(.+)$/m);
+          const descMatch = fmText.match(/^description:\s*(?:>-\s*)?([\s\S]*?)(?=\n[a-z_]+:|$)/m);
+          if (!nameMatch || !nameMatch[1].trim()) {
+            issues.push("Frontmatter is missing required 'name' field");
+          } else {
+            const nameVal = nameMatch[1].trim();
+            if (!/^[a-z0-9-]+$/.test(nameVal)) {
+              issues.push(`Invalid skill name '${nameVal}': must be lowercase alphanumeric and hyphens only`);
+            }
+          }
+          if (!descMatch || !descMatch[1].trim()) {
+            issues.push("Frontmatter is missing required 'description' field");
+          } else if (descMatch[1].trim().length < 20) {
+            issues.push("Frontmatter 'description' is too short; provide clear triggers on when to use this skill");
+          }
+        }
+        // Check relative markdown links
+        const linkRegex = /\[([^\]]+)\]\(\.\/([^\)]+)\)/g;
+        let match;
+        while ((match = linkRegex.exec(content)) !== null) {
+          const targetRel = match[2];
+          const targetAbs = path.resolve(skillPath, targetRel);
+          try {
+            await fs.stat(targetAbs);
+          } catch {
+            issues.push(`Broken relative link: [${match[1]}](./${targetRel}) -> file not found on disk`);
+          }
+        }
+      } catch (err) {
+        issues.push(`Failed to read SKILL.md: ${err.message}`);
+      }
+      return {
+        valid: issues.length === 0,
+        skill_path: skillPath,
+        issues,
+      };
+    }
   }
 
   if (command === "evaluation") {
