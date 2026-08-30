@@ -1,0 +1,47 @@
+work_unit:
+  id: "WU-{{WU_ID}}"
+  run_id: "run-{{RUN_ID}}"
+
+  topic_id: "topic.{{DOMAIN}}.{{FEATURE}}"
+  primary_obligation_id: "O-{{OBLIGATION_ID}}"
+
+  objective:
+    statement: "Targeted vertical problem to resolve"
+
+  context_pack_ref: "context://pack-{{WU_ID}}"
+
+  inputs:
+    artifact_refs:
+      - "git://candidate-current"
+    evidence_refs: []
+
+  authority:
+    allowed_tools:
+      - "view_file"
+      - "replace_file_content"
+      - "run_command"
+    allowed_change_scope:
+      - "src/**"
+      - "test/**"
+
+  expected_outputs:
+    - "patch"
+    - "test-result"
+    - "result-summary"
+
+  verifiers:
+    - "evaluator://unit-test"
+    - "evaluator://typecheck"
+
+  budgets:
+    max_steps: 12
+    max_tool_calls: 30
+    max_tokens: 30000
+    max_retries: 2
+
+  exit_conditions:
+    success:
+      - all_verifiers_pass
+    blocked:
+      - authority_scope_exceeded
+      - evaluator_failed

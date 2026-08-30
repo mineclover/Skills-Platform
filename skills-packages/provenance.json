@@ -7,9 +7,9 @@
       "display_name": "Skills Platform Core",
       "origin_type": "first_party",
       "maintainer": "Skills Platform Team",
-      "description": "Core architectural standards, worktree lifecycle orchestration, and spec compilation",
+      "description": "Core architectural standards, worktree lifecycle orchestration, vertical spec compilation, and 6-state logical completion harness v0.1",
       "license": "Apache-2.0",
-      "skills_count": 4
+      "skills_count": 6
     },
     {
       "package_id": "antigravity-builtin",
@@ -17,9 +17,9 @@
       "origin_type": "vendor_builtin",
       "upstream_provider": "Google DeepMind / Antigravity Team",
       "upstream_url": "https://antigravity.google/docs",
-      "description": "Official Antigravity CLI, teamwork multi-agent swarm, rules/hooks customization, and generative UI",
+      "description": "Official Antigravity CLI, teamwork multi-agent swarm, rules/hooks customization, generative UI, grill-me, goal mode, and schedule/browser protocols",
       "license": "Proprietary / Builtin",
-      "skills_count": 6
+      "skills_count": 12
     },
     {
       "package_id": "skills-manager",
@@ -32,12 +32,24 @@
     },
     {
       "package_id": "shared-agents",
-      "display_name": "Shared Global Agent Skills",
+      "display_name": "Shared Global Agent Skills & Orca Runtime",
       "origin_type": "local_shared_pool",
       "source_path": "~/.agents/skills",
-      "description": "Shared environment agent skills including computer-use, find-skills, and orchestration",
-      "license": "Custom / Internal",
+      "upstream_provider": "Orca Desktop Team / Open Agent Ecosystem",
+      "upstream_url": "https://skills.sh",
+      "description": "Global shared agent skills including Open Skills package manager (find-skills), Orca worktree/terminal CLI (orca-cli), inter-agent orchestration DAGs (orchestration), and OS accessibility GUI automation (computer-use)",
+      "license": "MIT / Apache-2.0",
       "skills_count": 4
+    },
+    {
+      "package_id": "paperthin",
+      "display_name": "Paperthin Agent Reflexes & re0 Ecosystem",
+      "origin_type": "community_imported",
+      "upstream_provider": "LilMGenius",
+      "upstream_url": "https://github.com/LilMGenius/paperthin",
+      "description": "Low-level agentic design patterns and cognitive reflexes including the re0 iteration lifecycle, Feynman probing, debloating, and SSOT alignment",
+      "license": "MIT / Apache-2.0",
+      "skills_count": 28
     },
     {
       "package_id": "community-codex",

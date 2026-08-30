@@ -91,6 +91,9 @@ Maintenance Control Plane (Skills Platform)
 | **`baseline-full-suite`** | Full Master Suite | 43 | (All) | 43종 전체 MLC 제어 평면 일괄 사용 |
 | **`builtin-pristine`** | Clean Slate Baseline | 0 | (Pristine) | 0개 스킬 상태로 안전한 완전 초기화 |
 
+> 📖 **루프 유형별 매트릭스 거버넌스 사양서**: [docs/guides/loop-types-and-skill-presets-matrix.md](./docs/guides/loop-types-and-skill-presets-matrix.md)  
+> (5대 표준 루프 유형: `LOOP-TDD`, `LOOP-ARCH`, `LOOP-RESEARCH`, `LOOP-HOTFIX`, `LOOP-SWARM`, `LOOP-AUDIT` 기반 스킬 생태계 바인딩 및 지속 고도화 프로토콜)
+
 ---
 
 ---

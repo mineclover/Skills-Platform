@@ -1,0 +1,23 @@
+verification_record:
+  id: "VR-{{VR_ID}}"
+  work_unit_id: "WU-{{WU_ID}}"
+  obligation_id: "O-{{OBLIGATION_ID}}"
+
+  evaluator_ref: "evaluator://{{EVALUATOR_NAME}}"
+  evaluator_version: 1
+
+  result: pass # pass | fail | inconclusive
+
+  assertions:
+    - id: "AC1"
+      result: pass
+      evidence_refs:
+        - "evidence://test-output-{{RUN_ID}}"
+
+  environment:
+    artifact_version: "git://commit/{{COMMIT_HASH}}"
+    runtime_version: "node://22"
+    dependency_lock_ref: "file://package-lock.json"
+
+  side_effects: []
+  observed_at: "2026-08-31T09:00:00Z"

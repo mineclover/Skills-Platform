@@ -1,0 +1,31 @@
+completion_certificate:
+  run_id: "run-{{RUN_ID}}"
+  contract_id: "contract-{{CONTRACT_ID}}"
+  contract_version: 1
+
+  result: completed # completed | partially_completed | blocked | inconclusive | aborted
+
+  baseline_ref: "git://commit/{{FINAL_COMMIT_HASH}}"
+
+  verified_obligations:
+    - "O-1"
+    - "O-2"
+
+  acceptance_results:
+    - check_id: "AC1"
+      result: pass
+      evidence_refs:
+        - "evidence://test-pass-01"
+
+  unresolved_noncritical_items: []
+
+  policy_versions:
+    consult_policy: 1
+    promotion_policy: 1
+
+  cost:
+    model_calls: 8
+    tool_calls: 18
+    tokens: 24500
+
+  issued_at: "2026-08-31T09:30:00Z"

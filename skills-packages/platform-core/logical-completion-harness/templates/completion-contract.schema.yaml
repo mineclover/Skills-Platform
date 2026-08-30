@@ -1,0 +1,42 @@
+completion_contract:
+  id: "contract-{{TASK_ID}}"
+  version: 1
+
+  goal:
+    statement: "Precise statement of required end state"
+
+  deliverables:
+    - id: D1
+      description: "Required deliverable artifact"
+
+  acceptance_checks:
+    - id: AC1
+      statement: "Objective checkable condition"
+      required: true
+      evaluator_ref: "evaluator://npm-test"
+      target_ref: "artifact://candidate/current"
+
+  constraints:
+    allowed_change_scope:
+      - "src/**"
+      - "test/**"
+    prohibited_change_scope:
+      - "production/**"
+      - ".env*"
+    allowed_tools:
+      - "view_file"
+      - "replace_file_content"
+      - "run_command"
+
+  non_goals:
+    - "Out of scope items for this execution"
+
+  risk:
+    level: medium
+    approval_required_for:
+      - "destructive-action"
+
+  stop_conditions:
+    - authority_missing
+    - evaluator_unavailable
+    - budget_exhausted
