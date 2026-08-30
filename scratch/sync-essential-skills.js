@@ -24,6 +24,17 @@ const ESSENTIAL_SKILLS_MAP = {
   "vertical-spec-documenter": path.join(root, "skills-packages", "platform-core", "vertical-spec-documenter"),
   "logical-completion-core": path.join(root, "skills-packages", "platform-core", "logical-completion-core"),
   "logical-completion-harness": path.join(root, "skills-packages", "platform-core", "logical-completion-harness"),
+  "lch-contract-compiler": path.join(root, "skills-packages", "platform-core", "lch-contract-compiler"),
+  "lch-horizontal-explorer": path.join(root, "skills-packages", "platform-core", "lch-horizontal-explorer"),
+  "lch-obligation-ledger": path.join(root, "skills-packages", "platform-core", "lch-obligation-ledger"),
+  "lch-responsibility-router": path.join(root, "skills-packages", "platform-core", "lch-responsibility-router"),
+  "lch-work-unit-executor": path.join(root, "skills-packages", "platform-core", "lch-work-unit-executor"),
+  "lch-evidence-collector": path.join(root, "skills-packages", "platform-core", "lch-evidence-collector"),
+  "lch-independent-auditor": path.join(root, "skills-packages", "platform-core", "lch-independent-auditor"),
+  "lch-failure-recovery": path.join(root, "skills-packages", "platform-core", "lch-failure-recovery"),
+  "lch-closure-gate": path.join(root, "skills-packages", "platform-core", "lch-closure-gate"),
+  "lch-experience-consolidator": path.join(root, "skills-packages", "platform-core", "lch-experience-consolidator"),
+  "lch-evolution-supervisor": path.join(root, "skills-packages", "platform-core", "lch-evolution-supervisor"),
 
   // Skills Manager Core
   "skills-manager-testing": path.join(root, "skills-packages", "skills-manager", "skills-manager-testing"),

@@ -8,7 +8,7 @@ Authoritative provenance and origin metadata for all modular skill packages in `
 
 | Package Name | Origin / Provider | Spec Format | License | Key Skills Included |
 | :--- | :--- | :--- | :--- | :--- |
-| **`platform-core`** | Skills Platform Core Team | Antigravity / Open Skills | Apache-2.0 | `worktree-lifecycle-orchestrator`, `vertical-spec-documenter`, `skill-authoring-standard`, `generative-ui`, `logical-completion-core`, `logical-completion-harness` (6 skills) |
+| **`platform-core`** | Skills Platform Core Team | Antigravity / Open Skills | Apache-2.0 | `worktree-lifecycle-orchestrator`, `vertical-spec-documenter`, `skill-authoring-standard`, `generative-ui`, `logical-completion-core`, `logical-completion-harness`, `lch-contract-compiler`, `lch-horizontal-explorer`, `lch-obligation-ledger`, `lch-responsibility-router`, `lch-work-unit-executor`, `lch-evidence-collector`, `lch-independent-auditor`, `lch-failure-recovery`, `lch-closure-gate`, `lch-experience-consolidator`, `lch-evolution-supervisor` (17 skills) |
 | **`antigravity-builtin`** | Google DeepMind (Antigravity) | Antigravity Native | Builtin | `teamwork-preview`, `agy-customizations`, `antigravity-guide`, `generative-ui`, `grill-me`, `goal`, `learn`, `schedule`, `browser`, `ralph-loop` (12 skills) |
 | **`skills-manager`** | Skills Manager System | Native Tooling | Apache-2.0 | `skills-manager-testing`, `skills-manager-architecture`, `skills-manager-orca`, `skills-manager-tauri`, `skills-manager-ui` |
 | **`shared-agents`** | Global Agent Pool (`~/.agents`) | Open Agent Spec | Internal | `find-skills`, `computer-use`, `orca-cli`, `orchestration` |
