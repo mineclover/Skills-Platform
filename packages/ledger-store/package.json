@@ -1,0 +1,27 @@
+{
+  "name": "@skills-platform/ledger-store",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic Ledger Store, Event Sourcing, and Real-time Gap Engine for Skills Platform.",
+  "main": "./src/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.js"
+    },
+    "./src": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@skills-platform/contracts": "*"
+  }
+}
