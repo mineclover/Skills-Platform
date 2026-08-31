@@ -61,6 +61,11 @@ const {
   applySkillUpdates,
   rollbackSkillUpdate,
   listBackupSnapshots,
+  loadUpstreamChannels,
+  registerUpstreamChannel,
+  removeUpstreamChannel,
+  checkChannelStatus,
+  syncChannelRoute,
 } = require(".");
 
 const MULTI_VALUE_FLAGS = new Set([
@@ -203,6 +208,39 @@ async function run(argv) {
     }
     if (action === "backups" || action === "list-backups") {
       return listBackupSnapshots();
+    }
+  }
+
+  if (command === "upstream" || command === "channels") {
+    const [action] = positional.slice(1);
+    if (action === "list" || !action) {
+      return loadUpstreamChannels();
+    }
+    if (action === "check" || action === "status") {
+      return checkChannelStatus({ channelId: flags.channel || flags.id });
+    }
+    if (action === "add" || action === "register") {
+      return registerUpstreamChannel({
+        channelId: flags.channel || flags.id || flags.name,
+        displayName: flags.title || flags["display-name"] || flags.name,
+        packageId: flags.package || flags["package-id"],
+        kind: flags.kind || "git",
+        locator: flags.locator || flags.url || positional[2],
+        requestedRef: flags.ref || flags.branch || "HEAD",
+        subpath: flags.subpath || "",
+        targetDirectory: flags.target || flags["target-directory"],
+        syncPolicy: flags.policy || flags["sync-policy"] || "fast-forward-only",
+      });
+    }
+    if (action === "remove" || action === "delete") {
+      return removeUpstreamChannel(flags.channel || flags.id || positional[2]);
+    }
+    if (action === "sync" || action === "pull") {
+      return syncChannelRoute({
+        channelId: flags.channel || flags.id || positional[2],
+        dryRun: Boolean(flags["dry-run"] || flags.dryRun),
+        createBackup: flags.backup !== false && flags["no-backup"] !== true,
+      });
     }
   }
 

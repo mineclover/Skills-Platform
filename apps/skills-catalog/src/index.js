@@ -14,4 +14,5 @@ module.exports = {
   ...require("./workspace-manager"),
   ...require("./sequential-merger"),
   ...require("./skills-updater"),
+  ...require("./upstream-channel-manager"),
 };
