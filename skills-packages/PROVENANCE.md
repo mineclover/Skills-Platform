@@ -14,6 +14,7 @@ Authoritative provenance and origin metadata for all modular skill packages in `
 | **`shared-agents`** | Global Agent Pool (`~/.agents`) | Open Agent Spec | Internal | `find-skills`, `computer-use`, `orca-cli`, `orchestration` |
 | **`paperthin`** | LilMGenius (`paperthin`) | Antigravity / Open Skills | MIT / Apache-2.0 | `re0-plan`, `re0-loop`, `re0-work`, `re0-memo`, `feynman`, `debloat`, `ssotize`, `hate`, `macrothink` (28 skills) |
 | **`community-codex`** | Codex / Open Agent Community | Open Agent Skills Spec | MIT / Apache-2.0 | `tdd`, `code-review`, `diagnosing-bugs`, `resolving-merge-conflicts`, `to-spec`, `grill-me`, `codebase-design` (47 skills) |
+| **`product-spine-convergence`** | Skills Platform Architecture Team | Antigravity / Open Skills | Apache-2.0 | `product-spine-convergence`, `product-spine-auditor`, `convergence-planner`, `architecture-governor`, `delivery-evidence-auditor` (5 skills) |
 
 ---
 

@@ -37,6 +37,13 @@ const ESSENTIAL_SKILLS_MAP = {
   "lch-evolution-supervisor": path.join(root, "skills-packages", "platform-core", "lch-evolution-supervisor"),
   "lch-teamwork-preview": path.join(root, "skills-packages", "platform-core", "lch-teamwork-preview"),
 
+  // Product Spine Convergence & Architecture Governance
+  "product-spine-convergence": path.join(root, "skills-packages", "product-spine-convergence"),
+  "product-spine-auditor": path.join(root, "skills-packages", "product-spine-convergence", "skills", "product-spine-auditor"),
+  "convergence-planner": path.join(root, "skills-packages", "product-spine-convergence", "skills", "convergence-planner"),
+  "architecture-governor": path.join(root, "skills-packages", "product-spine-convergence", "skills", "architecture-governor"),
+  "delivery-evidence-auditor": path.join(root, "skills-packages", "product-spine-convergence", "skills", "delivery-evidence-auditor"),
+
   // Skills Manager Core
   "skills-manager-testing": path.join(root, "skills-packages", "skills-manager", "skills-manager-testing"),
   "skills-manager-architecture": path.join(root, "skills-packages", "skills-manager", "skills-manager-architecture"),

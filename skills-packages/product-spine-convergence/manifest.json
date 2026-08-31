@@ -1,0 +1,23 @@
+{
+  "name": "product-spine-convergence-skill-pack",
+  "version": "0.1.0",
+  "entrypoint": "SKILL.md",
+  "standalone": "../product-spine-convergence-standalone-SKILL.md",
+  "files": [
+    "README.md",
+    "SKILL.md",
+    "references/principles.md",
+    "skills/architecture-governor/SKILL.md",
+    "skills/convergence-planner/SKILL.md",
+    "skills/delivery-evidence-auditor/SKILL.md",
+    "skills/product-spine-auditor/SKILL.md",
+    "templates/INVARIANTS.md",
+    "templates/MODEL.md",
+    "templates/PRODUCT.md",
+    "templates/ROADMAP.md",
+    "templates/convergence-report.md",
+    "tests/trigger-cases.md",
+    "workflows/recovery-workflow.md",
+    "manifest.json"
+  ]
+}

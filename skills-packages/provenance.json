@@ -64,6 +64,15 @@
       "description": "Extensive community development skills for TDD, code review, refactoring, bug diagnosis, and architecture",
       "license": "MIT / Apache-2.0",
       "skills_count": 47
+    },
+    {
+      "package_id": "product-spine-convergence",
+      "display_name": "Product Spine Convergence & Architecture Governance",
+      "origin_type": "first_party",
+      "maintainer": "Skills Platform Architecture Team",
+      "description": "Diagnose and recover projects from spec proliferation, establish canonical product spines, golden paths, asset disposition matrices, and evidence-based delivery gates",
+      "license": "Apache-2.0",
+      "skills_count": 5
     }
   ]
 }
