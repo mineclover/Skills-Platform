@@ -57,6 +57,10 @@ const {
   applyRecipe,
   exportRecipe,
   inspectRecipe,
+  checkSkillUpdates,
+  applySkillUpdates,
+  rollbackSkillUpdate,
+  listBackupSnapshots,
 } = require(".");
 
 const MULTI_VALUE_FLAGS = new Set([
@@ -177,6 +181,28 @@ async function run(argv) {
       const [decision, revisionId] = positional.slice(2);
       if (decision === "show") return latestSourceReview({ catalogRoot, sourceRevisionId: revisionId });
       return recordSourceReview({ catalogRoot, registryRoot, sourceRevisionId: revisionId, decision: decision === "approve" ? "approved" : decision === "reject" ? "rejected" : decision, summary: flags.summary, reviewer: flags.reviewer });
+    }
+  }
+
+  if (command === "update" || command === "updates") {
+    const [action] = positional.slice(1);
+    if (action === "check" || action === "status" || !action) {
+      return checkSkillUpdates({ registryRoot });
+    }
+    if (action === "apply") {
+      return applySkillUpdates({
+        registryRoot,
+        sourceIds: flags.source ? [flags.source] : (flags.sources ?? []),
+        dryRun: Boolean(flags["dry-run"] || flags.dryRun),
+        createBackup: flags.backup !== false && flags["no-backup"] !== true,
+        runVerification: flags.verify !== false && flags["no-verify"] !== true,
+      });
+    }
+    if (action === "rollback") {
+      return rollbackSkillUpdate({ backupId: flags.backup || flags["backup-id"] });
+    }
+    if (action === "backups" || action === "list-backups") {
+      return listBackupSnapshots();
     }
   }
 

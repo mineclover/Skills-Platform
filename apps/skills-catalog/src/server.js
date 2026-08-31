@@ -33,6 +33,12 @@ const {
   getQueueStatus,
   processQueue,
 } = require("./sequential-merger");
+const {
+  checkSkillUpdates,
+  applySkillUpdates,
+  rollbackSkillUpdate,
+  listBackupSnapshots,
+} = require("./skills-updater");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -696,6 +702,30 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
           reason: body.reason,
         });
         return json(response, 200, result);
+      }
+      if (request.method === "GET" && (url.pathname === "/api/skills/updates" || url.pathname === "/api/updates")) {
+        const result = await checkSkillUpdates({ registryRoot });
+        return json(response, 200, result);
+      }
+      if (request.method === "POST" && (url.pathname === "/api/skills/updates/apply" || url.pathname === "/api/updates/apply")) {
+        const body = await parseJsonBody(request).catch(() => ({}));
+        const result = await applySkillUpdates({
+          registryRoot,
+          sourceIds: body.source_ids ?? body.sourceIds ?? [],
+          dryRun: Boolean(body.dry_run ?? body.dryRun),
+          createBackup: body.create_backup !== false && body.createBackup !== false,
+          runVerification: body.run_verification !== false && body.runVerification !== false,
+        });
+        return json(response, 200, result);
+      }
+      if (request.method === "POST" && (url.pathname === "/api/skills/updates/rollback" || url.pathname === "/api/updates/rollback")) {
+        const body = await parseJsonBody(request).catch(() => ({}));
+        const result = await rollbackSkillUpdate({ backupId: body.backup_id ?? body.backupId });
+        return json(response, 200, result);
+      }
+      if (request.method === "GET" && (url.pathname === "/api/skills/updates/backups" || url.pathname === "/api/updates/backups")) {
+        const result = await listBackupSnapshots();
+        return json(response, 200, { backups: result });
       }
       return json(response, 404, { error: "Not found" });
     } catch (error) {
