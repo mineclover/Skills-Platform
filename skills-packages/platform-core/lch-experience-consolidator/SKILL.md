@@ -8,7 +8,7 @@ invocation_mode: hybrid
 
 # LCH: Experience Consolidator (`lch-experience-consolidator`)
 
-Phase 8.5 policy skill of the Logical Completion Harness. Manages post-run memory consolidation and LFU cache lifecycle.
+Phase 10 policy skill of the Logical Completion Harness. Manages post-run memory consolidation and LFU cache lifecycle.
 
 ---
 

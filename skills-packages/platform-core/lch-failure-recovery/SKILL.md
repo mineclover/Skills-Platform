@@ -8,7 +8,7 @@ invocation_mode: hybrid
 
 # LCH: Failure Recovery Controller (`lch-failure-recovery`)
 
-Phase 7.5 policy skill of the Logical Completion Harness. Routes failed verification records to appropriate recovery actions based on failure taxonomy.
+Phase 8 policy skill of the Logical Completion Harness. Routes failed verification records to appropriate recovery actions based on failure taxonomy.
 
 ---
 

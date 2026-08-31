@@ -8,7 +8,7 @@ invocation_mode: hybrid
 
 # LCH: Closure Gate (`lch-closure-gate`)
 
-Phase 8 policy skill of the Logical Completion Harness. Evaluates full contract fulfillment and issues the signed **Completion Certificate**.
+Phase 9 policy skill of the Logical Completion Harness. Evaluates full contract fulfillment and issues the signed **Completion Certificate**.
 
 ---
 

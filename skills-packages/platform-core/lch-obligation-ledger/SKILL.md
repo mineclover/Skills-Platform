@@ -8,7 +8,7 @@ invocation_mode: hybrid
 
 # LCH: Obligation Ledger (`lch-obligation-ledger`)
 
-Phase 2.5 policy skill of the Logical Completion Harness. Manages the state machine of all completion obligations.
+Phase 3 policy skill of the Logical Completion Harness. Manages the state machine of all completion obligations.
 
 ---
 

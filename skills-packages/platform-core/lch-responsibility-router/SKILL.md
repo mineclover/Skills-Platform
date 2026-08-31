@@ -8,7 +8,7 @@ invocation_mode: hybrid
 
 # LCH: Responsibility Router (`lch-responsibility-router`)
 
-Phase 3 policy skill of the Logical Completion Harness. Binds a single active topic and enforces strict authority and file scope boundaries.
+Phase 4 policy skill of the Logical Completion Harness. Binds a single active topic and enforces strict authority and file scope boundaries.
 
 ---
 

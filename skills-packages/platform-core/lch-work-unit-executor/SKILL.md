@@ -8,7 +8,7 @@ invocation_mode: hybrid
 
 # LCH: Work Unit Executor (`lch-work-unit-executor`)
 
-Phases 4 & 5 policy skill of the Logical Completion Harness. Executes targeted code modifications bounded strictly by the Work Unit contract and Context Pack.
+Phase 5 policy skill of the Logical Completion Harness. Executes targeted code modifications bounded strictly by the Work Unit contract and Context Pack.
 
 ---
 

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-31T21:01:52.679Z",
+  "channels": [
+    {
+      "channel_id": "channel_paperthin",
+      "display_name": "Paperthin Reflexes & re0 Upstream",
+      "package_id": "paperthin",
+      "kind": "git",
+      "locator": "https://github.com/LilMGenius/paperthin.git",
+      "requested_ref": "HEAD",
+      "subpath": "",
+      "target_directory": "skills-packages/paperthin",
+      "sync_policy": "fast-forward-only",
+      "auto_track": true,
+      "last_synced_commit": "3bca079a51bcfff5dafb53d1d7f9f523d66ee317",
+      "last_checked_at": "2026-08-31T21:01:52.677Z"
+    },
+    {
+      "channel_id": "channel_shared_agents",
+      "display_name": "Shared Global Agent Pool (~/.agents)",
+      "package_id": "shared-agents",
+      "kind": "local_directory",
+      "locator": "C:\\Users\\minec\\.agents\\skills",
+      "requested_ref": null,
+      "subpath": "",
+      "target_directory": "skills-packages/shared-agents",
+      "sync_policy": "overlay-protect",
+      "auto_track": true,
+      "last_synced_commit": null,
+      "last_checked_at": "2026-08-31T21:01:52.678Z"
+    }
+  ]
+}

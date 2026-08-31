@@ -8,7 +8,7 @@ invocation_mode: hybrid
 
 # LCH: Evolution Supervisor (`lch-evolution-supervisor`)
 
-Phase 9 policy skill of the Logical Completion Harness (Evolution Plane). Controls candidate exploration ($X_t = (L, H, F, G, Q)$) and halts stagnation.
+Phase 11 policy skill of the Logical Completion Harness (Evolution Plane). Controls candidate exploration ($X_t = (L, H, F, G, Q)$) and halts stagnation.
 
 ---
 
