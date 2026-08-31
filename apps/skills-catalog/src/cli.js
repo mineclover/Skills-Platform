@@ -66,6 +66,16 @@ const {
   removeUpstreamChannel,
   checkChannelStatus,
   syncChannelRoute,
+  createPlan,
+  getPlan,
+  listPlans,
+  deletePlan,
+  transitionObligation,
+  recordPlanVerification,
+  issuePlanCertificate,
+  calculatePlanGap,
+  getReadyObligations,
+  getEventHistory,
 } = require(".");
 
 const MULTI_VALUE_FLAGS = new Set([
@@ -241,6 +251,42 @@ async function run(argv) {
         dryRun: Boolean(flags["dry-run"] || flags.dryRun),
         createBackup: flags.backup !== false && flags["no-backup"] !== true,
       });
+    }
+  }
+
+  if (command === "ledger" || command === "plan") {
+    const [action] = positional.slice(1);
+    if (action === "list" || !action) {
+      return listPlans({ filter: { status: flags.status, phase: flags.phase } });
+    }
+    if (action === "get" || action === "show") {
+      return getPlan(flags.id || flags.plan || positional[2]);
+    }
+    if (action === "create" || action === "new") {
+      return createPlan({
+        planId: flags.id || flags.plan,
+        title: flags.title || positional[2] || "New Plan",
+      });
+    }
+    if (action === "gap" || action === "check-gap") {
+      return calculatePlanGap(flags.id || flags.plan || positional[2]);
+    }
+    if (action === "ready" || action === "ready-obligations") {
+      return getReadyObligations(flags.id || flags.plan || positional[2]);
+    }
+    if (action === "transition") {
+      return transitionObligation(
+        flags.id || flags.plan || positional[2],
+        flags.obligation || flags.oid,
+        flags.status || positional[3],
+        { actor: flags.actor || "cli_user", reason: flags.reason }
+      );
+    }
+    if (action === "events" || action === "history") {
+      return getEventHistory(flags.id || flags.plan || positional[2]);
+    }
+    if (action === "delete" || action === "rm") {
+      return deletePlan(flags.id || flags.plan || positional[2]);
     }
   }
 

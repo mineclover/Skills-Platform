@@ -15,4 +15,5 @@ module.exports = {
   ...require("./sequential-merger"),
   ...require("./skills-updater"),
   ...require("./upstream-channel-manager"),
+  ...require("./ledger-store"),
 };

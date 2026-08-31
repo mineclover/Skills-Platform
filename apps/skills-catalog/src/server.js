@@ -39,6 +39,18 @@ const {
   rollbackSkillUpdate,
   listBackupSnapshots,
 } = require("./skills-updater");
+const {
+  createPlan,
+  getPlan,
+  listPlans,
+  deletePlan,
+  transitionObligation,
+  recordPlanVerification,
+  issuePlanCertificate,
+  calculatePlanGap,
+  getReadyObligations,
+  getEventHistory,
+} = require("./ledger-store");
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -726,6 +738,80 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
       if (request.method === "GET" && (url.pathname === "/api/skills/updates/backups" || url.pathname === "/api/updates/backups")) {
         const result = await listBackupSnapshots();
         return json(response, 200, { backups: result });
+      }
+      if (request.method === "GET" && url.pathname === "/api/ledgers") {
+        const result = await listPlans({
+          filter: {
+            status: url.searchParams.get("status") || undefined,
+            phase: url.searchParams.get("phase") || undefined,
+          },
+        });
+        return json(response, 200, { plans: result });
+      }
+      if (request.method === "POST" && url.pathname === "/api/ledgers") {
+        const body = await parseJsonBody(request).catch(() => ({}));
+        const result = await createPlan({
+          planId: body.plan_id ?? body.planId,
+          title: body.title,
+          contract: body.contract,
+          actor: body.actor || "api_client",
+        });
+        return json(response, 201, result);
+      }
+      if (request.method === "GET" && url.pathname.startsWith("/api/ledgers/")) {
+        const parts = url.pathname.slice("/api/ledgers/".length).split("/");
+        const planId = decodeURIComponent(parts[0]);
+        const subAction = parts[1];
+
+        if (!subAction) {
+          const result = await getPlan(planId);
+          return json(response, 200, result);
+        }
+        if (subAction === "gap") {
+          const result = await calculatePlanGap(planId);
+          return json(response, 200, result);
+        }
+        if (subAction === "ready") {
+          const result = await getReadyObligations(planId);
+          return json(response, 200, { ready_obligations: result });
+        }
+        if (subAction === "events" || subAction === "history") {
+          const result = await getEventHistory(planId);
+          return json(response, 200, { events: result });
+        }
+      }
+      if (request.method === "POST" && url.pathname.startsWith("/api/ledgers/")) {
+        const parts = url.pathname.slice("/api/ledgers/".length).split("/");
+        const planId = decodeURIComponent(parts[0]);
+        const subAction = parts[1];
+        const body = await parseJsonBody(request).catch(() => ({}));
+
+        if (subAction === "transition") {
+          const result = await transitionObligation(
+            planId,
+            body.obligation_id ?? body.obligationId,
+            body.status,
+            { actor: body.actor || "api_client", reason: body.reason }
+          );
+          return json(response, 200, result);
+        }
+        if (subAction === "verify") {
+          const result = await recordPlanVerification(planId, body, {
+            actor: body.actor || "independent_auditor",
+          });
+          return json(response, 200, result);
+        }
+        if (subAction === "certificate") {
+          const result = await issuePlanCertificate(planId, body, {
+            actor: body.actor || "gatekeeper",
+          });
+          return json(response, 200, result);
+        }
+      }
+      if (request.method === "DELETE" && url.pathname.startsWith("/api/ledgers/")) {
+        const planId = decodeURIComponent(url.pathname.slice("/api/ledgers/".length));
+        const result = await deletePlan(planId);
+        return json(response, 200, result);
       }
       return json(response, 404, { error: "Not found" });
     } catch (error) {
