@@ -101,6 +101,10 @@ AGY skills typically implement one or more of the following 4 structural archety
 ### ③ Deterministic Verification Gates
 - Always conclude procedures with a mechanical verification step (exit code `0`, log assertion, checksum comparison).
 
+### ④ Document-to-Code Traceability & Topology Awareness
+- **Traceability**: Architecture flows unbroken from documentation (`System Architecture` ➔ `Contract C` ➔ `Spec` ➔ `Code Diff` ➔ `Audit`).
+- **Topology Awareness**: Skills must respect the existing folder topology (`layer-first`, `feature-first`, `framework-idiomatic`) rather than imposing rigid directory paths.
+
 ---
 
 ## 🚫 5. Critical Anti-Patterns & Guardrails

@@ -1,7 +1,8 @@
 ---
 name: lch-horizontal-explorer
 description: >-
-  Perform read-only horizontal discovery to map system facts, unknowns, risks, and candidate topic DAGs.
+  Perform read-only horizontal discovery to map system facts, unknowns, risks, candidate topic DAGs,
+  and folder structure topologies (Layer-First, Feature-First, Framework-Idiomatic, Monorepo).
   Enforces zero code mutation during horizontal exploration.
 invocation_mode: hybrid
 ---
@@ -15,8 +16,13 @@ Phase 2 policy skill of the Logical Completion Harness. Explores the system land
 ## 🏛️ Invariants & Rules
 
 1. **Pure Read-Only**: Absolutely no file patching or state-mutating commands during horizontal exploration.
-2. **Epistemic Classification**: Separate observed facts ($B_t$) from assumptions (`assumed`).
-3. **Topic Scoring Formula**:
+2. **Topology Detection**: Automatically scan and detect the existing codebase directory topology:
+   * `layer-first` (`src/models/`, `src/views/`, `src/viewmodels/`)
+   * `feature-first` (`src/features/<feature>/{model, view, viewmodel}`)
+   * `framework-idiomatic` (Next.js App Router, Vue composables `use*`, React hooks)
+   * `monorepo-split` (`packages/core`, `packages/state`, `apps/desktop`)
+3. **Epistemic Classification**: Separate observed facts ($B_t$) from assumptions (`assumed`).
+4. **Topic Scoring Formula**:
    $$
    \text{Score}(\text{topic}) = \frac{\text{Impact} \times \text{Blocking} \times \text{InformationGain}}{\text{Cost} + \text{Risk} + \text{Uncertainty}}
    $$
@@ -28,6 +34,8 @@ Phase 2 policy skill of the Logical Completion Harness. Explores the system land
 ```yaml
 horizontal_context:
   discovery_scope: [source-code, documentation, runtime-state, existing-tests]
+  detected_topology: "feature-first" # layer-first | feature-first | framework-idiomatic | monorepo-split
+  naming_convention: "*.viewmodel.ts" # or "use*.ts"
   known_facts: []
   unknowns: []
   risks: []
