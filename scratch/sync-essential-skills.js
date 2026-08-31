@@ -35,6 +35,7 @@ const ESSENTIAL_SKILLS_MAP = {
   "lch-closure-gate": path.join(root, "skills-packages", "platform-core", "lch-closure-gate"),
   "lch-experience-consolidator": path.join(root, "skills-packages", "platform-core", "lch-experience-consolidator"),
   "lch-evolution-supervisor": path.join(root, "skills-packages", "platform-core", "lch-evolution-supervisor"),
+  "lch-teamwork-preview": path.join(root, "skills-packages", "platform-core", "lch-teamwork-preview"),
 
   // Skills Manager Core
   "skills-manager-testing": path.join(root, "skills-packages", "skills-manager", "skills-manager-testing"),
