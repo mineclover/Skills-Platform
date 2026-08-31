@@ -1,15 +1,19 @@
 ---
 name: product-spine-convergence
 version: 0.1.0
-description: Diagnose and recover software projects where specs, packages, contracts, runtimes, demos, and proof surfaces have expanded faster than one complete user workflow. Establish a canonical product spine, golden path, source-of-truth boundaries, package disposition, and evidence-based completion gates.
+description: >-
+  Diagnose and recover software projects through Product Spine Alignment (스파인 정렬 / 제품 스파인 정합 / Spine Convergence).
+  Use when user requests "스파인 정렬", "제품 스파인 수렴", "Golden Path 정합성 점검", or when specs, packages, contracts,
+  and runtimes have expanded faster than one complete user workflow. Establishes a canonical product spine,
+  golden path, SSOT boundaries, asset disposition matrix, and evidence-based completion gates.
 invocation_mode: hybrid
 ---
 
-# Product Spine Convergence
+# Product Spine Convergence (스파인 정렬)
 
 ## 1. 목적
 
-이 스킬은 다음과 같은 프로젝트를 **제품 중심으로 다시 수렴**시킨다.
+이 스킬은 **'스파인 정렬(Product Spine Alignment)'**을 통해 다음과 같은 프로젝트를 **제품 중심으로 다시 수렴**시킨다.
 
 - 스펙과 문서는 많지만 무엇이 현재 정본인지 불명확하다.
 - 패키지와 계약이 계속 늘어나며 통합 비용이 기능 개발 비용보다 커졌다.
@@ -22,10 +26,11 @@ invocation_mode: hybrid
 
 ## 2. Invocation Gate
 
-### 반드시 사용
+### 반드시 사용 (Triggers)
 
-다음 중 하나라도 해당하면 사용한다.
+다음 중 하나라도 해당하면 사용한다:
 
+- **사용자가 "스파인 정렬", "스파인 정합", "제품 스파인 수렴", "골든패스 정렬"을 요청할 때**
 - 사용자가 프로젝트의 스펙 관리 또는 구현 관리 실패 원인을 묻는다.
 - 저장소가 과도하게 모듈화·패키지화되었는지 진단해 달라고 한다.
 - 여러 runtime, adapter, editor, host, proof 구현 중 무엇을 남길지 정해야 한다.
