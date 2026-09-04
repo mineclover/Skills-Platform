@@ -28,10 +28,27 @@ test("CLI runs the import, project, preset, plan, and prompt MVP workflow", asyn
   await run(["preset", "assign", "demo", "demo-preset", "--catalog", catalogRoot]);
 
   const plan = await run(["project-plan", "demo", "--catalog", catalogRoot, "--registry", registryRoot]);
+  const directPlan = await run([
+    "plan", "--registry", registryRoot, "--skill", skillId, "--provider", "codex",
+    "--delivery-root", path.join(os.homedir(), ".agents", "skills"), "--global",
+  ]);
+  await run([
+    "project", "skill", "demo", "disable", imported.skills[0].lineage_id,
+    "--catalog", catalogRoot, "--registry", registryRoot, "--skill", skillId,
+  ]);
+  const disabled = await run(["project", "resolve", "demo", "--catalog", catalogRoot, "--registry", registryRoot]);
+  await run([
+    "project", "skill", "demo", "inherit", imported.skills[0].lineage_id,
+    "--catalog", catalogRoot, "--registry", registryRoot,
+  ]);
+  const inherited = await run(["project", "resolve", "demo", "--catalog", catalogRoot, "--registry", registryRoot]);
   const prompt = await run(["system-prompt", "--catalog", catalogRoot, "--registry", registryRoot, "--preset", "demo-preset"]);
 
   assert.equal(plan.mode, "apply");
   assert.equal(plan.operations[0].desired_state, "enabled");
+  assert.equal(directPlan.operations[0].registry_skill_id, skillId);
+  assert.equal(disabled.skills[0].desired_state, "disabled");
+  assert.equal(inherited.skills[0].desired_state, "enabled");
   assert.match(prompt.content, /# Demo skill/);
 });
 
@@ -45,6 +62,7 @@ test("CLI manages a skill profile, scoped note, and metadata search", async (con
   await fs.writeFile(path.join(sourcePath, "SKILL.md"), "---\nname: demo-skill\ndescription: Demo workflow.\n---\n\n# Demo skill\n");
   const imported = await run(["import-local", path.join(root, "source"), "--registry", registryRoot]);
   const lineageId = imported.skills[0].lineage_id;
+  const sourceRevisionId = imported.skills[0].source_revision_id;
   await run([
     "project", "add", "demo", "--catalog", catalogRoot, "--name", "Demo",
     "--path", path.join(root, "project"), "--provider", "codex",
@@ -61,10 +79,21 @@ test("CLI manages a skill profile, scoped note, and metadata search", async (con
   const found = await run([
     "skill", "search", "keyboard", "--catalog", catalogRoot, "--registry", registryRoot, "--tag", "review",
   ]);
+  const annotation = await run([
+    "skill", "annotation", "add", lineageId, "--catalog", catalogRoot, "--registry", registryRoot,
+    "--revision", sourceRevisionId, "--kind", "plain_language", "--locale", "ko-KR",
+    "--body", "실행에 영향을 주지 않는 쉬운 설명입니다.",
+  ]);
+  const analysis = await run([
+    "skill", "analysis", "run", lineageId, "--catalog", catalogRoot, "--registry", registryRoot,
+    "--revision", sourceRevisionId,
+  ]);
 
   assert.equal(profile.purpose, "Review accessibility risks.");
   assert.equal(note.project_id, "demo");
   assert.equal(found[0].lineage.id, lineageId);
+  assert.equal(annotation.execution_effect, "none");
+  assert.equal(analysis.execution_effect, "none");
 });
 
 test("CLI records structured feedback and reads its health summary", async (context) => {
@@ -117,6 +146,23 @@ test("CLI records a revision-pinned evaluation case result and derives review wo
   assert.equal(runResult.outcome, "passed");
   assert.equal(summary.evaluated_active_case_count, 1);
   assert.equal(queue[0].reasons[0].code, "unreviewed_profile");
+});
+
+test("CLI exposes hook descriptions, failure policy, exact toggles, and runtime diagnostics", async (context) => {
+  const projectPath = await fs.mkdtemp(path.join(os.tmpdir(), "skills-catalog-cli-hooks-"));
+  context.after(() => fs.rm(projectPath, { recursive: true, force: true }));
+  const initial = await run(["hook", "list", "--project", projectPath]);
+  assert.ok(initial.hooks[0].description);
+  assert.equal(initial.hooks[0].failure_policy, "open");
+  assert.equal(typeof initial.hooks[0].priority, "number");
+
+  await run(["hook", "disable", initial.hooks[0].id, "--project", projectPath, "--no-sync"]);
+  const disabled = await run(["hook", "list", "--project", projectPath]);
+  assert.equal(disabled.hooks.find((hook) => hook.id === initial.hooks[0].id).enabled, false);
+  const diagnostics = await run(["hook", "diagnostics", "--project", projectPath]);
+  assert.equal(diagnostics.providers.codex.status, "not_configured");
+  assert.equal(diagnostics.providers.codex.supported, true);
+  assert.equal(diagnostics.providers.codex.runtimeReady, false);
 });
 
 test("CLI versions and annotates preset templates", async (context) => {

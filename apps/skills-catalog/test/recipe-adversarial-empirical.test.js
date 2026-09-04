@@ -72,7 +72,7 @@ test("Empirical: Provider Mappings correctly materialize into provider-specific 
 
   const providers = [
     { id: "antigravity", expectedSubdir: path.join(".agents", "skills") },
-    { id: "codex", expectedSubdir: "skills" },
+    { id: "codex", expectedSubdir: path.join(".agents", "skills") },
     { id: "claude", expectedSubdir: path.join(".claude", "skills") },
   ];
 
@@ -121,8 +121,8 @@ test("Empirical: Provider Mappings correctly materialize into provider-specific 
       await assert.rejects(fs.stat(path.join(targetProject, ".claude")));
       await assert.rejects(fs.stat(path.join(targetProject, "skills")));
     } else if (provider.id === "codex") {
-      await assert.rejects(fs.stat(path.join(targetProject, ".agents")));
       await assert.rejects(fs.stat(path.join(targetProject, ".claude")));
+      await assert.rejects(fs.stat(path.join(targetProject, "skills")));
     } else if (provider.id === "claude") {
       await assert.rejects(fs.stat(path.join(targetProject, ".agents")));
       await assert.rejects(fs.stat(path.join(targetProject, "skills")));
@@ -138,7 +138,7 @@ test("Empirical: Provider aliases (AGY, Gemini, CLAUDE, Codex) resolve to correc
     { alias: "AGY", expectedSubdir: path.join(".agents", "skills") },
     { alias: "gemini", expectedSubdir: path.join(".agents", "skills") },
     { alias: "CLAUDE", expectedSubdir: path.join(".claude", "skills") },
-    { alias: "CODEX", expectedSubdir: "skills" },
+    { alias: "CODEX", expectedSubdir: path.join(".agents", "skills") },
   ];
 
   for (const item of aliases) {
@@ -269,6 +269,28 @@ test("Empirical: Repeated recipe apply is idempotent and reconciles existing pro
   // Check project in catalog
   const catalog = await loadCatalog(targetCatalog);
   assert.equal(catalog.projects.filter((p) => p.id === "idempotent-project").length, 1);
+  assert.equal(catalog.presets.find((preset) => preset.id === recipe.presets[0].id).versions.length, 1);
+
+  const revisedRecipe = JSON.parse(JSON.stringify(recipe));
+  revisedRecipe.presets[0].purpose = "A revised, explicitly imported purpose";
+  await applyRecipe({
+    catalogRoot: targetCatalog,
+    registryRoot: targetRegistry,
+    recipeContent: revisedRecipe,
+  });
+  const revisedCatalog = await loadCatalog(targetCatalog);
+  const revisedPreset = revisedCatalog.presets.find((preset) => preset.id === recipe.presets[0].id);
+  assert.equal(revisedPreset.versions.length, 2);
+  assert.notEqual(revisedPreset.versions[0].purpose, revisedPreset.versions[1].purpose);
+  assert.equal(revisedPreset.selected_version, revisedPreset.active_version);
+  const reexported = await exportRecipe({
+    catalogRoot: targetCatalog,
+    registryRoot: targetRegistry,
+  });
+  assert.deepEqual(
+    reexported.presets[0].skills.map((skill) => skill.skill_name).sort(),
+    reexported.skills.map((skill) => skill.name).sort(),
+  );
 });
 
 test("Empirical: Missing project_path applies recipe to catalog/registry only without delivery", async (t) => {

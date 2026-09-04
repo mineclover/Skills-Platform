@@ -1,5 +1,9 @@
+const crypto = require("node:crypto");
+const path = require("node:path");
 const { digestDirectory } = require("../../../packages/skill-contracts/src");
 const { getProject, loadCatalog, recordActivationReport } = require("./catalog-state");
+
+const activePlanApplies = new Set();
 
 function upstreamProjectId(project) {
   return project.scope === "project" ? project.upstream_project_id : null;
@@ -18,22 +22,50 @@ async function resolveOperation(operation, upstreamSkills, project) {
   for (const skill of candidates) {
     try {
       if (await digestDirectory(skill.path) === operation.content_digest) {
-        return { operation, upstream_skill_instance_id: skill.instance_id, upstream_skill_path: skill.path };
+        return {
+          operation,
+          upstream_skill_instance_id: skill.instance_id,
+          upstream_skill_path: skill.path,
+          resolution: "digest_match",
+        };
       }
     } catch {
       // A candidate that cannot be read cannot prove immutable revision identity.
     }
   }
+  if (operation.desired_state === "disabled" && candidates.length === 0) {
+    return {
+      operation,
+      upstream_skill_instance_id: null,
+      upstream_skill_path: null,
+      resolution: "already_absent",
+    };
+  }
   throw new Error(`No upstream Skills Manager instance matches ${operation.skill_name} (${operation.content_digest.slice(0, 12)}). Adopt the reviewed revision into Skills Manager before applying.`);
 }
 
 function previewArgs(mapping, project) {
+  if (!mapping.upstream_skill_instance_id) return null;
   return ["skill", "preview", "--id", mapping.upstream_skill_instance_id, "--tool", project.provider_id, ...scopeArgs(project), mapping.operation.desired_state === "enabled" ? "--enable" : "--disable"];
 }
 
 function applyArgs(mapping, project, allowShared) {
+  if (!mapping.upstream_skill_instance_id) return null;
   const action = mapping.operation.desired_state === "enabled" ? "enable" : "disable";
   return ["skill", action, "--id", mapping.upstream_skill_instance_id, "--tool", project.provider_id, ...scopeArgs(project), ...(allowShared ? ["--confirm-shared"] : [])];
+}
+
+async function assertMappingStillMatches(mapping) {
+  if (!mapping.upstream_skill_instance_id || mapping.operation.desired_state !== "enabled") return;
+  let actualDigest;
+  try {
+    actualDigest = await digestDirectory(mapping.upstream_skill_path);
+  } catch (error) {
+    throw new Error(`Upstream skill changed or became unreadable before apply: ${mapping.operation.skill_name} (${error.message})`);
+  }
+  if (actualDigest !== mapping.operation.content_digest) {
+    throw new Error(`Upstream skill digest changed after preview: ${mapping.operation.skill_name}`);
+  }
 }
 
 function summarize(results) {
@@ -45,12 +77,87 @@ function summarize(results) {
   }), { requested: 0, applied: 0, skipped: 0, failed: 0 });
 }
 
+function planDigest(plan) {
+  return crypto.createHash("sha256").update(JSON.stringify(plan)).digest("hex");
+}
+
+function comparablePath(value) {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const resolved = path.resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function bindingFor(mapping, bindings, project) {
+  if (!mapping.upstream_skill_instance_id) return null;
+  const expectedTarget = comparablePath(mapping.operation.delivery_path);
+  return bindings.find((binding) => {
+    if (binding.provider_id && binding.provider_id !== project.provider_id) return false;
+    const bindingId = binding.skill_instance_id ?? binding.instance_id ?? binding.id;
+    if (bindingId && bindingId === mapping.upstream_skill_instance_id) return true;
+    return expectedTarget && comparablePath(binding.target_path) === expectedTarget;
+  }) ?? null;
+}
+
+function verifyBindings(mappings, bindings, project) {
+  const results = mappings.map((mapping) => {
+    const binding = bindingFor(mapping, bindings, project);
+    const desiredState = mapping.operation.desired_state;
+    if (desiredState === "disabled") {
+      const matched = !binding || binding.state === "disabled" || binding.state === "missing";
+      return {
+        registry_skill_id: mapping.operation.registry_skill_id,
+        skill_name: mapping.operation.skill_name,
+        desired_state: desiredState,
+        matched,
+        binding,
+        reason: matched ? "The binding is absent or disabled." : `The binding remains ${binding.state}.`,
+      };
+    }
+    if (!binding) {
+      return {
+        registry_skill_id: mapping.operation.registry_skill_id,
+        skill_name: mapping.operation.skill_name,
+        desired_state: desiredState,
+        matched: false,
+        binding: null,
+        reason: "No post-apply binding matches the planned skill instance or delivery path.",
+      };
+    }
+    const identityMismatch =
+      (binding.content_digest && binding.content_digest !== mapping.operation.content_digest)
+      || (binding.source_revision_id && binding.source_revision_id !== mapping.operation.source_revision_id);
+    const matched = binding.state === "enabled" && !identityMismatch;
+    return {
+      registry_skill_id: mapping.operation.registry_skill_id,
+      skill_name: mapping.operation.skill_name,
+      desired_state: desiredState,
+      matched,
+      binding,
+      reason: identityMismatch
+        ? "The observed binding revision or digest differs from the activation plan."
+        : matched
+          ? "The observed binding is enabled and matches the planned identity."
+          : `The observed binding state is ${binding.state}.`,
+    };
+  });
+  return {
+    verified: results.every((result) => result.matched),
+    results,
+  };
+}
+
 async function applyRecordedActivationPlan({ catalogRoot, planId, confirmed = false, upstreamCli, onProgress }) {
   if (!upstreamCli?.execute) throw new Error("A Skills Manager CLI adapter is required");
+  if (confirmed && activePlanApplies.has(planId)) throw new Error(`Activation plan is already being applied: ${planId}`);
+  if (confirmed) activePlanApplies.add(planId);
+  try {
   const progress = (stage, completed, total, message) => onProgress?.({ stage, completed, total, message, at: new Date().toISOString() });
   const catalog = await loadCatalog(catalogRoot);
   const record = catalog.activation_plans.find((item) => item.plan_id === planId);
   if (!record) throw new Error(`Activation plan not found: ${planId}`);
+  if (record.digest !== planDigest(record.plan)) {
+    throw new Error(`Activation plan integrity check failed: ${planId}`);
+  }
   const project = await getProject(catalogRoot, record.project_id);
   const total = record.plan.operations.length;
   progress("inspect", 0, total, "Inspecting the target Skills Manager project");
@@ -62,7 +169,13 @@ async function applyRecordedActivationPlan({ catalogRoot, planId, confirmed = fa
   }
   const previews = [];
   for (const mapping of mappings) {
-    previews.push({ ...mapping, preview: await upstreamCli.execute(previewArgs(mapping, project)) });
+    const args = previewArgs(mapping, project);
+    previews.push({
+      ...mapping,
+      preview: args
+        ? await upstreamCli.execute(args)
+        : { status: "noop", requires_confirmation: false, reason: "No upstream instance exists to disable." },
+    });
     progress("preview", previews.length, total, `Previewed ${mapping.operation.skill_name}`);
   }
   const requiresSharedConfirmation = previews.some((item) => item.preview.requires_confirmation === true);
@@ -78,9 +191,18 @@ async function applyRecordedActivationPlan({ catalogRoot, planId, confirmed = fa
   for (const previewed of previews) {
     progress("apply", operations.length, total, `Applying ${previewed.operation.skill_name}`);
     try {
-      const result = await upstreamCli.execute(applyArgs(previewed, project, requiresSharedConfirmation));
+      const args = applyArgs(previewed, project, requiresSharedConfirmation);
+      await assertMappingStillMatches(previewed);
+      const result = args
+        ? await upstreamCli.execute(args)
+        : { applied_count: 0, skipped_count: 1, failed_count: 0, status: "already_absent" };
       operations.push({ ...previewed, result });
-      progress("apply", operations.length, total, `Applied ${previewed.operation.skill_name}`);
+      if ((result.failed_count ?? 0) > 0) {
+        failure = new Error(result.error || `Skills Manager reported a failed operation for ${previewed.operation.skill_name}`);
+        progress("apply", operations.length, total, `Failed to apply ${previewed.operation.skill_name}`);
+        break;
+      }
+      progress("apply", operations.length, total, result.applied_count > 0 ? `Applied ${previewed.operation.skill_name}` : `No change needed for ${previewed.operation.skill_name}`);
     } catch (error) {
       failure = error;
       operations.push({
@@ -92,11 +214,25 @@ async function applyRecordedActivationPlan({ catalogRoot, planId, confirmed = fa
     }
   }
   progress("verify", operations.length, total, "Re-inspecting provider bindings");
-  const [inventory, bindings] = await Promise.all([
-    upstreamCli.execute(["providers", ...scopeArgs(project)]),
-    upstreamCli.execute(["bindings", ...scopeArgs(project)]),
-  ]);
+  let inventory = null;
+  let bindings = [];
+  let verificationError = null;
+  try {
+    [inventory, bindings] = await Promise.all([
+      upstreamCli.execute(["providers", ...scopeArgs(project)]),
+      upstreamCli.execute(["bindings", ...scopeArgs(project)]),
+    ]);
+  } catch (error) {
+    verificationError = error;
+  }
+  const verification = verificationError
+    ? { verified: false, results: [], error: verificationError.message }
+    : verifyBindings(mappings, Array.isArray(bindings) ? bindings : bindings.bindings ?? [], project);
+  if (!failure && !verification.verified) {
+    failure = new Error(verification.error || "Post-apply verification did not match the activation plan");
+  }
   const summary = summarize(operations);
+  if (failure && summary.failed === 0) summary.failed = 1;
   const report = {
     plan_id: planId,
     completed_at: new Date().toISOString(),
@@ -107,7 +243,7 @@ async function applyRecordedActivationPlan({ catalogRoot, planId, confirmed = fa
     provider_id: project.provider_id,
     operations,
     summary,
-    post_apply: { inventory, bindings },
+    post_apply: { inventory, bindings, verification },
   };
   const stored = await recordActivationReport({ catalogRoot, planId, report });
   progress(failure ? "failed" : "completed", operations.length, total, failure ? "Apply completed with failures" : "Apply and verification completed");
@@ -117,6 +253,9 @@ async function applyRecordedActivationPlan({ catalogRoot, planId, confirmed = fa
     stored_report_id: stored.report_id,
     error: failure?.message,
   };
+  } finally {
+    if (confirmed) activePlanApplies.delete(planId);
+  }
 }
 
-module.exports = { applyRecordedActivationPlan, resolveOperation };
+module.exports = { applyRecordedActivationPlan, resolveOperation, verifyBindings };

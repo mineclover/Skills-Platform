@@ -142,11 +142,11 @@ test("Recipe Transfer: Provider delivery roots map accurately to specifications"
         return `${root}/.claude/skills/`;
       case "codex":
       default:
-        return `${root}/skills/`;
+        return `${root}/.agents/skills/`;
     }
   };
 
   assert.equal(getDeliveryRoot("antigravity", projectPath), "/workspace/demo-app/.agents/skills/");
-  assert.equal(getDeliveryRoot("codex", projectPath), "/workspace/demo-app/skills/");
+  assert.equal(getDeliveryRoot("codex", projectPath), "/workspace/demo-app/.agents/skills/");
   assert.equal(getDeliveryRoot("claude", projectPath), "/workspace/demo-app/.claude/skills/");
 });

@@ -12,6 +12,7 @@ const {
   listRegistrySkills,
   listSourceUpdateCandidates,
   listSkillRevisions,
+  loadRegistry,
 } = require("../src");
 
 async function writeSkill(root, directory, name, description) {
@@ -59,6 +60,58 @@ test("re-importing an unchanged source reuses the source revision", async (conte
 
   assert.equal(first.source_revision_id, second.source_revision_id);
   assert.equal(skills.length, 2);
+});
+
+test("persists portable canonical paths and hydrates them against the runtime registry root", async (context) => {
+  const { root, sourcePath, registryRoot } = await fixture();
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const imported = await importLocalSource({ registryRoot, sourcePath, selectedSkillNames: ["frontend-design"] });
+  const raw = JSON.parse(await fs.readFile(path.join(registryRoot, "registry.json"), "utf8"));
+  const stored = raw.skills.find((skill) => skill.id === imported.skills[0].id);
+
+  assert.equal(path.isAbsolute(stored.canonical_path), false);
+  assert.equal(stored.canonical_path, stored.canonical_relative_path);
+  assert.match(stored.canonical_relative_path, /^revisions\/revision_[^/]+\/artifacts\/frontend-design-/);
+
+  const loaded = (await loadRegistry(registryRoot)).skills.find((skill) => skill.id === stored.id);
+  assert.equal(path.isAbsolute(loaded.canonical_path), true);
+  assert.equal(loaded.canonical_path, path.resolve(registryRoot, ...stored.canonical_relative_path.split("/")));
+  assert.ok(await fs.stat(path.join(loaded.canonical_path, "SKILL.md")));
+});
+
+test("rebases a legacy Windows canonical path to its runtime revision artifact", async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-registry-relocation-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const registryRoot = path.join(root, "registry");
+  const artifactName = "portable-demo-0123456789";
+  const artifactPath = path.join(registryRoot, "revisions", "revision_demo", "artifacts", artifactName);
+  await fs.mkdir(artifactPath, { recursive: true });
+  await fs.writeFile(path.join(artifactPath, "SKILL.md"), "---\nname: portable-demo\ndescription: Portable demo.\n---\n", "utf8");
+  await fs.writeFile(path.join(registryRoot, "registry.json"), JSON.stringify({
+    schema_version: 2,
+    sources: [{ id: "source_demo", kind: "local", locator: "C:\\Users\\demo\\skills" }],
+    revisions: [{ id: "revision_demo", source_id: "source_demo" }],
+    lineages: [],
+    skills: [{
+      id: "skill_demo",
+      source_id: "source_demo",
+      source_revision_id: "revision_demo",
+      source_relative_path: ".",
+      skill_name: "portable-demo",
+      content_digest: "0123456789abcdef",
+      canonical_path: `C:\\Users\\demo\\Skills-Platform\\.skills-platform\\registry\\revisions\\revision_demo\\artifacts\\${artifactName}`,
+      canonical_relative_path: "../../outside-registry",
+      imported_at: new Date(0).toISOString(),
+    }],
+  }, null, 2), "utf8");
+
+  const registry = await loadRegistry(registryRoot);
+  assert.equal(registry.skills[0].canonical_path, artifactPath);
+  assert.equal(
+    registry.skills[0].canonical_relative_path,
+    `revisions/revision_demo/artifacts/${artifactName}`,
+  );
 });
 
 test("a changed source creates a new immutable revision and skill identity", async (context) => {

@@ -9,6 +9,8 @@ coverage/
 .skills-platform/*
 !.skills-platform/hooks/
 !.skills-platform/registry/
+.skills-platform/hooks/provider-sync-state.json
+.codex/hooks.json
 skills/
 *.tsbuildinfo
 .agents/

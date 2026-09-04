@@ -222,7 +222,7 @@ test("Tier 1 - F20.6: Multi-Provider Symlink Junction & Live Sync Drift Detector
     providers: [
       { id: "antigravity", name: "Google Antigravity", deliveryPath: ".agents/skills/", activeSkills: ["task-planning", "scoped-tdd"] },
       { id: "claude", name: "Claude Desktop", deliveryPath: ".claude/skills/", activeSkills: ["task-planning", "scoped-tdd"] },
-      { id: "codex", name: "Codex CLI", deliveryPath: "skills/", activeSkills: ["task-planning"] }, // Drift: missing scoped-tdd
+      { id: "codex", name: "Codex CLI", deliveryPath: ".agents/skills/", activeSkills: ["task-planning"] }, // Drift: missing scoped-tdd
     ],
     expectedSkills: ["task-planning", "scoped-tdd"],
   };

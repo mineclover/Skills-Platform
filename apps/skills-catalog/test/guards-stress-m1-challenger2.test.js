@@ -36,6 +36,7 @@ function runSubprocess(scriptName, payload, extraArgs = [], extraEnv = {}, input
   const env = {
     ...process.env,
     HOOK_EVENT: "pre_tool_use",
+    SKILLS_PLATFORM_DISABLE_TELEMETRY: "1",
     ...extraEnv,
   };
   let inputStr = input;
@@ -219,7 +220,7 @@ test("Scope Boundary Enforcer Stress: Strict Out-of-Bounds Enforcement & Telemet
   try {
     const violation = evaluateScopeBoundaryEnforcer(
       { TargetFile: "src/auth/keys.env" },
-      { spec, projectRoot: tmpTelemetryDir }
+      { spec, projectRoot: tmpTelemetryDir, recordTelemetry: true }
     );
 
     assert.equal(violation.allow, false);
@@ -269,7 +270,7 @@ test("Scope Boundary Enforcer Stress: Path Normalization Across URI schemes & Ba
   assert.equal(normalizePath("./src/components/Button.tsx", root), "src/components/Button.tsx");
 
   // Redundant slashes
-  assert.equal(normalizePath("src///components//Button.tsx", root), "src///components//Button.tsx");
+  assert.equal(normalizePath("src///components//Button.tsx", root), "src/components/Button.tsx");
 });
 
 test("Scope Boundary Enforcer Stress: Multiple Target Files in Array (Batch Mutations)", () => {

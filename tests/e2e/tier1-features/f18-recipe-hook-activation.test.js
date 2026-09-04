@@ -52,17 +52,19 @@ test("Tier 1 - F18.1: applyRecipe registers embedded hooks and synchronizes mult
   assert.equal(applied.name, "E2E Activation Recipe");
   assert.equal(applied.hooks_applied.length, 1);
   assert.ok(applied.hooks_synced.antigravityHooks > 0);
-  assert.ok(applied.hooks_synced.claudeHooks > 0);
+  assert.equal(applied.hooks_synced.claudeHooks, 0);
+  assert.equal(applied.hooks_synced.providers.claude.status, "unsupported");
 
   // Check generated provider files
   const agyFile = path.join(targetProject, ".agents/hooks.json");
-  const claudeFile = path.join(targetProject, ".claude/hooks.json");
 
   const agyContent = JSON.parse(await fs.readFile(agyFile, "utf8"));
   assert.ok(agyContent["destructive-command-blocker"]);
 
-  const claudeContent = JSON.parse(await fs.readFile(claudeFile, "utf8"));
-  assert.ok(claudeContent.hooks.some((h) => h.id === "destructive-command-blocker"));
+  await assert.rejects(
+    () => fs.readFile(path.join(targetProject, ".claude/settings.json"), "utf8"),
+    (error) => error.code === "ENOENT",
+  );
 
   await fs.rm(tempDir, { recursive: true, force: true });
 });

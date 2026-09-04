@@ -5,6 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { promisify } = require("node:util");
 const { digestDirectory, listFiles, ARTIFACT_TYPES = new Set(["skill", "rule", "hook", "plugin", "mcp_server"]), INVOCATION_MODES = new Set(["model_invoked", "user_invoked", "hybrid", "unspecified"]) } = require("@skills-platform/contracts");
+const { inspectSkillPackage, parseSkillManifest } = require("./skill-authoring");
 
 const REGISTRY_SCHEMA_VERSION = 2;
 const execFileAsync = promisify(execFile);
@@ -97,6 +98,27 @@ function parseArtifactManifest(content, artifactPath) {
       invocation_mode,
     };
   }
+  if (base === "skill.md") {
+    const manifest = parseSkillManifest(content, {
+      manifestPath: path.basename(artifactPath),
+      folderName: path.basename(path.dirname(artifactPath)),
+    });
+    const declaredMode = manifest.frontmatter.invocation_mode
+      ?? manifest.frontmatter.invoker
+      ?? manifest.frontmatter.invoked_by;
+    return {
+      name: manifest.name,
+      description: manifest.description,
+      artifact_type: "skill",
+      invocation_mode: inferInvocationMode({ declaredMode, description: manifest.description, content }),
+      manifest: {
+        declared_name: manifest.declared_name,
+        license: manifest.license,
+        allowed_tools: manifest.allowed_tools,
+        metadata: manifest.metadata,
+      },
+    };
+  }
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) {
     throw new Error(`Missing YAML frontmatter: ${artifactPath}`);
@@ -156,8 +178,17 @@ async function inspectLocalSource({ sourcePath }) {
     const absolutePath = path.join(resolvedSourcePath, relativePath);
     try {
       const metadata = parseArtifactManifest(await fs.readFile(absolutePath, "utf8"), absolutePath);
+      let authoring = null;
+      if ((metadata.artifact_type ?? inferArtifactType(absolutePath)) === "skill") {
+        authoring = await inspectSkillPackage({ skillPath: path.dirname(absolutePath), provider: "portable" });
+      }
       skills.push({
         ...metadata,
+        authoring,
+        provider_compatibility: authoring ? {
+          codex: authoring.results.codex.summary.status !== "nonconformant",
+          antigravity: authoring.results.antigravity.summary.status !== "nonconformant",
+        } : null,
         relative_path: path.dirname(relativePath).replaceAll("\\", "/") || ".",
         root_path: path.dirname(absolutePath),
       });
@@ -195,6 +226,122 @@ function lineageId(artifactKey) {
   return `lineage_${sha256(artifactKey).slice(0, 20)}`;
 }
 
+function isWithin(candidate, root) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function portableRelativePath(value) {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  if (path.isAbsolute(value) || path.win32.isAbsolute(value)) return null;
+  const normalized = path.posix.normalize(value.trim().replace(/\\/g, "/")).replace(/^\.\//, "");
+  if (normalized === "." || normalized === ".." || normalized.startsWith("../")) return null;
+  return normalized;
+}
+
+function safePathSegment(value) {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const segment = value.trim();
+  if (segment === "." || segment === ".." || segment.includes("/") || segment.includes("\\")) return null;
+  return segment;
+}
+
+function canonicalRevisionPrefix(skill) {
+  const revisionId = safePathSegment(skill.source_revision_id);
+  return revisionId ? path.posix.join("revisions", revisionId) : null;
+}
+
+function canonicalArtifactPrefix(skill) {
+  const revisionPrefix = canonicalRevisionPrefix(skill);
+  return revisionPrefix ? path.posix.join(revisionPrefix, "artifacts") : null;
+}
+
+function canonicalRelativeCandidate(skill, value) {
+  const relative = portableRelativePath(value);
+  const prefix = canonicalRevisionPrefix(skill);
+  if (!relative || !prefix || !relative.startsWith(`${prefix}/`)) return null;
+  return relative;
+}
+
+function legacyCanonicalBasename(value) {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const basename = path.win32.basename(value.trim().replace(/\//g, "\\"));
+  return safePathSegment(basename);
+}
+
+function legacyCanonicalRelativePath(skill) {
+  if (typeof skill.canonical_path !== "string") return null;
+  const revisionId = safePathSegment(skill.source_revision_id);
+  if (!revisionId) return null;
+  const segments = skill.canonical_path.trim().replace(/\\/g, "/").split("/").filter(Boolean);
+  for (let index = segments.length - 2; index >= 0; index -= 1) {
+    if (segments[index].toLowerCase() !== "revisions" || segments[index + 1] !== revisionId) continue;
+    const tail = segments.slice(index + 2);
+    if (tail.length === 0 || tail.some((segment) => !safePathSegment(segment))) return null;
+    return canonicalRelativeCandidate(skill, path.posix.join("revisions", revisionId, ...tail));
+  }
+  return null;
+}
+
+function derivedCanonicalRelativePath(skill) {
+  const prefix = canonicalArtifactPrefix(skill);
+  if (!prefix) return null;
+  const storedBasename = legacyCanonicalBasename(skill.canonical_path);
+  if (storedBasename) return path.posix.join(prefix, storedBasename);
+  if (typeof skill.skill_name !== "string" || typeof skill.content_digest !== "string") return null;
+  return path.posix.join(prefix, `${slug(skill.skill_name)}-${skill.content_digest.slice(0, 10)}`);
+}
+
+function relativePathFromRuntimeCanonical(registryRoot, skill) {
+  if (typeof skill.canonical_path !== "string" || skill.canonical_path.trim() === "") return null;
+  if (!path.isAbsolute(skill.canonical_path)) return canonicalRelativeCandidate(skill, skill.canonical_path);
+  const resolvedRoot = path.resolve(registryRoot);
+  const resolvedCanonical = path.resolve(skill.canonical_path);
+  if (!isWithin(resolvedCanonical, resolvedRoot)) return null;
+  return canonicalRelativeCandidate(skill, path.relative(resolvedRoot, resolvedCanonical));
+}
+
+function canonicalCandidates(registryRoot, skill) {
+  const values = [
+    canonicalRelativeCandidate(skill, skill.canonical_relative_path),
+    relativePathFromRuntimeCanonical(registryRoot, skill),
+    legacyCanonicalRelativePath(skill),
+    derivedCanonicalRelativePath(skill),
+  ].filter(Boolean);
+  return [...new Set(values)];
+}
+
+async function hydrateCanonicalPaths(registryRoot, registry) {
+  const resolvedRoot = path.resolve(registryRoot);
+  for (const skill of registry.skills ?? []) {
+    const candidates = canonicalCandidates(resolvedRoot, skill);
+    let selected = candidates[0] ?? null;
+    for (const candidate of candidates) {
+      if (await pathExists(path.resolve(resolvedRoot, ...candidate.split("/")))) {
+        selected = candidate;
+        break;
+      }
+    }
+    if (!selected) continue;
+    skill.canonical_relative_path = selected;
+    skill.canonical_path = path.resolve(resolvedRoot, ...selected.split("/"));
+  }
+  return registry;
+}
+
+function registryForStorage(registryRoot, registry) {
+  const stored = JSON.parse(JSON.stringify(registry));
+  for (const skill of stored.skills ?? []) {
+    const relative = canonicalCandidates(registryRoot, skill)[0];
+    if (!relative) continue;
+    skill.canonical_relative_path = relative;
+    // canonical_path remains required by schema v1/v2 consumers. Keep it as a
+    // portable registry-relative alias while runtime reads hydrate it fully.
+    skill.canonical_path = relative;
+  }
+  return stored;
+}
+
 function normalizeRegistry(registry) {
   if (registry.schema_version !== 1 && registry.schema_version !== REGISTRY_SCHEMA_VERSION) {
     throw new Error(`Unsupported registry schema: ${registry.schema_version}`);
@@ -226,14 +373,26 @@ function normalizeRegistry(registry) {
 async function loadRegistry(registryRoot) {
   const file = registryFile(registryRoot);
   if (!await pathExists(file)) return blankRegistry();
-  return normalizeRegistry(JSON.parse(await fs.readFile(file, "utf8")));
+  const registry = normalizeRegistry(JSON.parse(await fs.readFile(file, "utf8")));
+  return hydrateCanonicalPaths(registryRoot, registry);
 }
 
 async function saveRegistry(registryRoot, registry) {
   await fs.mkdir(registryRoot, { recursive: true });
-  const temporaryFile = `${registryFile(registryRoot)}.tmp`;
-  await fs.writeFile(temporaryFile, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
-  await fs.rename(temporaryFile, registryFile(registryRoot));
+  const temporaryFile = `${registryFile(registryRoot)}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  const stored = registryForStorage(registryRoot, registry);
+  try {
+    const handle = await fs.open(temporaryFile, "wx", 0o600);
+    try {
+      await handle.writeFile(`${JSON.stringify(stored, null, 2)}\n`, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await fs.rename(temporaryFile, registryFile(registryRoot));
+  } finally {
+    await fs.rm(temporaryFile, { force: true }).catch(() => {});
+  }
 }
 
 function defaultRegistryRoot(workspacePath = process.cwd()) {
@@ -290,6 +449,7 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
     // exact immutable instructions it was reviewed against.
     const artifactId = `skill_${sha256(`${id}:${revisionId}:${skill.relative_path}`).slice(0, 20)}`;
     const artifactPath = path.join(artifactsRoot, `${slug(skill.name)}-${artifactDigest.slice(0, 10)}`);
+    const canonicalRelativePath = path.relative(path.resolve(registryRoot), artifactPath).replaceAll("\\", "/");
     if (!await pathExists(artifactPath)) {
       await fs.mkdir(path.dirname(artifactPath), { recursive: true });
       await fs.cp(skill.root_path, artifactPath, { recursive: true, force: false, errorOnExist: true });
@@ -298,6 +458,9 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
     const record = existing ? Object.assign(existing, {
       invocation_mode: skill.invocation_mode ?? existing.invocation_mode ?? "unspecified",
       artifact_type: skill.artifact_type ?? existing.artifact_type ?? "skill",
+      manifest: skill.manifest ?? existing.manifest ?? null,
+      provider_compatibility: skill.provider_compatibility ?? existing.provider_compatibility ?? null,
+      authoring_ruleset_fingerprint: skill.authoring?.ruleset_fingerprint ?? existing.authoring_ruleset_fingerprint ?? null,
     }) : {
       id: artifactId,
       source_id: id,
@@ -309,8 +472,12 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
       artifact_key: `${id}:${skill.relative_path}`,
       lineage_id: lineageId(`${id}:${skill.relative_path}`),
       description: skill.description,
+      manifest: skill.manifest ?? null,
+      provider_compatibility: skill.provider_compatibility ?? null,
+      authoring_ruleset_fingerprint: skill.authoring?.ruleset_fingerprint ?? null,
       content_digest: artifactDigest,
       canonical_path: artifactPath,
+      canonical_relative_path: canonicalRelativePath,
       imported_at: importedAt,
       review_state: "imported",
     };
@@ -348,30 +515,56 @@ function requireGitLocator(value) {
 async function inspectGitSource({ repository, ref = "HEAD" }) {
   repository = requireGitLocator(repository);
   if (typeof ref !== "string" || ref.trim() === "") throw new Error("Git ref is required");
+  const requestedRef = ref.trim();
+  if (/^[0-9a-f]{40,64}$/i.test(requestedRef)) {
+    // A recipe may pin a commit that is reachable but is no longer the tip of
+    // an advertised ref. The exact commit is verified by fetch during import.
+    return {
+      kind: "git",
+      locator: repository,
+      requested_ref: requestedRef,
+      resolved_revision: requestedRef.toLowerCase(),
+    };
+  }
   let stdout;
   try {
-    ({ stdout } = await execFileAsync("git", ["ls-remote", repository, ref.trim()], { windowsHide: true, maxBuffer: 1024 * 1024 }));
+    ({ stdout } = await execFileAsync("git", ["ls-remote", repository, requestedRef], { windowsHide: true, maxBuffer: 1024 * 1024 }));
   } catch (error) {
     throw new Error(`Could not inspect Git source: ${error.stderr?.trim() || error.message}`);
   }
   const line = stdout.split(/\r?\n/).find(Boolean);
   const revision = line?.split(/\s+/)[0];
   if (!revision || !/^[0-9a-f]{40,64}$/i.test(revision)) throw new Error(`Git ref was not found: ${ref}`);
-  return { kind: "git", locator: repository, requested_ref: ref.trim(), resolved_revision: revision.toLowerCase() };
+  return { kind: "git", locator: repository, requested_ref: requestedRef, resolved_revision: revision.toLowerCase() };
 }
 
 async function importGitSource({ registryRoot, repository, ref = "HEAD", selectedSkillNames = [] }) {
   const inspection = await inspectGitSource({ repository, ref });
   const temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "skills-platform-git-"));
   try {
-    await execFileAsync("git", ["clone", "--no-checkout", "--depth", "1", "--no-tags", inspection.locator, temporaryRoot], {
+    await execFileAsync("git", ["init", "--quiet", temporaryRoot], {
       windowsHide: true,
       maxBuffer: 1024 * 1024,
     });
-    await execFileAsync("git", ["-C", temporaryRoot, "checkout", "--detach", inspection.resolved_revision], {
+    await execFileAsync("git", ["-C", temporaryRoot, "remote", "add", "origin", inspection.locator], {
       windowsHide: true,
       maxBuffer: 1024 * 1024,
     });
+    await execFileAsync("git", ["-C", temporaryRoot, "fetch", "--depth", "1", "--no-tags", "origin", inspection.resolved_revision], {
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+    });
+    await execFileAsync("git", ["-C", temporaryRoot, "checkout", "--quiet", "--detach", "FETCH_HEAD"], {
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+    });
+    const { stdout } = await execFileAsync("git", ["-C", temporaryRoot, "rev-parse", "HEAD"], {
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+    });
+    if (stdout.trim().toLowerCase() !== inspection.resolved_revision) {
+      throw new Error("Fetched Git commit does not match the requested immutable revision");
+    }
     return await importLocalSource({
       registryRoot,
       sourcePath: temporaryRoot,
@@ -540,4 +733,5 @@ module.exports = {
   listSkillLineages,
   loadRegistry,
   parseSkillMarkdown,
+  saveRegistry,
 };

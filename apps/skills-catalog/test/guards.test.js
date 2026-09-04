@@ -5,6 +5,7 @@ const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
+const { pathToFileURL } = require("node:url");
 
 // Import guard modules
 const {
@@ -40,6 +41,7 @@ function runGuardSubprocess(scriptName, payload, extraEnv = {}) {
       ...process.env,
       HOOK_EVENT: "pre_tool_use",
       HOOK_PAYLOAD: JSON.stringify(payload),
+      SKILLS_PLATFORM_DISABLE_TELEMETRY: "1",
       ...extraEnv,
     },
     encoding: "utf8",
@@ -491,6 +493,76 @@ test("Scope Boundary Enforcer: handles cross-platform path normalization, globst
   assert.ok(matchPattern("src/secrets.env", "*.env"));
   assert.ok(matchPattern("config/certs/tls.key", "*.key"));
   assert.ok(!matchPattern("src/env.js", "*.env"));
+});
+
+test("Scope Boundary Enforcer: blocks POSIX absolute and file URL paths outside the project", { skip: process.platform === "win32" }, () => {
+  const projectRoot = path.join(os.tmpdir(), "scope-project-root");
+  const spec = {
+    topic_id: "topic:path-boundary",
+    local_horizontal_scope: { owned_files: ["src/allowed.js"], out_of_bounds: [] },
+  };
+  const externalPath = path.join(path.parse(projectRoot).root, "src", "allowed.js");
+
+  for (const target of [externalPath, pathToFileURL(externalPath).href]) {
+    const result = evaluateScopeBoundaryEnforcer({ TargetFile: target }, { projectRoot, spec });
+    assert.equal(result.allow, false);
+    assert.equal(result.violation_type, "scope_path_escape");
+  }
+});
+
+test("Scope Boundary Enforcer: blocks relative traversal outside the project", () => {
+  const projectRoot = path.join(os.tmpdir(), "scope-project-root");
+  const spec = {
+    topic_id: "topic:path-boundary",
+    local_horizontal_scope: { owned_files: ["src/**"], out_of_bounds: [] },
+  };
+  const result = evaluateScopeBoundaryEnforcer(
+    { TargetFile: "../scope-project-root-escape/src/file.js" },
+    { projectRoot, spec },
+  );
+  assert.equal(result.allow, false);
+  assert.equal(result.violation_type, "scope_path_escape");
+});
+
+test("Scope Boundary Enforcer: blocks a path that escapes through a project symlink", { skip: process.platform === "win32" }, (context) => {
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "scope-symlink-"));
+  context.after(() => fs.rmSync(sandbox, { recursive: true, force: true }));
+  const projectRoot = path.join(sandbox, "project");
+  const externalRoot = path.join(sandbox, "external");
+  fs.mkdirSync(projectRoot, { recursive: true });
+  fs.mkdirSync(externalRoot, { recursive: true });
+  fs.symlinkSync(externalRoot, path.join(projectRoot, "linked"), "dir");
+  const spec = {
+    topic_id: "topic:path-boundary",
+    local_horizontal_scope: { owned_files: ["linked/**"], out_of_bounds: [] },
+  };
+
+  const result = evaluateScopeBoundaryEnforcer(
+    { TargetFile: "linked/not-created-yet.js" },
+    { projectRoot, spec },
+  );
+  assert.equal(result.allow, false);
+  assert.equal(result.violation_type, "scope_path_escape");
+});
+
+test("Scope Boundary Enforcer: keeps project-relative and percent-encoded in-project URLs usable", (context) => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "scope-in-project-"));
+  context.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
+  const targetPath = path.join(projectRoot, "src", "space name.js");
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  const spec = {
+    topic_id: "topic:path-boundary",
+    local_horizontal_scope: { owned_files: ["src/space name.js"], out_of_bounds: [] },
+  };
+
+  assert.equal(evaluateScopeBoundaryEnforcer(
+    { TargetFile: "src/space name.js" },
+    { projectRoot, spec },
+  ).allow, true);
+  assert.equal(evaluateScopeBoundaryEnforcer(
+    { TargetFile: pathToFileURL(targetPath).href },
+    { projectRoot, spec },
+  ).allow, true);
 });
 
 test("Scope Boundary Enforcer: blocks extension wildcard out_of_bounds in subdirectories", () => {

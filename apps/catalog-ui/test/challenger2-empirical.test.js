@@ -341,16 +341,16 @@ test("Scope 1.6: NodeDetailInspector resolves junction_node delivery path specif
     name: "OpenAI Codex CLI Junction",
     category: "Multi-Provider Delivery",
     status: "drift",
-    description: "Symlink delivery root at skills/ for OpenAI Codex.",
+    description: "Symlink delivery root at .agents/skills/ for OpenAI Codex.",
     lineage: {
       topicId: "JUNC-CODEX",
       canonicalName: "codex_delivery_junction",
-      path: ["skills"],
+      path: [".agents", "skills"],
       lifecycleState: "IN_PROGRESS",
     },
     junction: {
       providerId: "codex",
-      deliveryPath: "skills/",
+      deliveryPath: ".agents/skills/",
       syncState: "drift",
       symlinkTarget: "packages/skill-contracts/dist",
       managedCount: 5,
@@ -361,7 +361,7 @@ test("Scope 1.6: NodeDetailInspector resolves junction_node delivery path specif
       allowedCommand: "skills-manager apply --provider codex",
       prohibitedCommands: [],
       invariants: {
-        preConditions: ["skills/ directory exists"],
+        preConditions: [".agents/skills/ directory exists"],
         strictInvariants: ["Detect missing/stale symlinks and trigger drift warning"],
         postConditions: ["Reconciled symlinks match active preset"],
       },
@@ -373,7 +373,7 @@ test("Scope 1.6: NodeDetailInspector resolves junction_node delivery path specif
   assert.equal(resolved.data.type, "junction_node");
   assert.equal(resolved.data.isDrift, true);
   assert.equal(resolved.data.junction.providerId, "codex");
-  assert.equal(resolved.data.junction.deliveryPath, "skills/");
+  assert.equal(resolved.data.junction.deliveryPath, ".agents/skills/");
   assert.equal(resolved.data.junction.managedCount, 5);
   assert.equal(resolved.data.junction.activePreset, "mlc-task-planning");
 });
@@ -409,7 +409,7 @@ test("Scope 1.7: NodeDetailInspector handles minimal and edge-case nodes without
 const CANONICAL_PROVIDER_ROOTS = {
   antigravity: { deliveryPath: ".agents/skills/", name: "Google Antigravity" },
   claude: { deliveryPath: ".claude/skills/", name: "Anthropic Claude Desktop" },
-  codex: { deliveryPath: "skills/", name: "OpenAI Codex CLI" },
+  codex: { deliveryPath: ".agents/skills/", name: "OpenAI Codex CLI" },
 };
 
 function calculateMultiProviderDrift(providersState, activeRecipe) {

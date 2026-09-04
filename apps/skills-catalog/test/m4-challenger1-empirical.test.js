@@ -383,10 +383,11 @@ test("Milestone M4 Challenger 1: Empirical CLI & REST API Stress Suite", async (
           port,
           method: "OPTIONS",
           path: "/api/workspaces",
+          headers: { origin: "http://localhost:5173" },
         });
 
         assert.equal(res.status, 204);
-        assert.equal(res.headers["access-control-allow-origin"], "*");
+        assert.equal(res.headers["access-control-allow-origin"], "http://localhost:5173");
         assert.ok(res.headers["access-control-allow-methods"].includes("POST"));
       });
 

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import {
   fetchHooksApi,
+  fetchHookDiagnosticsApi,
   toggleHookApi,
   registerHookApi,
   removeHookApi,
@@ -35,6 +36,7 @@ import {
 } from "../api/catalog-api";
 import type {
   HookDefinition,
+  HookDiagnostics,
   HookSimulationResult,
   SecurityFeedEvent,
 } from "../types";
@@ -53,6 +55,9 @@ export function HookWorkspace({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEventFilter, setSelectedEventFilter] = useState<string>("all");
   const [notice, setNotice] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<HookDiagnostics | null>(null);
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(true);
 
   // Security Feed State
   const [feedEvents, setFeedEvents] = useState<SecurityFeedEvent[]>([]);
@@ -77,6 +82,24 @@ export function HookWorkspace({
   // Modal State
   const [showCatalogModal, setShowCatalogModal] = useState(false);
 
+  const refreshDiagnostics = useCallback(async (): Promise<boolean> => {
+    setDiagnosticsLoading(true);
+    try {
+      const result = await fetchHookDiagnosticsApi({ projectPath });
+      setDiagnostics(result);
+      setDiagnosticsError(null);
+      return true;
+    } catch (err: unknown) {
+      setDiagnostics(null);
+      setDiagnosticsError(
+        err instanceof Error ? err.message : "Hook runtime diagnostics are unavailable",
+      );
+      return false;
+    } finally {
+      setDiagnosticsLoading(false);
+    }
+  }, [projectPath]);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -86,12 +109,19 @@ export function HookWorkspace({
       ]);
       setHooks(hooksData.hooks);
       setFeedEvents(feedData.events);
-    } catch (err: any) {
-      setNotice(err.message || "Failed to load hook data");
+      await refreshDiagnostics();
+    } catch (err: unknown) {
+      setHooks([]);
+      setDiagnostics(null);
+      setDiagnosticsError(
+        err instanceof Error ? err.message : "Hook runtime diagnostics are unavailable",
+      );
+      setDiagnosticsLoading(false);
+      setNotice(err instanceof Error ? err.message : "Failed to load hook data");
     } finally {
       setLoading(false);
     }
-  }, [projectPath]);
+  }, [projectPath, refreshDiagnostics]);
 
   useEffect(() => {
     loadData();
@@ -107,7 +137,12 @@ export function HookWorkspace({
       setHooks((prev) =>
         prev.map((h) => (h.id === hookId ? { ...h, enabled: updated.enabled } : h))
       );
-      setNotice(`Hook '${hookId}' ${updated.enabled ? "enabled" : "disabled"}`);
+      const diagnosticsAvailable = await refreshDiagnostics();
+      setNotice(
+        diagnosticsAvailable
+          ? `Hook '${hookId}' ${updated.enabled ? "enabled" : "disabled"}; runtime status re-checked.`
+          : `Hook '${hookId}' ${updated.enabled ? "enabled" : "disabled"}, but runtime status could not be verified.`,
+      );
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
       setNotice(err.message || "Failed to toggle hook");
@@ -118,10 +153,17 @@ export function HookWorkspace({
     try {
       setSyncing(true);
       const res = await syncHooksApi({ projectPath });
-      setNotice(
-        `Synchronized hooks: ${res.antigravityHooks} Antigravity, ${res.claudeHooks} Claude hooks compiled.`
-      );
-      setTimeout(() => setNotice(null), 4000);
+      await loadData();
+      const counts = `${res.antigravityHooks} Antigravity, ${res.codexHooks} Codex, ${res.claudeHooks} Claude`;
+      const codex = res.providers.codex;
+      const trustReview = codex?.configured && codex.synced && !codex.runtimeReady && codex.trust?.status === "unknown"
+        ? " Codex configuration is synced; open /hooks in Codex to review and trust the project hooks."
+        : "";
+      const partial = !res.fullySynced || !res.ok
+        ? ` Partial sync${res.unsupportedProviders.length ? `; unsupported: ${res.unsupportedProviders.join(", ")}` : ""}.`
+        : " Fully synchronized.";
+      setNotice(`Hook configuration result: ${counts}.${partial}${trustReview}`);
+      setTimeout(() => setNotice(null), 7000);
     } catch (err: any) {
       setNotice(err.message || "Sync failed");
     } finally {
@@ -145,7 +187,7 @@ export function HookWorkspace({
     if (!window.confirm(`Remove hook '${hookId}'?`)) return;
     try {
       await removeHookApi({ hookId, projectPath });
-      setHooks((prev) => prev.filter((h) => h.id !== hookId));
+      await loadData();
       setNotice(`Removed hook '${hookId}'`);
       setTimeout(() => setNotice(null), 3000);
     } catch (err: any) {
@@ -271,6 +313,48 @@ export function HookWorkspace({
   }, [feedEvents, feedFilter]);
 
   const activeCount = hooks.filter((h) => h.enabled).length;
+  const providerDiagnostics = useMemo(
+    () =>
+      diagnostics
+        ? Object.values(diagnostics.providers).sort((left, right) => {
+            if (left.provider === providerId) return -1;
+            if (right.provider === providerId) return 1;
+            return left.provider.localeCompare(right.provider);
+          })
+        : [],
+    [diagnostics, providerId],
+  );
+  const diagnosticsByHook = useMemo(
+    () => new Map((diagnostics?.hooks ?? []).map((hook) => [hook.id, hook])),
+    [diagnostics],
+  );
+  const activeProviderDiagnostic = diagnostics?.providers[providerId];
+  const activeProviderNeedsTrustReview = Boolean(
+    activeProviderDiagnostic?.provider === "codex" &&
+    activeProviderDiagnostic.configured &&
+    activeProviderDiagnostic.synced &&
+    activeProviderDiagnostic.trust?.status === "unknown" &&
+    !activeProviderDiagnostic.runtimeReady,
+  );
+  const runtimeStatusLabel = loading || diagnosticsLoading
+    ? "CHECKING RUNTIME"
+    : diagnosticsError
+      ? "RUNTIME UNKNOWN"
+      : activeProviderDiagnostic?.runtimeReady
+        ? "RUNTIME READY"
+        : activeProviderNeedsTrustReview
+          ? "TRUST REVIEW REQUIRED"
+          : "ACTION REQUIRED";
+  const runtimeStatusColor = activeProviderDiagnostic?.runtimeReady
+    ? "#4ade80"
+    : diagnosticsError
+      ? "#f87171"
+      : "#facc15";
+  const runtimeStatusBackground = activeProviderDiagnostic?.runtimeReady
+    ? "rgba(34, 197, 94, 0.15)"
+    : diagnosticsError
+      ? "rgba(239, 68, 68, 0.15)"
+      : "rgba(234, 179, 8, 0.15)";
 
   return (
     <div className="hook-studio-container" style={{ padding: "1.5rem", maxWidth: "1400px", margin: "0 auto" }}>
@@ -296,17 +380,18 @@ export function HookWorkspace({
               Hook & Governance Studio
             </h1>
             <span
+              aria-label={`Hook runtime status: ${runtimeStatusLabel.toLowerCase()}`}
               style={{
                 fontSize: "0.75rem",
                 padding: "0.25rem 0.6rem",
                 borderRadius: "9999px",
-                background: "rgba(34, 197, 94, 0.15)",
-                color: "#4ade80",
-                border: "1px solid rgba(34, 197, 94, 0.3)",
+                background: runtimeStatusBackground,
+                color: runtimeStatusColor,
+                border: `1px solid ${runtimeStatusColor}55`,
                 fontWeight: 600,
               }}
             >
-              RUNTIME GUARD ACTIVE
+              {runtimeStatusLabel}
             </span>
           </div>
           <p style={{ margin: "0.4rem 0 0 0", color: "#94a3b8", fontSize: "0.875rem" }}>
@@ -359,6 +444,312 @@ export function HookWorkspace({
           </button>
         </div>
       </div>
+
+      <section
+        aria-label="Observed hook runtime diagnostics"
+        style={{
+          marginBottom: "1rem",
+          padding: "1rem",
+          borderRadius: "12px",
+          background: "rgba(15, 23, 42, 0.78)",
+          border: "1px solid rgba(71, 85, 105, 0.45)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "1rem",
+            marginBottom: "0.75rem",
+          }}
+        >
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Activity size={17} style={{ color: "#38bdf8" }} />
+              <h2 style={{ margin: 0, fontSize: "1rem", color: "#f8fafc" }}>
+                Observed Configuration &amp; Runtime Trust
+              </h2>
+            </div>
+            <p style={{ margin: "0.3rem 0 0", color: "#94a3b8", fontSize: "0.8rem" }}>
+              Provider-file synchronization and runtime readiness are reported separately. Codex
+              configuration is not called runtime-ready until trust has been observed.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="action-button secondary"
+            onClick={() => void refreshDiagnostics()}
+            disabled={loading || syncing || diagnosticsLoading}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              padding: "0.35rem 0.65rem",
+              borderRadius: "6px",
+              background: "rgba(51, 65, 85, 0.7)",
+              color: "#cbd5e1",
+              border: "1px solid rgba(100, 116, 139, 0.35)",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <RefreshCw size={14} className={diagnosticsLoading ? "animate-spin" : ""} /> Re-check
+          </button>
+        </div>
+
+        {diagnosticsError ? (
+          <div
+            role="alert"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.65rem 0.75rem",
+              borderRadius: "8px",
+              color: "#fca5a5",
+              background: "rgba(239, 68, 68, 0.1)",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              fontSize: "0.8rem",
+            }}
+          >
+            <ShieldAlert size={16} /> Runtime status unavailable: {diagnosticsError}
+          </div>
+        ) : diagnostics ? (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                gap: "0.6rem",
+                marginBottom: "0.75rem",
+              }}
+            >
+              {[
+                ["Configured", diagnostics.summary.configuredProviders, "provider files found"],
+                ["Synced", diagnostics.summary.syncedProviders, "match desired hooks"],
+                ["Drift", diagnostics.summary.driftedProviders, "need reconciliation"],
+                ["Unsupported", diagnostics.summary.unsupportedProviders, "not runtime active"],
+              ].map(([label, value, description]) => (
+                <div
+                  key={String(label)}
+                  style={{
+                    padding: "0.65rem",
+                    borderRadius: "8px",
+                    background: "rgba(30, 41, 59, 0.65)",
+                    border: "1px solid rgba(71, 85, 105, 0.35)",
+                  }}
+                >
+                  <span style={{ display: "block", color: "#94a3b8", fontSize: "0.7rem" }}>
+                    {label}
+                  </span>
+                  <strong style={{ color: "#f8fafc", fontSize: "1.1rem" }}>{value}</strong>
+                  <small style={{ display: "block", color: "#64748b" }}>{description}</small>
+                </div>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${Math.max(1, providerDiagnostics.length)}, minmax(0, 1fr))`,
+                gap: "0.6rem",
+              }}
+            >
+              {providerDiagnostics.map((provider) => {
+                const statusColor = provider.status === "synced"
+                  ? "#4ade80"
+                  : provider.status === "drift"
+                    ? "#facc15"
+                    : provider.status === "unsupported"
+                      ? "#94a3b8"
+                      : "#f87171";
+                const runtimeColor = provider.runtimeReady
+                  ? "#4ade80"
+                  : provider.trust?.status === "unknown"
+                    ? "#facc15"
+                    : "#94a3b8";
+                const capability = provider.capability;
+                return (
+                  <div
+                    key={provider.provider}
+                    data-provider-status={provider.status}
+                    data-runtime-ready={provider.runtimeReady ? "true" : "false"}
+                    data-trust-status={provider.trust?.status ?? "not_applicable"}
+                    style={{
+                      padding: "0.7rem",
+                      borderRadius: "8px",
+                      background: "rgba(15, 23, 42, 0.7)",
+                      border: `1px solid ${statusColor}55`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <strong style={{ color: "#e2e8f0", textTransform: "capitalize" }}>
+                        {provider.provider}
+                      </strong>
+                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "0.35rem" }}>
+                        <span
+                          aria-label={`${provider.provider} configuration ${provider.status.replaceAll("_", " ")}`}
+                          style={{
+                            color: statusColor,
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          CONFIG {provider.status.replaceAll("_", " ")}
+                        </span>
+                        <span
+                          aria-label={`${provider.provider} runtime ${provider.runtimeReady ? "ready" : "not verified"}`}
+                          style={{
+                            color: runtimeColor,
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          RUNTIME {provider.runtimeReady ? "READY" : "NOT VERIFIED"}
+                        </span>
+                      </div>
+                    </div>
+                    <small style={{ display: "block", color: "#64748b", marginTop: "0.3rem" }}>
+                      {provider.status === "unsupported"
+                        ? "Provider does not support this hook runtime; no active claim is made."
+                        : provider.configured
+                          ? provider.configPath || "Configuration file detected"
+                          : "Provider configuration has not been created."}
+                    </small>
+                    {provider.provider === "codex" && capability ? (
+                      <div
+                        aria-label="Codex hook capability"
+                        style={{
+                          marginTop: "0.45rem",
+                          padding: "0.45rem",
+                          borderRadius: "6px",
+                          background: "rgba(30, 41, 59, 0.6)",
+                          color: "#94a3b8",
+                          fontSize: "0.7rem",
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        <div>
+                          Codex CLI: {capability.installed ? capability.version || "version unknown" : "not observed"}
+                          {capability.versionSupported ? " · supported" : ` · requires ${capability.minimumVersion}+`}
+                        </div>
+                        <div>
+                          Hooks feature: {capability.hooksFeature.enabled === true
+                            ? capability.hooksFeature.stage || "enabled"
+                            : capability.hooksFeature.enabled === false
+                              ? "disabled"
+                              : "not observed"}
+                        </div>
+                        <div>
+                          Native events: {capability.supportedEvents.length} supported · {capability.excludedEvents.length} excluded
+                          {capability.asyncSupported ? " · async supported" : " · synchronous dispatch"}
+                        </div>
+                        <div>
+                          Strict config probe: {capability.strictConfig.status} · MCP tool hooks: {capability.mcpToolSupported ? "supported" : "not supported"}
+                        </div>
+                        {capability.supportedEvents.length ? (
+                          <div title={capability.supportedEvents.join(", ")}>
+                            Supported: {capability.supportedEvents.join(", ")}
+                          </div>
+                        ) : null}
+                        {capability.excludedEvents.length ? (
+                          <div title={capability.excludedEvents.join(", ")}>
+                            Excluded: {capability.excludedEvents.join(", ")}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {provider.provider === "codex" && provider.trust ? (
+                      <small
+                        style={{
+                          display: "block",
+                          color: provider.runtimeReady ? "#86efac" : "#facc15",
+                          marginTop: "0.4rem",
+                        }}
+                      >
+                        Runtime trust: {provider.trust.status}.
+                        {provider.trust.status === "unknown"
+                          ? " Open /hooks in Codex to review and trust this project's hooks."
+                          : provider.runtimeReady
+                            ? " Runtime readiness is verified."
+                            : " Runtime readiness is not verified."}
+                      </small>
+                    ) : null}
+                    {provider.configParse && (!provider.configParse.jsonParsed || !provider.configParse.strictValid) ? (
+                      <small style={{ display: "block", color: "#fca5a5", marginTop: "0.25rem" }}>
+                        Configuration parse: {provider.configParse.jsonParsed ? "JSON parsed" : "invalid JSON"}
+                        {provider.configParse.strictValid ? "" : " · strict validation failed"}
+                      </small>
+                    ) : null}
+                    {provider.missingHookIds.length || provider.unexpectedHookIds.length ? (
+                      <small style={{ display: "block", color: "#fbbf24", marginTop: "0.25rem" }}>
+                        {provider.missingHookIds.length} missing · {provider.unexpectedHookIds.length} unexpected
+                      </small>
+                    ) : null}
+                    {provider.unmanagedHookIds?.length ? (
+                      <small style={{ display: "block", color: "#94a3b8", marginTop: "0.25rem" }}>
+                        {provider.unmanagedHookIds.length} unmanaged entr{provider.unmanagedHookIds.length === 1 ? "y" : "ies"} preserved
+                      </small>
+                    ) : null}
+                    {provider.error ? (
+                      <small style={{ display: "block", color: "#fca5a5", marginTop: "0.25rem" }}>
+                        {provider.error}
+                      </small>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+                marginTop: "0.65rem",
+                color: "#94a3b8",
+                fontSize: "0.72rem",
+              }}
+            >
+              <span>{diagnostics.summary.runtimeReadyHooks} runtime-ready hooks</span>
+              <span>{diagnostics.summary.missingHandlers} missing handlers</span>
+              <span>{diagnostics.desired.enabled} desired enabled</span>
+              <span>Checked {new Date(diagnostics.analyzedAt).toLocaleString()}</span>
+            </div>
+            {diagnostics.issues.length ? (
+              <details style={{ marginTop: "0.6rem", color: "#fbbf24", fontSize: "0.75rem" }}>
+                <summary style={{ cursor: "pointer" }}>
+                  {diagnostics.issues.length} diagnostic issue{diagnostics.issues.length === 1 ? "" : "s"}
+                </summary>
+                <ul
+                  style={{
+                    margin: "0.45rem 0 0",
+                    paddingLeft: "1.25rem",
+                    maxHeight: "180px",
+                    overflowY: "auto",
+                  }}
+                >
+                  {diagnostics.issues.map((issue, index) => (
+                    <li key={`${issue}-${index}`}>{issue}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </>
+        ) : (
+          <div style={{ color: "#94a3b8", fontSize: "0.8rem" }}>Checking provider configuration…</div>
+        )}
+      </section>
 
       {notice && (
         <div
@@ -618,6 +1009,36 @@ export function HookWorkspace({
                       {hook.description || "No description provided."}
                     </p>
 
+                    {diagnosticsByHook.get(hook.id) ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          marginBottom: "0.5rem",
+                          color: diagnosticsByHook.get(hook.id)?.runtimeReady
+                            ? "#4ade80"
+                            : hook.enabled
+                              ? "#fbbf24"
+                              : "#94a3b8",
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                        }}
+                        title={diagnosticsByHook.get(hook.id)?.issues.join(" · ") || undefined}
+                      >
+                        {diagnosticsByHook.get(hook.id)?.runtimeReady ? (
+                          <ShieldCheck size={13} />
+                        ) : (
+                          <AlertTriangle size={13} />
+                        )}
+                        {diagnosticsByHook.get(hook.id)?.runtimeReady
+                          ? "Runtime ready"
+                          : hook.enabled
+                            ? "Desired enabled · runtime not verified"
+                            : "Desired disabled"}
+                      </div>
+                    ) : null}
+
                     {hook.matcher && (
                       <div
                         style={{
@@ -734,6 +1155,25 @@ export function HookWorkspace({
                             />
                           </span>
                         </label>
+                        {diagnosticsByHook.get(hook.id) ? (
+                          <small
+                            style={{
+                              display: "block",
+                              marginTop: "0.25rem",
+                              color: diagnosticsByHook.get(hook.id)?.runtimeReady
+                                ? "#4ade80"
+                                : hook.enabled
+                                  ? "#fbbf24"
+                                  : "#64748b",
+                            }}
+                          >
+                            {diagnosticsByHook.get(hook.id)?.runtimeReady
+                              ? "runtime ready"
+                              : hook.enabled
+                                ? "not verified"
+                                : "desired off"}
+                          </small>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

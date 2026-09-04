@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const fs = require("node:fs");
 const path = require("node:path");
 const { loadCatalog, saveCatalog } = require("./catalog-state");
 
@@ -71,26 +72,111 @@ async function listObservedStates({ catalogRoot, projectId, providerId }) {
   }).sort((left, right) => right.recorded_at.localeCompare(left.recorded_at));
 }
 
+function isWindowsPath(value) {
+  return process.platform === "win32" || /^[A-Za-z]:[\\/]/.test(value) || /^\\\\/.test(value);
+}
+
 function normalizedPath(value) {
   if (typeof value !== "string" || value.trim() === "") return null;
-  return path.resolve(value).toLowerCase();
+  const input = value.trim();
+  if (isWindowsPath(input)) {
+    return { flavor: "win32", value: path.win32.resolve(input).toLowerCase() };
+  }
+  const resolved = path.resolve(input);
+  try {
+    return { flavor: "posix", value: fs.realpathSync.native(resolved) };
+  } catch {
+    return { flavor: "posix", value: path.normalize(resolved) };
+  }
+}
+
+function pathsEqual(left, right) {
+  const normalizedLeft = normalizedPath(left);
+  const normalizedRight = normalizedPath(right);
+  return Boolean(
+    normalizedLeft
+      && normalizedRight
+      && normalizedLeft.flavor === normalizedRight.flavor
+      && normalizedLeft.value === normalizedRight.value,
+  );
 }
 
 function operationBinding(operation, bindings, providerId) {
-  const deliveryPath = normalizedPath(operation.delivery_path);
-  return bindings.find((binding) => binding.provider_id === providerId && normalizedPath(binding.target_path) === deliveryPath) ?? null;
+  return bindings.find((binding) => binding.provider_id === providerId && pathsEqual(binding.target_path, operation.delivery_path)) ?? null;
+}
+
+function firstText(record, fields) {
+  for (const field of fields) {
+    const value = record?.[field];
+    if (typeof value === "string" && value.trim() !== "") return { field, value: value.trim() };
+  }
+  return null;
+}
+
+function normalizedDigest(value) {
+  return value.replace(/^sha256:/i, "").toLowerCase();
+}
+
+function bindingIdentityMismatches(operation, binding) {
+  if (!binding) return [];
+  const mismatches = [];
+  const digest = firstText(binding, ["content_digest", "source_digest", "digest"]);
+  if (digest && typeof operation.content_digest === "string"
+    && normalizedDigest(digest.value) !== normalizedDigest(operation.content_digest)) {
+    mismatches.push({ field: digest.field, expected: operation.content_digest, observed: digest.value });
+  }
+
+  const revision = firstText(binding, ["source_revision_id", "revision_id"]);
+  if (revision && typeof operation.source_revision_id === "string" && revision.value !== operation.source_revision_id) {
+    mismatches.push({ field: revision.field, expected: operation.source_revision_id, observed: revision.value });
+  }
+
+  const registrySkill = firstText(binding, ["registry_skill_id"]);
+  if (registrySkill && typeof operation.registry_skill_id === "string" && registrySkill.value !== operation.registry_skill_id) {
+    mismatches.push({ field: registrySkill.field, expected: operation.registry_skill_id, observed: registrySkill.value });
+  }
+
+  // source_path is useful for direct/link adapters. Prefer immutable digest or
+  // revision claims when an upstream manager keeps its own canonical copy.
+  const hasImmutableClaim = Boolean(digest || revision || registrySkill);
+  const sourcePath = firstText(binding, ["canonical_path", "source_path"]);
+  if (!hasImmutableClaim && sourcePath && typeof operation.canonical_path === "string"
+    && !pathsEqual(sourcePath.value, operation.canonical_path)) {
+    mismatches.push({ field: sourcePath.field, expected: operation.canonical_path, observed: sourcePath.value });
+  }
+  return mismatches;
 }
 
 function comparisonFor(operation, binding, providerAvailable) {
   if (!providerAvailable) return { operation, binding, status: "provider_unavailable", reason: "Provider is not detected or reachable in the observed snapshot." };
   if (operation.desired_state === "enabled") {
     if (!binding) return { operation, binding: null, status: "missing", reason: "No observed binding targets the planned delivery path." };
+    const identityMismatches = bindingIdentityMismatches(operation, binding);
+    if (identityMismatches.length > 0) {
+      return {
+        operation,
+        binding,
+        status: "conflict",
+        reason: `Observed binding identity does not match the activation plan (${identityMismatches.map((item) => item.field).join(", ")}).`,
+        identity_mismatches: identityMismatches,
+      };
+    }
     if (binding.state === "enabled") return { operation, binding, status: "matched", reason: "Observed binding is enabled at the planned delivery path." };
     if (binding.state === "disabled") return { operation, binding, status: "disabled", reason: "Observed binding is disabled." };
     return { operation, binding, status: "conflict", reason: binding.reason ?? `Observed binding state is ${binding.state}.` };
   }
   if (!binding || binding.state === "disabled" || binding.state === "missing") {
     return { operation, binding, status: "matched", reason: "Observed state satisfies the disabled delivery intent." };
+  }
+  const identityMismatches = bindingIdentityMismatches(operation, binding);
+  if (identityMismatches.length > 0) {
+    return {
+      operation,
+      binding,
+      status: "conflict",
+      reason: `An active binding at the delivery path has a different identity (${identityMismatches.map((item) => item.field).join(", ")}).`,
+      identity_mismatches: identityMismatches,
+    };
   }
   if (binding.state === "enabled") return { operation, binding, status: "still_enabled", reason: "Observed binding remains enabled." };
   return { operation, binding, status: "conflict", reason: binding.reason ?? `Observed binding state is ${binding.state}.` };
@@ -129,8 +215,11 @@ async function compareRecordedPlanWithObservedState({ catalogRoot, planId, obser
   const observedState = observedStateId
     ? catalog.observed_states.find((item) => item.id === observedStateId)
     : catalog.observed_states
-      .filter((item) => item.project_id === planRecord.project_id && item.provider_id === providerId)
-      .sort((left, right) => right.recorded_at.localeCompare(left.recorded_at))[0];
+      .filter((item) => item.project_id === planRecord.project_id
+        && item.provider_id === providerId
+        && item.captured_at >= planRecord.plan.created_at)
+      .sort((left, right) => right.captured_at.localeCompare(left.captured_at)
+        || right.recorded_at.localeCompare(left.recorded_at))[0];
   if (!observedState) throw new Error(`No observed state found for project/provider: ${planRecord.project_id}/${providerId}`);
   return compareActivationPlanWithObservedState({ plan: planRecord.plan, observedState });
 }

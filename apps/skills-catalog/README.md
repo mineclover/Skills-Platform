@@ -7,38 +7,106 @@ activation-plan generation.
 It does not write provider `skills/` paths. Delivery is delegated to the
 Skills Manager adapter through the shared contracts package.
 
+All commands below run from the repository root. Query live Catalog and
+Registry state instead of relying on a checked-in inventory or fixed counts.
+
 ## Core CLI
 
-The initial CLI works with local sources and produces immutable delivery plans;
-it does not perform agent-path mutations.
+Inspection, import, review, profile, recipe reconciliation, and plan-export
+commands do not mutate agent paths. A skill-delivery mutation occurs only through an
+explicitly confirmed adapter path such as `project apply --confirm`,
+`recipe apply --confirm` with `--path`, or the confirmed production bridge.
 
 ```bash
 # Inspect local SKILL.md directories without executing third-party installers or mutating the registry.
-node src/cli.js source inspect ../some-skills
+node apps/skills-catalog/src/cli.js source inspect ./some-skills
 
 # Import inspected local SKILL.md directories into the local registry.
-node src/cli.js import-local ../some-skills --registry ./.skills-platform/registry
+node apps/skills-catalog/src/cli.js import-local ./some-skills \
+  --registry ./.skills-platform/registry
 
 # Resolve a Git ref to its commit, inspect the checked-out content, and import
 # only the immutable registry copy. No installer or repository script runs.
-node src/cli.js import-git https://github.com/example/skills.git --ref main \
+node apps/skills-catalog/src/cli.js import-git \
+  https://github.com/example/skills.git --ref main \
   --registry ./.skills-platform/registry
 
 # Discover a newer commit without importing or adopting it automatically.
-node src/cli.js source updates --registry ./.skills-platform/registry
+node apps/skills-catalog/src/cli.js source updates \
+  --registry ./.skills-platform/registry
 
 # After explicitly importing a candidate, approve the exact immutable revision.
-node src/cli.js source review approve revision_candidate --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js source review approve revision_candidate \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --summary "Reviewed the prompt diff and source provenance."
 
-# List registered artifacts and copy the emitted registry IDs
-node src/cli.js list --registry ./.skills-platform/registry
+# Query the current projects, presets, and managed skills.
+node apps/skills-catalog/src/cli.js project list --catalog ./.skills-platform/catalog
+node apps/skills-catalog/src/cli.js preset list --catalog ./.skills-platform/catalog
+node apps/skills-catalog/src/cli.js skill list --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry
 
 # Generate the link-first request for the delivery adapter
-node src/cli.js plan --registry ./.skills-platform/registry \
+node apps/skills-catalog/src/cli.js plan --registry ./.skills-platform/registry \
   --skill skill_example --provider codex --project-id demo \
-  --project-path C:/work/demo --delivery-root C:/work/demo/.agents/skills
+  --project-path /absolute/path/to/demo \
+  --delivery-root /absolute/path/to/demo/.agents/skills
+
+# Inspect the independently versioned provider authoring contracts.
+node apps/skills-catalog/src/cli.js skill rulesets
+
+# Create only the requested package resources, then validate each provider independently.
+node apps/skills-catalog/src/cli.js skill init my-skill --provider portable \
+  --out ./skills-packages/local \
+  --resources scripts,references --interface default_prompt='Use $my-skill for this task.'
+node apps/skills-catalog/src/cli.js skill validate \
+  ./skills-packages/local/my-skill --provider codex
+node apps/skills-catalog/src/cli.js skill validate \
+  ./skills-packages/local/my-skill --provider antigravity
 ```
+
+`source inspect` reports `importable` from discovery and manifest parsing. It
+does not collapse provider rules into that boolean. Check
+`skills[].authoring.results.codex.summary.status` and
+`skills[].authoring.results.antigravity.summary.status` separately: an
+importable source can still be nonconformant for either provider. Import also
+does not approve, select, enable, or deliver an artifact.
+
+## Portable recipes and project-local packages
+
+A tracked recipe is the portable desired state; `.skills-platform/catalog`
+remains machine-local state. Inspect and reconcile a recipe before registering
+or delivering to a project:
+
+```bash
+node apps/skills-catalog/src/cli.js recipe inspect \
+  ./skills-platform-authoring-recipe.json
+node apps/skills-catalog/src/cli.js recipe apply \
+  ./skills-platform-authoring-recipe.json \
+  --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry
+```
+
+For a hook-free recipe such as this one, omitting `--path` imports pinned
+sources and reconciles presets without creating provider bindings. Recipes that
+declare hooks also reconcile those hooks. To let a recipe register and preview
+a target, use the current `--path` flag:
+
+```bash
+node apps/skills-catalog/src/cli.js recipe apply ./recipe.json \
+  --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry \
+  --path /absolute/path/to/project --provider codex --enabled-only
+```
+
+If `recipe.projects` declares a matching provider, that path uses the declared
+project identity and its provider-specific default preset. Recipes without a
+project declaration retain the path-derived project/first-preset fallback.
+The command uses the reference delivery adapter; omit `--confirm` for preview.
+`--enabled-only` makes the operation additive; omit it for exact reconciliation
+that explicitly disables every unselected managed Registry skill.
+Register Codex and Antigravity as separate targets even if both use a project
+`.agents/skills` root.
 
 ## Local Catalog bridge
 
@@ -46,8 +114,15 @@ The bridge gives the separate Catalog UI a local view of Catalog state. Its
 single delivery write endpoint delegates only to the upstream Skills Manager
 CLI; it never writes provider paths itself.
 
+The bridge is bound to loopback by default and permits browser CORS only from
+loopback origins. Hook endpoints are limited to the server workspace and
+registered project roots. HTTP registration accepts existing script files
+inside `.skills-platform/hooks`; trusted command, module, and webhook handlers
+must be managed through the local CLI (or an explicit unsafe-handler server
+opt-in), preventing arbitrary websites from turning the bridge into a shell.
+
 ```bash
-node src/cli.js serve --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js serve --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --port 4300
 ```
 
@@ -67,11 +142,20 @@ endpoints applies a delivery operation. `GET|POST
 /api/activation-plans/:id/observed-state-comparison` compares a pinned plan
 with the latest matching snapshot.
 
-`POST /api/activation-plans/:id/apply` is the sole write endpoint. It requires
-`{"confirmed":true}`, resolves each plan operation to an upstream instance with
-the identical canonical digest, calls `skill preview`, runs the upstream CLI,
-and stores its report with a post-apply provider/binding inspection. It rejects
-missing or mismatched upstream skills instead of importing them implicitly.
+The production flow first calls `POST
+/api/projects/:id/activation-plan/preview`, optionally with
+`{"preflight":true}`. That endpoint records the immutable plan. The client then
+passes the returned **same** `plan.plan_id` to `POST
+/api/activation-plans/:id/apply` with `{"confirmed":true}` (or to its streaming
+variant). Apply resolves each operation to an upstream instance with the
+identical canonical digest, calls upstream `skill preview`, runs the upstream
+CLI, and stores a post-apply provider/binding inspection. It rejects missing or
+mismatched upstream skills instead of importing them implicitly.
+
+This bridge path is distinct from `project apply`, which invokes the in-repo
+reference adapter and can directly materialize guarded filesystem bindings for
+development and contract tests. Production delivery uses the recorded-plan
+upstream bridge so preview and confirmation cannot silently switch plans.
 
 `GET /api/skills` exposes the managed skill catalog (lineage, latest immutable
 revision, profile, and active notes). `GET|POST /api/skills/:lineage/profile`
@@ -84,6 +168,25 @@ bridge validates the target scope and records whether a note may be injected
 into a system prompt. This mirrors the `skill note` CLI group and leaves
 template membership and provider delivery unchanged.
 
+`GET|POST /api/skills/:lineage/annotations` and the annotation mutation
+endpoints manage reader-only explanations. `POST
+/api/skills/:lineage/analysis` creates a deterministic, revision-pinned static
+analysis, and `GET /api/skills/:lineage/analyses` lists results with stale and
+outdated status. These sidecars are structurally excluded from system prompts,
+activation plans, recipes, and provider delivery.
+
+`GET /api/skill-authoring/rulesets` exposes the official-source, independently
+versioned Codex and Antigravity ruleset descriptors. `POST
+/api/skill-authoring/validate` accepts only virtual package-relative file
+content and returns execution-neutral provider findings; filesystem paths are
+rejected. Revision analysis embeds the same two results, including exact
+ruleset versions, without modifying canonical content or enablement.
+
+`POST /api/projects/:id/skill-overrides/:lineage` sets an exact pinned desired
+state or clears it with `desired_state: "inherit"`. Plan preview records the
+immutable plan; clients must apply that same `plan_id` instead of generating a
+new plan after confirmation.
+
 `POST /api/activation-plans/:id/apply/stream` is the streaming form of the
 confirmed apply endpoint. It emits NDJSON `progress` records for inspection,
 immutable revision resolution, preview, each apply operation, and verification,
@@ -94,33 +197,93 @@ confirmation, or reporting safeguards.
 
 ```bash
 # Register a project delivery target. It starts from Pristine.
-node src/cli.js project add demo --catalog ./.skills-platform/catalog \
-  --name Demo --path C:/work/demo --provider codex \
-  --delivery-root C:/work/demo/.agents/skills
+node apps/skills-catalog/src/cli.js project add demo \
+  --catalog ./.skills-platform/catalog \
+  --name Demo --path /absolute/path/to/demo --provider codex \
+  --delivery-root /absolute/path/to/demo/.agents/skills
 
 # Create a reusable set from registry IDs, then make it the project's default.
-node src/cli.js preset create demo-build --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js preset create demo-build \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --name "Demo build" --skill skill_example
-node src/cli.js preset assign demo demo-build --catalog ./.skills-platform/catalog
+node apps/skills-catalog/src/cli.js preset assign demo demo-build \
+  --catalog ./.skills-platform/catalog
 
 # Adoption changes the preset only by creating a new version; existing project
 # pins remain unchanged until explicitly reassigned.
-node src/cli.js preset adopt demo-build --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js preset adopt demo-build \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --skill skill_candidate
 
-# Export a pinned plan for the Skills Manager delivery adapter; no provider path is changed.
-node src/cli.js project-plan demo --catalog ./.skills-platform/catalog \
-  --registry ./.skills-platform/registry --out ./demo-plan.json
+# Export a pinned plan; no provider path is changed.
+node apps/skills-catalog/src/cli.js project-plan demo \
+  --catalog ./.skills-platform/catalog \
+  --registry ./.skills-platform/registry --enabled-only --out ./demo-plan.json
 
 # Emit the complete, provenance-marked SKILL.md prompt content for another system.
-node src/cli.js system-prompt --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js system-prompt \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --preset demo-build
 
 # Add only explicitly prompt-enabled usage notes for a project context.
-node src/cli.js system-prompt --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js system-prompt \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --preset demo-build \
   --project-id demo --include-notes
 ```
+
+Codex project delivery is fixed to `<project>/.agents/skills`. Antigravity
+defaults to the same project root and also permits legacy `.agent/skills`;
+their global roots and package metadata rules differ, as described below.
+
+## Reference-adapter verification
+
+The in-repo adapter is a filesystem implementation for local development and
+contract verification. Preview and apply the exact same exported plan file:
+
+```bash
+node packages/skills-manager-adapter/src/cli.js preview ./demo-plan.json
+node packages/skills-manager-adapter/src/cli.js apply ./demo-plan.json --confirm
+```
+
+`node apps/skills-catalog/src/cli.js project apply demo` is a convenience
+preview through that same reference adapter; adding `--confirm` performs its
+direct apply. Neither command replaces the production bridge's recorded-plan,
+upstream Skills Manager flow described above.
+
+Pass `--enabled-only` to `project-plan` or `project apply` for additive
+bootstrap: only selected enabled revisions are emitted, so unrelated bindings
+and Codex config entries are left alone. Omit it for exact reconciliation,
+which deliberately emits disabled operations for all unselected managed
+Registry skills. Pristine is an exact-disable operation and rejects
+`--enabled-only`.
+
+## Provider authoring and activation semantics
+
+Codex and Antigravity share the exact-case `SKILL.md` package root, but their
+specifications remain independently versioned:
+
+| Concern | Codex | Antigravity |
+| --- | --- | --- |
+| Project discovery | `<project>/.agents/skills` | `<project>/.agents/skills`; legacy `.agent/skills` is accepted |
+| Global discovery | `$HOME/.agents/skills` | `$HOME/.gemini/config/skills` |
+| Required frontmatter | `name`, `description` | `description`; `name` may default from the folder |
+| Optional directories | `scripts`, `references`, `assets`, `agents` | `scripts`, `examples`, `resources` |
+| Provider metadata | Optional `agents/openai.yaml` | No `openai.yaml` runtime contract |
+| Root symlink | Documented and accepted | Undocumented; authoring validation warns |
+
+Codex `agents/openai.yaml` can set
+`policy.allow_implicit_invocation: false`. The authoring result is then
+`explicit_only`: the delivered, enabled skill is still available through an
+explicit `$skill-name` request, but Codex should not select it implicitly.
+This is not the same as project/preset `disabled`, which emits
+`desired_state: "disabled"`, removes the managed binding, and reconciles an
+existing matching Codex `[[skills.config]]` entry to `enabled = false`.
+Codex config changes report `restart_required: true`.
+
+The Catalog profile taxonomy (`model_invoked`, `user_invoked`, `hybrid`, and
+`unspecified`) is management metadata for search, recipes, and telemetry. It
+does not itself enable or disable a provider binding.
 
 ## Skill profiles and usage notes
 
@@ -129,26 +292,64 @@ skill revisions while preserving the profile and its notes.
 
 ```bash
 # Find the lineage ID and enrich the skill without changing its SKILL.md source.
-node src/cli.js skill list --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js skill list \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry
-node src/cli.js skill profile set lineage_example --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js skill profile set lineage_example \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --purpose "Review UI changes" \
   --use-when "Before frontend implementation" --tag design --tag review \
   --provider codex --review-state reviewed
 
 # Keep a project-only caveat. It is excluded from prompts unless explicitly enabled.
-node src/cli.js skill note add lineage_example --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js skill note add lineage_example \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --scope project --project-id demo \
   --kind caveat --body "Check keyboard navigation on the demo surface."
 
 # Search combines skill metadata and active notes.
-node src/cli.js skill search keyboard --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js skill search keyboard \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --tag design --provider codex
 
 # Review a lineage's immutable revisions and its canonical SKILL.md delta.
-node src/cli.js skill revisions lineage_example --registry ./.skills-platform/registry
-node src/cli.js skill diff lineage_example revision_old revision_new \
+node apps/skills-catalog/src/cli.js skill revisions lineage_example \
   --registry ./.skills-platform/registry
+node apps/skills-catalog/src/cli.js skill diff \
+  lineage_example revision_old revision_new \
+  --registry ./.skills-platform/registry
+```
+
+## Per-project state overrides
+
+An override pins an exact registry revision and changes desired state only.
+It does not touch a provider until that exact previewed plan is confirmed.
+
+```bash
+node apps/skills-catalog/src/cli.js project skill demo enable lineage_example \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
+  --skill skill_exact_revision
+node apps/skills-catalog/src/cli.js project skill demo disable lineage_example \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
+  --skill skill_exact_revision
+node apps/skills-catalog/src/cli.js project skill demo inherit lineage_example \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry
+```
+
+## Reader-only annotations and static analysis
+
+Reader annotations differ from usage notes: they have no prompt-injection or
+activation controls and always report `execution_effect: "none"`. They are
+stored outside immutable registry artifacts.
+
+```bash
+node apps/skills-catalog/src/cli.js skill annotation add lineage_example \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
+  --revision revision_example --kind plain_language --locale ko-KR \
+  --body "스킬의 목적과 사용 시점을 쉽게 설명합니다."
+node apps/skills-catalog/src/cli.js skill analysis run lineage_example \
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
+  --revision revision_example
 ```
 
 ## Structured feedback and health
@@ -159,7 +360,7 @@ silently modify source content or selection policy.
 
 ```bash
 # Record a reviewed evaluation with explicit counters.
-node src/cli.js skill feedback add lineage_example \
+node apps/skills-catalog/src/cli.js skill feedback add lineage_example \
   --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
   --scope project --project-id demo --outcome success --evidence evaluation \
   --summary "The task completed with the expected checks." \
@@ -167,7 +368,7 @@ node src/cli.js skill feedback add lineage_example \
 
 # See the outcome/evidence breakdown, supplied counters, success rate, and
 # conservative healthy / needs_review / unknown state.
-node src/cli.js skill feedback summary lineage_example \
+node apps/skills-catalog/src/cli.js skill feedback summary lineage_example \
   --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry
 ```
 
@@ -180,7 +381,7 @@ the new version.
 
 ```bash
 # Define an active, explicit evaluation contract.
-node src/cli.js evaluation case create review-contract \
+node apps/skills-catalog/src/cli.js evaluation case create review-contract \
   --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
   --lineage lineage_example --name "Review contract" \
   --objective "Confirm a review is scoped and evidenced" \
@@ -188,13 +389,14 @@ node src/cli.js evaluation case create review-contract \
   --criterion "Records verifiable evidence" --lifecycle active
 
 # Record a human or external evaluator result against a pinned source revision.
-node src/cli.js evaluation run record review-contract \
+node apps/skills-catalog/src/cli.js evaluation run record review-contract \
   --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry \
   --revision revision_example --outcome passed --summary "Both checks passed." \
   --criterion-results '[{"criterion":"Explains the expected scope","outcome":"passed"},{"criterion":"Records verifiable evidence","outcome":"passed"}]'
 
 # List inferred review work; it never changes a template or delivery target.
-node src/cli.js review queue --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js review queue \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry
 ```
 
@@ -211,10 +413,10 @@ npm run inspect -- providers --project <manager-project-id> --json > providers.j
 npm run inspect -- bindings --project <manager-project-id> --provider codex --json > bindings.json
 
 # Record the observation against the Catalog project, then check for drift.
-node src/cli.js observed-state record demo \
+node apps/skills-catalog/src/cli.js observed-state record demo \
   --catalog ./.skills-platform/catalog --provider codex \
   --inventory ./providers.json --bindings ./bindings.json
-node src/cli.js observed-state compare <catalog-plan-id> \
+node apps/skills-catalog/src/cli.js observed-state compare <catalog-plan-id> \
   --catalog ./.skills-platform/catalog
 ```
 
@@ -240,33 +442,44 @@ was given, so an updated template is never adopted implicitly.
 
 ```bash
 # Create a reviewed work template, inspect its immutable version, and annotate why it exists.
-node src/cli.js preset create frontend-build --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js preset create frontend-build \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --name "Frontend build" \
   --purpose "Implement and verify interface changes" --work-scope ui \
   --owner frontend --lifecycle reviewed --skill skill_design --skill skill_test
-node src/cli.js preset note add frontend-build --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js preset note add frontend-build \
+  --catalog ./.skills-platform/catalog \
   --body "Use only after discovery and planning are complete."
-node src/cli.js preset show frontend-build --catalog ./.skills-platform/catalog --version 1
+node apps/skills-catalog/src/cli.js preset show frontend-build \
+  --catalog ./.skills-platform/catalog --version 1
 
 # Updating creates v2; compare, then explicitly pin a project to that version.
-node src/cli.js preset update frontend-build --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js preset update frontend-build \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --purpose "Implement, review, and verify UI changes"
-node src/cli.js preset compare frontend-build 1 2 --catalog ./.skills-platform/catalog
-node src/cli.js preset assign demo frontend-build --catalog ./.skills-platform/catalog --version 2
+node apps/skills-catalog/src/cli.js preset compare frontend-build 1 2 \
+  --catalog ./.skills-platform/catalog
+node apps/skills-catalog/src/cli.js preset assign demo frontend-build \
+  --catalog ./.skills-platform/catalog --version 2
 
 # Inspect the exact pinned version and why each managed skill is selected or disabled.
-node src/cli.js project resolve demo --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js project resolve demo \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry
 
 # Add verification skills only for implementation work. The base assignment remains pinned.
-node src/cli.js preset assign demo verification --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js preset assign demo verification \
+  --catalog ./.skills-platform/catalog \
   --version 1 --role work_scope_overlay --priority 10 --work-scope implementation
-node src/cli.js project resolve demo --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js project resolve demo \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --work-scope implementation
 
 # Preserve an immutable plan record, then attach a report returned by the delivery adapter.
-node src/cli.js history record-plan demo --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js history record-plan demo \
+  --catalog ./.skills-platform/catalog \
   --registry ./.skills-platform/registry --work-scope implementation
-node src/cli.js history record-report <plan-id> --catalog ./.skills-platform/catalog \
+node apps/skills-catalog/src/cli.js history record-report <plan-id> \
+  --catalog ./.skills-platform/catalog \
   --file ./activation-report.json
 ```

@@ -8,6 +8,9 @@ const {
   addSkillFeedback,
   addPresetTemplateNote,
   addSkillNote,
+  analyzeSkillRevision,
+  createSkillAnnotation,
+  deleteSkillAnnotation,
   latestSourceReview,
   deleteSkillNote,
   diffSkillRevisions,
@@ -18,6 +21,7 @@ const {
   getSkillEvaluationSummary,
   createPreset,
   createProject,
+  clearProjectSkillOverride,
   createProjectPlan,
   clonePresetTemplate,
   comparePresetVersions,
@@ -35,6 +39,8 @@ const {
   listSourceUpdateCandidates,
   listSkillRevisions,
   listSkillNotes,
+  listSkillAnnotations,
+  listSkillAnalyses,
   listSkillFeedback,
   listEvaluationCases,
   listEvaluationRuns,
@@ -46,14 +52,17 @@ const {
   resolveProjectSelection,
   searchSkills,
   startCatalogServer,
+  setProjectSkillOverride,
   recordSourceReview,
   recordEvaluationRun,
   recordObservedState,
   resolveProjectEffectiveSet,
   restoreSkillNote,
+  restoreSkillAnnotation,
   updateEvaluationCase,
   updatePresetTemplate,
   updateSkillProfile,
+  updateSkillAnnotation,
   applyRecipe,
   exportRecipe,
   inspectRecipe,
@@ -76,6 +85,9 @@ const {
   calculatePlanGap,
   getReadyObligations,
   getEventHistory,
+  initializeSkillPackage,
+  inspectSkillPackage,
+  listSkillAuthoringRulesets,
 } = require(".");
 
 const MULTI_VALUE_FLAGS = new Set([
@@ -84,7 +96,7 @@ const MULTI_VALUE_FLAGS = new Set([
   "owned", "owned-file", "owned-files",
   "prohibited", "prohibited-action", "prohibited-actions",
   "acceptance", "acceptance-criterion", "acceptance-criteria",
-  "dependency", "dependencies", "guard",
+  "dependency", "dependencies", "guard", "resource", "resources", "interface",
 ]);
 
 function parseArguments(argv) {
@@ -129,14 +141,16 @@ function usage() {
     "  skills-catalog workspace prune --task <id>",
     "  skills-catalog project add <id> --name <name> --path <path> --provider <id> [--delivery-root <path>] [--upstream-project-id <id>]",
     "  skills-catalog project list | project resolve <id> [--preset <id>] [--work-scope <tag>]...",
-    "  skills-catalog project apply <id> [--confirm] [--preset <id>] [--work-scope <tag>]... [--copy]",
+    "  skills-catalog project apply <id> [--confirm] [--preset <id>] [--work-scope <tag>]... [--enabled-only] [--copy]",
+    "  skills-catalog project skill <project-id> enable|disable <lineage-id> --skill <registry-skill-id>",
+    "  skills-catalog project skill <project-id> inherit <lineage-id>",
     "  skills-catalog preset create <id> --name <name> --skill <registry-skill-id>...",
     "  skills-catalog preset show <id> [--version <n>] | preset update <id> [--skill <id>]...",
     "  skills-catalog preset clone <source-id> <new-id> --name <name> | preset compare <id> <left> <right>",
     "  skills-catalog preset note add <id> --body <text> | preset assign <project-id> <preset-id> [--version <n>]",
     "  skills-catalog preset adopt <preset-id> --skill <approved-registry-skill-id>",
     "      [--role default|recommended|work_scope_overlay] [--priority <n>] [--work-scope <tag>]...",
-    "  skills-catalog project-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--copy] [--out <file>]",
+    "  skills-catalog project-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--enabled-only] [--copy] [--out <file>]",
     "  skills-catalog history record-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--copy]",
     "  skills-catalog history record-report <plan-id> --file <adapter-report.json> | history list [--project-id <id>]",
     "  skills-catalog system-prompt --preset <id>",
@@ -144,9 +158,14 @@ function usage() {
     "  skills-catalog skill revisions <lineage-id> | skill diff <lineage-id> <left-revision> <right-revision>",
     "  skills-catalog skill profile show <lineage-id>",
     "  skills-catalog skill profile set <lineage-id> [--purpose <text>] [--use-when <text>] [--tag <tag>]...",
+    "  skills-catalog skill init <name> [--out <parent-dir>] [--provider codex|antigravity|portable] [--resources <list>] [--interface key=value]...",
+    "  skills-catalog skill inspect|validate <skill-dir> [--provider codex|antigravity|portable] | skill rulesets",
     "  skills-catalog skill note add <lineage-id> --body <text> [--scope <scope>] [--kind <kind>]",
     "  skills-catalog skill note list [--lineage <id>] | skill note edit <note-id> --body <text>",
     "  skills-catalog skill note delete|restore <note-id>",
+    "  skills-catalog skill annotation add <lineage-id> --body <text> [--revision <id>] [--kind <kind>] [--locale <tag>]",
+    "  skills-catalog skill annotation list <lineage-id> | skill annotation edit|delete|restore <annotation-id> --lineage <id> --expected-version <n>",
+    "  skills-catalog skill analysis run|list <lineage-id> [--revision <id>]",
     "  skills-catalog skill feedback add <lineage-id> --summary <text> [--outcome <outcome>] [--evidence <type>]",
     "  skills-catalog skill feedback list [--lineage <id>] | skill feedback summary <lineage-id>",
     "  skills-catalog evaluation case create <id> --lineage <id> --name <name> --objective <text> --criterion <text>...",
@@ -154,11 +173,14 @@ function usage() {
     "      --summary <text> --criterion-results <json> | evaluation summary <lineage-id> | review queue",
     "  skills-catalog observed-state record <project-id> --provider <id> --inventory <file> --bindings <file>",
     "      | observed-state list [--project-id <id>] | observed-state compare <plan-id>",
+    "  skills-catalog hook list|diagnostics [--project <path>] [--event <name>]",
+    "  skills-catalog hook add --id <id> --name <name> --event <event> --handler <path> [--failure-policy open|closed] [--no-sync]",
+    "  skills-catalog hook enable|disable|remove <id> [--project <path>] [--no-sync] | hook sync | hook test --event <event>",
     "  skills-catalog plan --skill <registry-skill-id>... --provider <id> --delivery-root <path>",
     "      [--registry <path>] [--project-id <id> --project-path <path> | --global] [--copy]",
     "  skills-catalog recipe export [--project <id>] [--preset <id>] [--name <text>] [--out <file>]",
     "  skills-catalog recipe inspect <file>",
-    "  skills-catalog recipe apply <file> [--path <path>] [--provider <id>] [--confirm]",
+    "  skills-catalog recipe apply <file> [--path <path>] [--provider <id>] [--enabled-only] [--confirm]",
     "  skills-catalog loop run --prd <path> [--project <path>] [--provider <id>] [--confirm]",
   ].join("\n");
 }
@@ -254,7 +276,7 @@ async function run(argv) {
     }
   }
 
-  if (command === "ledger" || command === "plan") {
+  if (command === "ledger") {
     const [action] = positional.slice(1);
     if (action === "list" || !action) {
       return listPlans({ filter: { status: flags.status, phase: flags.phase } });
@@ -406,6 +428,75 @@ async function run(argv) {
       if (action === "delete") return deleteSkillNote({ catalogRoot, noteId: subject, author: flags.author });
       if (action === "restore") return restoreSkillNote({ catalogRoot, noteId: subject });
     }
+    if (area === "annotation") {
+      const parseAnchor = () => {
+        if (flags.anchor === undefined) return undefined;
+        try {
+          return JSON.parse(flags.anchor);
+        } catch {
+          throw new Error("Annotation anchor must be valid JSON");
+        }
+      };
+      if (action === "add") {
+        return createSkillAnnotation({
+          catalogRoot,
+          registryRoot,
+          lineageId: subject,
+          sourceRevisionId: flags.revision ?? flags["source-revision-id"] ?? null,
+          kind: flags.kind,
+          title: flags.title,
+          body: flags.body,
+          locale: flags.locale,
+          anchor: parseAnchor(),
+          author: flags.author,
+        });
+      }
+      if (action === "list") {
+        return listSkillAnnotations({
+          catalogRoot,
+          lineageId: subject ?? flags.lineage,
+          sourceRevisionId: flags.revision ?? flags["source-revision-id"],
+          kind: flags.kind,
+          includeDeleted: flags["include-deleted"] === true,
+        });
+      }
+      const mutation = {
+        catalogRoot,
+        registryRoot,
+        lineageId: flags.lineage,
+        annotationId: subject,
+        expectedVersion: flags["expected-version"],
+        author: flags.author,
+      };
+      if (action === "edit") {
+        return updateSkillAnnotation({
+          ...mutation,
+          patch: {
+            ...(flags.kind !== undefined ? { kind: flags.kind } : {}),
+            ...(flags.title !== undefined ? { title: flags.title } : {}),
+            ...(flags.body !== undefined ? { body: flags.body } : {}),
+            ...(flags.locale !== undefined ? { locale: flags.locale } : {}),
+            ...(flags.anchor !== undefined ? { anchor: parseAnchor() } : {}),
+          },
+        });
+      }
+      if (action === "delete") return deleteSkillAnnotation(mutation);
+      if (action === "restore") return restoreSkillAnnotation(mutation);
+    }
+    if (area === "analysis") {
+      if (action === "run") {
+        return analyzeSkillRevision({
+          catalogRoot,
+          registryRoot,
+          lineageId: subject,
+          sourceRevisionId: flags.revision ?? flags["source-revision-id"],
+          analyzerVersion: flags["analyzer-version"],
+        });
+      }
+      if (action === "list") {
+        return listSkillAnalyses({ catalogRoot, registryRoot, lineageId: subject });
+      }
+    }
     if (area === "feedback") {
       if (action === "add") {
         let metrics;
@@ -461,82 +552,22 @@ async function run(argv) {
       const skillName = action ?? subject ?? flags.name;
       if (!skillName) throw new Error("skill init requires a skill name: skills-platform skill init <name>");
       const pkgName = flags.pkg ?? flags.package ?? flags.group ?? "platform-core";
-      const baseDir = flags.out ?? flags.dir ?? path.join(process.cwd(), "skills-packages", pkgName);
-      const targetDir = path.basename(baseDir) === skillName ? path.resolve(baseDir) : path.resolve(baseDir, skillName);
-      await fs.mkdir(path.join(targetDir, "references"), { recursive: true });
-      await fs.mkdir(path.join(targetDir, "examples"), { recursive: true });
-      const scaffoldSkillMd = `---
-name: ${skillName}
-description: >-
-  Concise 3rd-person summary of what this skill does and the exact scenarios when the agent should activate it. Use when...
----
-
-# ${skillName}
-
-Step-by-step procedural runbook for ${skillName}.
-
-## 1. Prerequisites
-- Confirm environment and tools are ready.
-
-## 2. Steps
-1. Execute core workflow step.
-2. Verify output.
-
-For detailed manuals and schemas, see [references/guide.md](./references/guide.md).
-`;
-      await fs.writeFile(path.join(targetDir, "SKILL.md"), scaffoldSkillMd, "utf8");
-      await fs.writeFile(path.join(targetDir, "references", "guide.md"), `# ${skillName} Reference Manual\n\nDeep specifications and schemas go here.\n`, "utf8");
-      await fs.writeFile(path.join(targetDir, "examples", "example.md"), `# ${skillName} Example Walkthrough\n\nSample inputs and outputs go here.\n`, "utf8");
-      return { initialized: true, skill_name: skillName, path: targetDir };
-    }
-    if (area === "validate") {
-      const skillPath = path.resolve(action ?? subject ?? flags.path ?? process.cwd());
-      const skillMdPath = path.join(skillPath, "SKILL.md");
-      const issues = [];
-      try {
-        const content = await fs.readFile(skillMdPath, "utf8");
-        const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-        if (!fmMatch) {
-          issues.push("SKILL.md is missing YAML frontmatter (--- ... ---)");
-        } else {
-          const fmText = fmMatch[1];
-          const nameMatch = fmText.match(/^name:\s*(.+)$/m);
-          const descMatch = fmText.match(/^description:\s*(?:>-\s*)?([\s\S]*?)(?=\n[a-z_]+:|$)/m);
-          if (!nameMatch || !nameMatch[1].trim()) {
-            issues.push("Frontmatter is missing required 'name' field");
-          } else {
-            const nameVal = nameMatch[1].trim();
-            if (!/^[a-z0-9-]+$/.test(nameVal)) {
-              issues.push(`Invalid skill name '${nameVal}': must be lowercase alphanumeric and hyphens only`);
-            }
-          }
-          if (!descMatch || !descMatch[1].trim()) {
-            issues.push("Frontmatter is missing required 'description' field");
-          } else if (descMatch[1].trim().length < 20) {
-            issues.push("Frontmatter 'description' is too short; provide clear triggers on when to use this skill");
-          }
-        }
-        // Check relative markdown links
-        const linkRegex = /\[([^\]]+)\]\(\.\/([^\)]+)\)/g;
-        let match;
-        while ((match = linkRegex.exec(content)) !== null) {
-          const targetRel = match[2];
-          const targetAbs = path.resolve(skillPath, targetRel);
-          try {
-            await fs.stat(targetAbs);
-          } catch {
-            issues.push(`Broken relative link: [${match[1]}](./${targetRel}) -> file not found on disk`);
-          }
-        }
-      } catch (err) {
-        issues.push(`Failed to read SKILL.md: ${err.message}`);
+      const outputDirectory = flags.out ?? flags.dir ?? path.join(process.cwd(), "skills-packages", pkgName);
+      const provider = flags.provider?.[0] ?? "portable";
+      const resources = [...(flags.resource ?? []), ...(flags.resources ?? [])];
+      const interfaceValues = {};
+      for (const raw of flags.interface ?? []) {
+        const separator = raw.indexOf("=");
+        if (separator <= 0) throw new Error("--interface must use key=value");
+        interfaceValues[raw.slice(0, separator).trim()] = raw.slice(separator + 1).trim();
       }
-      return {
-        valid: issues.length === 0,
-        skill_path: skillPath,
-        issues,
-      };
+      return initializeSkillPackage({ skillName, outputDirectory, provider, resources, interfaceValues });
     }
+    if (area === "inspect" || area === "validate") {
+      const skillPath = path.resolve(action ?? subject ?? flags.path ?? process.cwd());
+      return inspectSkillPackage({ skillPath, provider: flags.provider?.[0] ?? "portable" });
+    }
+    if (area === "rulesets") return { rulesets: listSkillAuthoringRulesets() };
   }
 
   if (command === "evaluation") {
@@ -645,6 +676,24 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
       });
     }
     if (action === "list") return listProjects(catalogRoot);
+    if (action === "skill") {
+      const desiredState = positional[3];
+      const lineageId = positional[4];
+      if (desiredState === "inherit") {
+        return clearProjectSkillOverride({ catalogRoot, registryRoot, projectId, lineageId });
+      }
+      if (desiredState !== "enabled" && desiredState !== "disabled" && desiredState !== "enable" && desiredState !== "disable") {
+        throw new Error("project skill requires enable, disable, or inherit");
+      }
+      return setProjectSkillOverride({
+        catalogRoot,
+        registryRoot,
+        projectId,
+        lineageId,
+        registrySkillId: flags.skill?.[0],
+        desiredState: desiredState === "enable" ? "enabled" : desiredState === "disable" ? "disabled" : desiredState,
+      });
+    }
     if (action === "resolve") {
       return resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [] });
     }
@@ -656,6 +705,7 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
         presetId: flags.preset,
         workScopeTags: flags["work-scope"] ?? [],
         distribution: { method: flags.copy === true ? "copy" : "symlink" },
+        enabledOnly: flags["enabled-only"] === true,
       });
       const adapter = require("@skills-platform/skills-manager-adapter");
       const confirmed = flags.confirm === true;
@@ -665,7 +715,7 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
       }
       const report = await adapter.applyActivationPlan(plan, { confirm: true });
       const selection = await resolveProjectSelection({
-        catalogRoot, projectId, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [],
+        catalogRoot, registryRoot, projectId, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [],
       });
       await recordActivationPlan({ catalogRoot, plan, projectId, assignments: selection.assignments });
       await recordActivationReport({ catalogRoot, planId: plan.plan_id, report });
@@ -748,6 +798,7 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
       presetId: flags.preset,
       workScopeTags: flags["work-scope"] ?? [],
       distribution: { method: flags.copy === true ? "copy" : "symlink" },
+      enabledOnly: flags["enabled-only"] === true,
     });
     if (flags.out) await exportActivationPlan({ outputPath: flags.out, plan });
     return plan;
@@ -758,7 +809,7 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
     if (action === "list") return listActivationHistory({ catalogRoot, projectId: flags["project-id"], planId: flags["plan-id"] });
     if (action === "record-plan") {
       const selection = await resolveProjectSelection({
-        catalogRoot, projectId: subject, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [],
+        catalogRoot, registryRoot, projectId: subject, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [],
       });
       const plan = await createProjectPlan({
         catalogRoot,
@@ -830,6 +881,7 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
         projectPath: flags.path,
         providerId: flags.provider?.[0],
         confirm: flags.confirm === true,
+        enabledOnly: flags["enabled-only"] === true,
       });
     }
   }
@@ -842,6 +894,7 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
       removeHook,
       updateHookStatus,
       compileProviderConfigs,
+      getHookDiagnostics,
       triggerHookEvent,
     } = require("./hooks-manager");
 
@@ -857,10 +910,19 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
           event: h.event,
           enabled: h.enabled,
           matcher: h.matcher,
+          description: h.description,
           type: h.handler.type,
           target: h.handler.target || h.handler.command,
+          timeout_ms: h.handler.timeout_ms,
+          failure_policy: h.failure_policy ?? "open",
+          priority: h.priority ?? 100,
+          providers: h.providers ?? [],
         })),
       };
+    }
+
+    if (action === "diagnostics" || action === "status") {
+      return getHookDiagnostics({ projectPath });
     }
 
     if (action === "add" || action === "register") {
@@ -872,7 +934,7 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
       const cmd = flags.command;
 
       if (!id) throw new Error("hook add requires --id <id>");
-      if (!target && !cmd) throw new Error("hook add requires --handler <path> or --command <cmd>");
+      if (!target && !cmd && !flags.url) throw new Error("hook add requires --handler <path>, --command <cmd>, or --url <webhook>");
 
       return registerHook({
         projectPath,
@@ -887,31 +949,33 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
             type: handlerType,
             target: target ?? undefined,
             command: cmd ?? undefined,
+            url: flags.url ?? undefined,
             timeout_ms: flags.timeout ? Number(flags.timeout) : 5000,
           },
           priority: flags.priority ? Number(flags.priority) : 100,
+          failure_policy: flags["failure-policy"] ?? "open",
           providers: flags.provider ? (Array.isArray(flags.provider) ? flags.provider : [flags.provider]) : undefined,
         },
-        sync: flags.sync !== false,
+        sync: flags["no-sync"] !== true,
       });
     }
 
     if (action === "remove" || action === "delete") {
       const id = flags.id ?? targetId;
       if (!id) throw new Error("hook remove requires <id>");
-      return removeHook({ projectPath, hookId: id, sync: flags.sync !== false });
+      return removeHook({ projectPath, hookId: id, sync: flags["no-sync"] !== true });
     }
 
     if (action === "enable") {
       const id = flags.id ?? targetId;
       if (!id) throw new Error("hook enable requires <id>");
-      return updateHookStatus({ projectPath, hookId: id, enabled: true, sync: flags.sync !== false });
+      return updateHookStatus({ projectPath, hookId: id, enabled: true, sync: flags["no-sync"] !== true });
     }
 
     if (action === "disable") {
       const id = flags.id ?? targetId;
       if (!id) throw new Error("hook disable requires <id>");
-      return updateHookStatus({ projectPath, hookId: id, enabled: false, sync: flags.sync !== false });
+      return updateHookStatus({ projectPath, hookId: id, enabled: false, sync: flags["no-sync"] !== true });
     }
 
     if (action === "sync") {
@@ -1180,8 +1244,14 @@ For detailed manuals and schemas, see [references/guide.md](./references/guide.m
 }
 
 if (require.main === module) {
-  run(process.argv.slice(2))
-    .then((result) => process.stdout.write(`${JSON.stringify(result, null, 2)}\n`))
+  const cliArguments = process.argv.slice(2);
+  run(cliArguments)
+    .then((result) => {
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      if (cliArguments[0] === "skill" && cliArguments[1] === "validate" && result?.valid === false) {
+        process.exitCode = 1;
+      }
+    })
     .catch((error) => {
       process.stderr.write(`${error.message}\n`);
       if (error.issues) process.stderr.write(`${JSON.stringify(error.issues, null, 2)}\n`);

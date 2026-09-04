@@ -1,97 +1,54 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const {
-  listPresets,
-  getPreset,
-  resolveProjectSelection,
-  exportRecipe,
-  inspectRecipe
-} = require("../src");
+const { inspectRecipe } = require("../src");
 const { validateSkillRecipe } = require("../../../packages/skill-contracts/src");
 
-test("MLC Modular Presets & Work-Scope Decompositions", async (t) => {
+const MODULAR_RECIPES = [
+  ["condensation-recipe.json", "condensation-core", 3],
+  ["baseline-curation-recipe.json", "baseline-curation-core", 11],
+  ["mlc-recursive-context-recipe.json", "mlc-recursive-context", 13],
+  ["mlc-specialist-domains-recipe.json", "mlc-specialist-domains", 5],
+  ["mlc-toolchain-recipe.json", "mlc-toolchain-plane", 6],
+  ["mlc-governance-recipe.json", "mlc-lifecycle-governance", 8],
+  ["mlc-full-suite-recipe.json", "baseline-full-suite", 43],
+];
+
+test("MLC modular recipe fixtures are self-contained and deterministic", async (t) => {
   const repoRoot = path.resolve(__dirname, "../../..");
-  const catalogRoot = path.join(repoRoot, ".skills-platform/catalog");
-  const registryRoot = path.join(repoRoot, ".skills-platform/registry");
 
-  await t.test("All 7 MLC modular presets exist with exact expected skill counts", async () => {
-    const expected = {
-      "condensation-core": 3,
-      "baseline-curation-core": 11,
-      "mlc-recursive-context": 13,
-      "mlc-specialist-domains": 5,
-      "mlc-toolchain-plane": 6,
-      "mlc-lifecycle-governance": 8,
-      "baseline-full-suite": 43,
-      "paperthin-reflexes": 28,
-      "builtin-pristine": 0,
-    };
-
-    for (const [id, count] of Object.entries(expected)) {
-      const preset = await getPreset(catalogRoot, id);
-      assert.ok(preset, `Preset ${id} should exist`);
-      if (id !== "builtin-pristine") {
-        assert.equal(
-          preset.registry_skill_ids.length,
-          count,
-          `Preset ${id} should have exactly ${count} skills`
-        );
-      }
+  await t.test("all seven checked-in modules retain their expected preset membership", () => {
+    for (const [fileName, presetId, expectedCount] of MODULAR_RECIPES) {
+      const recipe = require(path.join(repoRoot, fileName));
+      const preset = recipe.presets.find((item) => item.id === presetId);
+      assert.ok(preset, `${fileName} must contain preset ${presetId}`);
+      assert.equal(preset.skills.length, expectedCount, `${presetId} membership changed unexpectedly`);
     }
   });
 
-  await t.test("Dynamic work-scope overlays resolve exact composite counts on Antigravity", async () => {
-    const scopeExpected = {
-      curation: 31,      // 28 + 3
-      architecture: 39,  // 28 + 11
-      explore: 41,       // 28 + 13
-      specialist: 33,    // 28 + 5
-      toolchain: 34,     // 28 + 6
-      governance: 36,    // 28 + 8
-      planning: 28,      // default 28
-      implementation: 28,// default 28
-      review: 28         // default 28
-    };
-
-    for (const [scope, count] of Object.entries(scopeExpected)) {
-      const res = await resolveProjectSelection({
-        catalogRoot,
-        projectId: "skills-platform-antigravity",
-        workScopeTags: [scope]
-      });
-      assert.equal(
-        res.selected.length,
-        count,
-        `Scope ${scope} should resolve exactly ${count} skills`
-      );
-    }
-  });
-
-  await t.test("Modular recipes export valid JSON schemas that pass validation", async () => {
-    const modularPresetIds = [
-      "condensation-core",
-      "baseline-curation-core",
-      "mlc-recursive-context",
-      "mlc-specialist-domains",
-      "mlc-toolchain-plane",
-      "mlc-lifecycle-governance",
-      "baseline-full-suite"
-    ];
-
-    for (const presetId of modularPresetIds) {
-      const recipe = await exportRecipe({
-        catalogRoot,
-        registryRoot,
-        presetId,
-        name: `Test Recipe for ${presetId}`,
-        description: `Automated test recipe export for ${presetId}`
-      });
-
+  await t.test("every modular recipe passes the executable shared contract", async () => {
+    for (const [fileName] of MODULAR_RECIPES) {
+      const recipe = require(path.join(repoRoot, fileName));
       const validation = validateSkillRecipe(recipe);
-      assert.equal(validation.valid, true, `Exported recipe for ${presetId} should be valid`);
-      assert.ok(recipe.skills.length > 0, `Recipe for ${presetId} should contain skills`);
-      assert.ok(recipe.presets.length > 0, `Recipe for ${presetId} should contain presets`);
+      assert.equal(validation.valid, true, `${fileName}: ${JSON.stringify(validation.issues)}`);
+      const inspected = await inspectRecipe({ recipeContent: recipe });
+      assert.equal(inspected.valid, true);
+      assert.equal(inspected.summary.skills_count, recipe.skills.length);
+      assert.equal(inspected.summary.presets_count, 1);
+    }
+  });
+
+  await t.test("preset entries resolve to one declared immutable skill identity", () => {
+    for (const [fileName] of MODULAR_RECIPES) {
+      const recipe = require(path.join(repoRoot, fileName));
+      const declaredByName = new Map(recipe.skills.map((skill) => [skill.name, skill]));
+      assert.equal(declaredByName.size, recipe.skills.length, `${fileName} contains duplicate skill names`);
+      for (const entry of recipe.presets[0].skills) {
+        const declared = declaredByName.get(entry.skill_name);
+        assert.ok(declared, `${fileName} preset references undeclared skill ${entry.skill_name}`);
+        assert.match(declared.content_digest, /^[0-9a-f]{64}$/);
+        assert.equal(declared.source_relative_path, entry.source_relative_path);
+      }
     }
   });
 });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, RefreshCcw, X } from "lucide-react";
-import { catalogApi, copyText, readApplyStream } from "./api/catalog-api";
+import { catalogApi, copyText, readApplyStream, setProjectSkillOverrideApi } from "./api/catalog-api";
 import { ActivationProgressModal } from "./components/ActivationProgressModal";
 import { LiveActivationDrawer } from "./components/LiveActivationDrawer";
 import { LiveActivationStatus } from "./components/LiveActivationStatus";
@@ -134,6 +134,7 @@ export function CatalogApp() {
   const [sourceActionId, setSourceActionId] = useState<string | null>(null);
   const [updatingDefault, setUpdatingDefault] = useState(false);
   const [updatingOverlay, setUpdatingOverlay] = useState(false);
+  const [updatingSkillId, setUpdatingSkillId] = useState<string | null>(null);
   const [policyVersion, setPolicyVersion] = useState(0);
   const [activePage, setActivePage] = useState("Projects");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -369,6 +370,12 @@ export function CatalogApp() {
   }, [scope, pristine, selectedProjectId, policyVersion]);
 
   useEffect(() => {
+    // A preview is immutable. Any policy input change requires a new preview
+    // before the plan can be applied.
+    setActivePlanId(null);
+  }, [scope, pristine, selectedProjectId, policyVersion]);
+
+  useEffect(() => {
     if (!catalogApi || !selectedProjectId) return;
     let active = true;
     fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/history`)
@@ -453,11 +460,14 @@ export function CatalogApp() {
             );
             return {
               name: skill.skill_name,
+              registry_skill_id: skill.registry_skill_id,
+              lineage_id: skill.lineage_id,
               source: assignment?.name ?? (pristine ? "Pristine" : "Catalog"),
               enabled: skill.desired_state === "enabled",
               reason: skill.reason.replaceAll("_", " "),
               artifact_type: skill.artifact_type,
               invocation_mode: skill.invocation_mode,
+              override: skill.override,
             };
           })
         : sampleSkills(scope, pristine),
@@ -493,7 +503,7 @@ export function CatalogApp() {
     return (
       selectedProject?.provider_id ||
       globalStatus?.inventory.providers.find((p) => p.detected)?.provider_id ||
-      "antigravity"
+      "codex"
     );
   }, [selectedProject, globalStatus]);
 
@@ -568,6 +578,35 @@ export function CatalogApp() {
         .finally(() => setUpdatingOverlay(false));
     },
     [presets, scope, selectedProjectId],
+  );
+
+  const updateProjectSkillState = useCallback(
+    (skill: DisplaySkill, desiredState: "enabled" | "disabled" | "inherit") => {
+      if (!catalogApi || !selectedProjectId || !skill.lineage_id || !skill.registry_skill_id) {
+        setNotice("Connect the Catalog bridge before changing an individual skill state.");
+        return;
+      }
+      setUpdatingSkillId(skill.registry_skill_id);
+      setNotice(null);
+      setProjectSkillOverrideApi({
+        projectId: selectedProjectId,
+        lineageId: skill.lineage_id,
+        registrySkillId: skill.registry_skill_id,
+        desiredState,
+      })
+        .then(() => {
+          setActivePlanId(null);
+          setPolicyVersion((version) => version + 1);
+          setNotice(
+            desiredState === "inherit"
+              ? `${skill.name} now inherits its template state.`
+              : `${skill.name} is explicitly ${desiredState} for this project. Preview is required before apply.`,
+          );
+        })
+        .catch((error: Error) => setNotice(error.message))
+        .finally(() => setUpdatingSkillId(null));
+    },
+    [selectedProjectId],
   );
 
   const saveTemplateMembership = useCallback(
@@ -747,20 +786,27 @@ export function CatalogApp() {
           body: JSON.stringify({
             work_scope_tags: [scope],
             preset_id: pristine ? "builtin-pristine" : undefined,
+            preflight: true,
           }),
         },
       )
         .then((response) =>
           response.ok ? response.json() : Promise.reject(new Error("Preview request was rejected")),
         )
-        .then((body: { plan: { operations: unknown[]; plan_id?: string } }) => {
+        .then((body: {
+          plan: { operations: unknown[]; plan_id?: string };
+          preflight?: { status: string; requires_shared_confirmation?: boolean } | null;
+        }) => {
           const count = body.plan.operations.length;
           setActivePlanId(body.plan.plan_id ?? null);
+          if (body.preflight?.requires_shared_confirmation) {
+            throw new Error("This target requires a shared-root confirmation plan before it can be applied.");
+          }
           setModalProgress({
             stage: "completed",
             completed: count,
             total: count,
-            message: `${count} operations validated across providers. Ready for delivery.`,
+            message: `${count} operations were recorded and preflighted. The same immutable plan is ready for delivery.`,
           });
           setModalResult({
             status: "succeeded",
@@ -769,10 +815,11 @@ export function CatalogApp() {
             },
           });
           setNotice(
-            `${count} operations were validated. Ready for Skills Manager delivery.`,
+            `${count} operations were recorded and preflighted as plan ${body.plan.plan_id}.`,
           );
         })
         .catch((error: Error) => {
+          setActivePlanId(null);
           setModalError(error.message);
           setModalProgress({ stage: "failed", completed: 0, total: 0, message: error.message });
           setNotice(error.message);
@@ -833,6 +880,10 @@ export function CatalogApp() {
       setNotice("Connect the local Catalog bridge before applying through Skills Manager CLI.");
       return;
     }
+    if (!activePlanId) {
+      setNotice("Preview and preflight an immutable activation plan before applying it.");
+      return;
+    }
     if (
       !window.confirm(
         "Apply this immutable plan through Skills Manager CLI? The upstream manager may change provider bindings.",
@@ -850,59 +901,33 @@ export function CatalogApp() {
     setIsModalStreaming(true);
 
     const initialProg: ApplyProgress = {
-      stage: "record",
+      stage: "inspect",
       completed: 0,
       total: 1,
-      message: "Recording the immutable activation plan",
+      message: `Applying the previously previewed plan ${activePlanId}`,
     };
     setApplyProgress(initialProg);
     setModalProgress(initialProg);
 
-    fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/activation-plan`, {
+    fetch(
+      `${catalogApi}/api/activation-plans/${encodeURIComponent(activePlanId)}/apply/stream`,
+      {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        work_scope_tags: [scope],
-        preset_id: pristine ? "builtin-pristine" : undefined,
-      }),
-    })
-      .then((response) =>
-        response.ok
-          ? response.json()
-          : Promise.reject(new Error("Activation plan could not be recorded")),
-      )
-      .then(async (body: { plan: { plan_id: string; operations: unknown[] } }) => {
-        setActivePlanId(body.plan.plan_id);
-        const inspectProg: ApplyProgress = {
-          stage: "inspect",
-          completed: 0,
-          total: body.plan.operations.length,
-          message: "Starting Skills Manager preflight",
-        };
-        setApplyProgress(inspectProg);
-        setModalProgress(inspectProg);
-
-        const response = await fetch(
-          `${catalogApi}/api/activation-plans/${encodeURIComponent(
-            body.plan.plan_id,
-          )}/apply/stream`,
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ confirmed: true }),
-          },
-        );
-        return readApplyStream(response, (p) => {
+      body: JSON.stringify({ confirmed: true }),
+      },
+    )
+      .then((response) => readApplyStream(response, (p) => {
           setApplyProgress(p);
           setModalProgress(p);
-        });
-      })
+        }))
       .then((body) => {
         setModalResult(body);
         const summary = body.report.summary;
         setNotice(
           `Skills Manager CLI ${body.status}: ${summary.applied} applied · ${summary.skipped} skipped · ${summary.failed} failed.`,
         );
+        setActivePlanId(null);
         void refreshLiveStatus();
       })
       .catch((error: Error) => {
@@ -921,7 +946,7 @@ export function CatalogApp() {
         setApplyingPlan(false);
         setIsModalStreaming(false);
       });
-  }, [pristine, refreshLiveStatus, scope, selectedProjectId]);
+  }, [activePlanId, refreshLiveStatus, selectedProjectId]);
 
   const copySystemPrompt = useCallback(() => {
     if (!catalogApi || !selectedProjectId) {
@@ -1156,7 +1181,12 @@ export function CatalogApp() {
                     <RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}
                   </button>
                 </div>
-                <SkillTable skills={skills} providerId={activeProviderId} />
+                <SkillTable
+                  skills={skills}
+                  providerId={activeProviderId}
+                  onSkillStateChange={updateProjectSkillState}
+                  updatingSkillId={updatingSkillId}
+                />
                 <LiveActivationStatus
                   globalStatus={globalStatus}
                   projectStatus={projectStatus}
@@ -1201,6 +1231,7 @@ export function CatalogApp() {
                 copyingPrompt={copyingPrompt}
                 updatingDefault={updatingDefault}
                 updatingOverlay={updatingOverlay}
+                planReady={Boolean(activePlanId)}
               />
             </div>
             <PlanHistory

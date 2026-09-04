@@ -59,7 +59,7 @@ const INVOCATION_CHIPS: Array<{
 
 const PROVIDER_OPTIONS: Array<{ id: string; label: string; tooltip: string }> = [
   { id: "all", label: "All Providers", tooltip: "Show skills for all assistant platforms" },
-  { id: "codex", label: "Codex", tooltip: "Codex CLI (delivery root: skills/)" },
+  { id: "codex", label: "Codex", tooltip: "Codex CLI (delivery root: .agents/skills/)" },
   { id: "antigravity", label: "Antigravity", tooltip: "Antigravity (delivery root: .agents/skills/)" },
   { id: "claude", label: "Claude", tooltip: "Claude Desktop (delivery root: .claude/skills/)" },
 ];

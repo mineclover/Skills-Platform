@@ -1,8 +1,20 @@
 const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
 const { URL } = require("node:url");
-const { assignPreset, createPreset, getProject, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay, updatePresetTemplate } = require("./catalog-state");
+const { validateSkillAuthoringVirtualValidationRequest } = require("@skills-platform/contracts");
+const { assignPreset, clearProjectSkillOverride, createPreset, getProject, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, loadCatalog, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay, setProjectSkillOverride, updatePresetTemplate } = require("./catalog-state");
 const { buildProjectSystemPrompt, createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 const { addSkillFeedback, addSkillNote, getSkillFeedbackSummary, getSkillProfile, listSkillFeedback, listSkillNotes, searchSkills, updateSkillProfile } = require("./skill-management");
+const {
+  analyzeSkillRevision,
+  createSkillAnnotation,
+  deleteSkillAnnotation,
+  listSkillAnalyses,
+  listSkillAnnotations,
+  restoreSkillAnnotation,
+  updateSkillAnnotation,
+} = require("./skill-annotations");
 const { createEvaluationCase, getSkillEvaluationSummary, listEvaluationCases, listEvaluationRuns, listReviewQueue, recordEvaluationRun } = require("./evaluation");
 const { compareRecordedPlanWithObservedState, listObservedStates, recordObservedState } = require("./observed-state");
 const { adoptApprovedRevisionIntoPreset, latestSourceReview, listSourceAdoptionCandidates, recordSourceReview } = require("./source-review");
@@ -10,6 +22,7 @@ const { latestSkillsByArtifact, listRegistrySkills } = require("./registry");
 const { createSkillsManagerInspector } = require("./upstream-inspector");
 const { applyRecordedActivationPlan } = require("./upstream-apply");
 const { applyRecipe, exportRecipe, inspectRecipe } = require("./recipes");
+const { inspectSkillVirtualFiles, listSkillAuthoringRulesets } = require("./skill-authoring");
 const { getTelemetrySummary, recordTelemetry } = require("./telemetry");
 const {
   listHooks,
@@ -17,6 +30,7 @@ const {
   removeHook,
   updateHookStatus,
   compileProviderConfigs,
+  getHookDiagnostics,
   triggerHookEvent,
 } = require("./hooks-manager");
 const {
@@ -54,12 +68,93 @@ const {
 
 function json(response, status, value) {
   response.writeHead(status, {
-    "access-control-allow-origin": "*",
+    "access-control-allow-origin": response.getHeader("access-control-allow-origin") ?? "http://127.0.0.1",
     "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-allow-headers": "content-type",
     "content-type": "application/json; charset=utf-8",
   });
   response.end(`${JSON.stringify(value, null, 2)}\n`);
+}
+
+function isAllowedLocalOrigin(origin, extraOrigins = []) {
+  if (!origin) return true;
+  if (extraOrigins.includes(origin)) return true;
+  try {
+    const parsed = new URL(origin);
+    return (parsed.protocol === "http:" || parsed.protocol === "https:")
+      && ["127.0.0.1", "localhost", "::1", "[::1]"].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function accessDenied(message) {
+  const error = new Error(message);
+  error.code = "CATALOG_ACCESS_DENIED";
+  error.statusCode = 403;
+  return error;
+}
+
+function isWithin(candidate, root) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+async function authorizedHookProjectPath({ catalogRoot, requestedPath, additionalRoots = [] }) {
+  if (requestedPath !== undefined && (typeof requestedPath !== "string" || requestedPath.trim() === "")) {
+    throw accessDenied("Hook project_path must be a non-empty string");
+  }
+  const resolved = path.resolve(requestedPath ?? process.cwd());
+  const catalog = await loadCatalog(catalogRoot);
+  const allowedRoots = new Set([
+    path.resolve(process.cwd()),
+    ...additionalRoots.filter((root) => typeof root === "string").map((root) => path.resolve(root)),
+    ...catalog.projects
+      .map((project) => project.project_path)
+      .filter((root) => typeof root === "string" && root.trim() !== "")
+      .map((root) => path.resolve(root)),
+  ]);
+  if (!allowedRoots.has(resolved)) {
+    throw accessDenied("Hook operations are limited to the server workspace and registered project roots");
+  }
+  return resolved;
+}
+
+function validateApiHookRegistration({ hook, projectPath, allowUnsafeHandlers = false }) {
+  if (!hook || typeof hook !== "object" || Array.isArray(hook)) throw accessDenied("A hook definition is required");
+  const handler = hook.handler;
+  if (!handler || typeof handler !== "object" || Array.isArray(handler)) throw accessDenied("A hook handler is required");
+  if (handler.type !== "script") {
+    if (!allowUnsafeHandlers) {
+      throw accessDenied("The HTTP API accepts script hooks only; use the local CLI for trusted command, module, or webhook handlers");
+    }
+    return;
+  }
+  if (typeof handler.target !== "string" || handler.target.trim() === "") {
+    throw accessDenied("Script hook target is required");
+  }
+  const hooksRoot = path.resolve(projectPath, ".skills-platform", "hooks");
+  const target = path.isAbsolute(handler.target)
+    ? path.resolve(handler.target)
+    : path.resolve(projectPath, handler.target);
+  if (!isWithin(target, hooksRoot) || target === hooksRoot) {
+    throw accessDenied("Script hook targets registered through HTTP must stay inside .skills-platform/hooks");
+  }
+  let realTarget;
+  try {
+    realTarget = fs.realpathSync.native(target);
+  } catch {
+    throw accessDenied("Script hook target does not exist");
+  }
+  let realHooksRoot;
+  try {
+    realHooksRoot = fs.realpathSync.native(hooksRoot);
+  } catch {
+    realHooksRoot = hooksRoot;
+  }
+  if (!isWithin(realTarget, realHooksRoot) || !fs.statSync(realTarget).isFile()) {
+    throw accessDenied("Script hook target must be a regular file inside .skills-platform/hooks");
+  }
 }
 
 function streamJson(response, value) {
@@ -96,12 +191,50 @@ function workScopeTags(url, body = {}) {
   return url.searchParams.getAll("work_scope");
 }
 
-function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstreamInspector = createSkillsManagerInspector(), upstreamCli = upstreamInspector }) {
+function createCatalogServer({
+  catalogRoot,
+  registryRoot,
+  telemetryPath,
+  upstreamInspector = createSkillsManagerInspector(),
+  upstreamCli = upstreamInspector,
+  allowedOrigins = [],
+  hookProjectRoots = [],
+  allowUnsafeHookHandlers = process.env.SKILLS_PLATFORM_ALLOW_UNSAFE_HOOK_HANDLERS === "1",
+}) {
   if (!catalogRoot || !registryRoot) throw new Error("catalogRoot and registryRoot are required");
   return http.createServer(async (request, response) => {
+    const origin = request.headers.origin;
+    if (!isAllowedLocalOrigin(origin, allowedOrigins)) {
+      response.writeHead(403, { "content-type": "application/json; charset=utf-8" });
+      response.end(`${JSON.stringify({ error: "Cross-origin access to the local Catalog bridge is not allowed" })}\n`);
+      return;
+    }
+    if (origin) response.setHeader("access-control-allow-origin", origin);
+    response.setHeader("vary", "origin");
     const url = new URL(request.url, "http://127.0.0.1");
     if (request.method === "OPTIONS") return json(response, 204, {});
     try {
+      if (request.method === "GET" && url.pathname === "/api/skill-authoring/rulesets") {
+        return json(response, 200, { rulesets: listSkillAuthoringRulesets() });
+      }
+      if (request.method === "POST" && url.pathname === "/api/skill-authoring/validate") {
+        const body = await parseJsonBody(request);
+        if (body.skill_path !== undefined || body.path !== undefined || body.source_path !== undefined) {
+          throw accessDenied("Virtual skill validation accepts file content only; filesystem paths are not allowed");
+        }
+        const requestValidation = validateSkillAuthoringVirtualValidationRequest(body);
+        if (!requestValidation.valid) {
+          const error = new Error("Skill authoring virtual validation request is invalid");
+          error.code = "SKILL_AUTHORING_REQUEST_INVALID";
+          error.issues = requestValidation.issues;
+          throw error;
+        }
+        const inspection = inspectSkillVirtualFiles({
+          platforms: body.platforms,
+          files: body.files,
+        });
+        return json(response, 200, { authoring: inspection.authoring });
+      }
       if (request.method === "GET" && url.pathname === "/api/projects") {
         return json(response, 200, { projects: await listProjects(catalogRoot) });
       }
@@ -349,6 +482,73 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
           patch: body,
         }) });
       }
+      const skillAnnotations = url.pathname.match(/^\/api\/skills\/([^/]+)\/annotations$/);
+      if (skillAnnotations && request.method === "GET") {
+        return json(response, 200, { annotations: await listSkillAnnotations({
+          catalogRoot,
+          lineageId: decodeURIComponent(skillAnnotations[1]),
+          sourceRevisionId: url.searchParams.get("source_revision_id") ?? undefined,
+          kind: url.searchParams.get("kind") ?? undefined,
+          includeDeleted: url.searchParams.get("include_deleted") === "true",
+        }) });
+      }
+      if (skillAnnotations && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, await createSkillAnnotation({
+          catalogRoot,
+          registryRoot,
+          lineageId: decodeURIComponent(skillAnnotations[1]),
+          sourceRevisionId: body.source_revision_id ?? null,
+          kind: body.kind,
+          title: body.title,
+          body: body.body,
+          locale: body.locale,
+          anchor: body.anchor,
+          author: body.author,
+          origin: body.origin,
+        }));
+      }
+      const skillAnalyses = url.pathname.match(/^\/api\/skills\/([^/]+)\/analyses$/);
+      if (skillAnalyses && request.method === "GET") {
+        return json(response, 200, { analyses: await listSkillAnalyses({
+          catalogRoot,
+          registryRoot,
+          lineageId: decodeURIComponent(skillAnalyses[1]),
+        }) });
+      }
+      const skillAnalysis = url.pathname.match(/^\/api\/skills\/([^/]+)\/analysis$/);
+      if (skillAnalysis && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json(response, 201, await analyzeSkillRevision({
+          catalogRoot,
+          registryRoot,
+          lineageId: decodeURIComponent(skillAnalysis[1]),
+          sourceRevisionId: body.source_revision_id,
+          analyzerVersion: body.analyzer_version,
+        }));
+      }
+      const annotationMutation = url.pathname.match(/^\/api\/annotations\/([^/]+)(?:\/(delete|restore))?$/);
+      if (annotationMutation && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        const shared = {
+          catalogRoot,
+          lineageId: body.lineage_id,
+          annotationId: decodeURIComponent(annotationMutation[1]),
+          expectedVersion: body.expected_version,
+          author: body.author,
+        };
+        if (annotationMutation[2] === "delete") {
+          return json(response, 200, await deleteSkillAnnotation(shared));
+        }
+        if (annotationMutation[2] === "restore") {
+          return json(response, 200, await restoreSkillAnnotation(shared));
+        }
+        return json(response, 200, await updateSkillAnnotation({
+          ...shared,
+          registryRoot,
+          patch: body.patch,
+        }));
+      }
       const feedbackSummary = url.pathname.match(/^\/api\/skills\/([^/]+)\/feedback-summary$/);
       if (feedbackSummary && request.method === "GET") {
         return json(response, 200, await getSkillFeedbackSummary({
@@ -368,6 +568,28 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
           presetId: url.searchParams.get("preset") ?? undefined,
           workScopeTags: workScopeTags(url),
         }));
+      }
+      const skillOverride = url.pathname.match(/^\/api\/projects\/([^/]+)\/skill-overrides\/([^/]+)$/);
+      if (request.method === "POST" && skillOverride) {
+        const body = await parseJsonBody(request);
+        const projectId = decodeURIComponent(skillOverride[1]);
+        const lineageId = decodeURIComponent(skillOverride[2]);
+        if (body.desired_state === "inherit" || body.clear === true) {
+          return json(response, 200, await clearProjectSkillOverride({
+            catalogRoot,
+            registryRoot,
+            projectId,
+            lineageId,
+          }));
+        }
+        return json(response, 200, { override: await setProjectSkillOverride({
+          catalogRoot,
+          registryRoot,
+          projectId,
+          lineageId,
+          registrySkillId: body.registry_skill_id,
+          desiredState: body.desired_state,
+        }) });
       }
       const upstreamStatus = url.pathname.match(/^\/api\/projects\/([^/]+)\/upstream-status$/);
       if (request.method === "GET" && upstreamStatus) {
@@ -417,11 +639,21 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
         const body = await parseJsonBody(request);
         const projectId = decodeURIComponent(preview[1]);
         const tags = workScopeTags(url, body);
-        const [effectiveSet, plan] = await Promise.all([
+        const [effectiveSet, selection, plan] = await Promise.all([
           resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
+          resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
           createProjectPlan({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags, distribution: body.distribution }),
         ]);
-        return json(response, 200, { effective_set: effectiveSet, plan });
+        const record = await recordActivationPlan({
+          catalogRoot,
+          plan,
+          projectId,
+          assignments: selection.assignments,
+        });
+        const preflight = body.preflight === true
+          ? await applyRecordedActivationPlan({ catalogRoot, planId: plan.plan_id, confirmed: false, upstreamCli })
+          : null;
+        return json(response, 200, { effective_set: effectiveSet, plan, record, preflight });
       }
       const recordPlan = url.pathname.match(/^\/api\/projects\/([^/]+)\/activation-plan$/);
       if (request.method === "POST" && recordPlan) {
@@ -429,7 +661,7 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
         const projectId = decodeURIComponent(recordPlan[1]);
         const tags = workScopeTags(url, body);
         const [selection, plan] = await Promise.all([
-          resolveProjectSelection({ catalogRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
+          resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
           createProjectPlan({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags, distribution: body.distribution }),
         ]);
         return json(response, 201, { record: await recordActivationPlan({
@@ -463,7 +695,7 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
       if (request.method === "POST" && applyStream) {
         const body = await parseJsonBody(request);
         response.writeHead(200, {
-          "access-control-allow-origin": "*",
+          "access-control-allow-origin": response.getHeader("access-control-allow-origin") ?? "http://127.0.0.1",
           "access-control-allow-methods": "GET, POST, OPTIONS",
           "access-control-allow-headers": "content-type",
           "content-type": "application/x-ndjson; charset=utf-8",
@@ -541,15 +773,28 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
         }));
       }
       if (url.pathname === "/api/hooks" && request.method === "GET") {
-        const projectPath = url.searchParams.get("project_path") ?? process.cwd();
+        const projectPath = await authorizedHookProjectPath({
+          catalogRoot,
+          requestedPath: url.searchParams.get("project_path") ?? undefined,
+          additionalRoots: hookProjectRoots,
+        });
         const eventName = url.searchParams.get("event") ?? undefined;
         return json(response, 200, {
           hooks: listHooks({ projectPath, eventName }),
         });
       }
+      if (url.pathname === "/api/hooks/diagnostics" && request.method === "GET") {
+        const projectPath = await authorizedHookProjectPath({
+          catalogRoot,
+          requestedPath: url.searchParams.get("project_path") ?? undefined,
+          additionalRoots: hookProjectRoots,
+        });
+        return json(response, 200, getHookDiagnostics({ projectPath }));
+      }
       if (url.pathname === "/api/hooks/register" && request.method === "POST") {
         const body = await parseJsonBody(request);
-        const projectPath = body.project_path ?? process.cwd();
+        const projectPath = await authorizedHookProjectPath({ catalogRoot, requestedPath: body.project_path, additionalRoots: hookProjectRoots });
+        validateApiHookRegistration({ hook: body.hook, projectPath, allowUnsafeHandlers: allowUnsafeHookHandlers });
         return json(response, 201, registerHook({
           projectPath,
           hook: body.hook,
@@ -558,7 +803,7 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
       }
       if (url.pathname === "/api/hooks/toggle" && request.method === "POST") {
         const body = await parseJsonBody(request);
-        const projectPath = body.project_path ?? process.cwd();
+        const projectPath = await authorizedHookProjectPath({ catalogRoot, requestedPath: body.project_path, additionalRoots: hookProjectRoots });
         return json(response, 200, updateHookStatus({
           projectPath,
           hookId: body.hook_id,
@@ -568,7 +813,7 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
       }
       if (url.pathname === "/api/hooks/remove" && request.method === "POST") {
         const body = await parseJsonBody(request);
-        const projectPath = body.project_path ?? process.cwd();
+        const projectPath = await authorizedHookProjectPath({ catalogRoot, requestedPath: body.project_path, additionalRoots: hookProjectRoots });
         return json(response, 200, removeHook({
           projectPath,
           hookId: body.hook_id,
@@ -577,12 +822,24 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
       }
       if (url.pathname === "/api/hooks/sync" && request.method === "POST") {
         const body = await parseJsonBody(request);
-        const projectPath = body.project_path ?? process.cwd();
-        return json(response, 200, compileProviderConfigs({ projectPath }));
+        const projectPath = await authorizedHookProjectPath({ catalogRoot, requestedPath: body.project_path, additionalRoots: hookProjectRoots });
+        const result = compileProviderConfigs({ projectPath });
+        if (result.ok) return json(response, 200, result);
+        const hasSyncedProvider = Object.values(result.providers ?? {})
+          .some((provider) => provider?.synced === true);
+        return hasSyncedProvider
+          ? json(response, 207, {
+              message: "Hook provider synchronization completed partially",
+              ...result,
+            })
+          : json(response, 409, {
+              error: "Hook provider synchronization is incomplete",
+              ...result,
+            });
       }
       if (url.pathname === "/api/hooks/trigger" && request.method === "POST") {
         const body = await parseJsonBody(request);
-        const projectPath = body.project_path ?? process.cwd();
+        const projectPath = await authorizedHookProjectPath({ catalogRoot, requestedPath: body.project_path, additionalRoots: hookProjectRoots });
         return json(response, 200, await triggerHookEvent({
           projectPath,
           eventName: body.event ?? "post_tool_use",
@@ -815,13 +1072,16 @@ function createCatalogServer({ catalogRoot, registryRoot, telemetryPath, upstrea
       }
       return json(response, 404, { error: "Not found" });
     } catch (error) {
-      return json(response, 400, { error: error.message, issues: error.issues ?? [] });
+      const status = Number.isInteger(error.statusCode) && error.statusCode >= 400 && error.statusCode <= 599
+        ? error.statusCode
+        : 400;
+      return json(response, status, { error: error.message, code: error.code, issues: error.issues ?? [] });
     }
   });
 }
 
-async function startCatalogServer({ catalogRoot, registryRoot, telemetryPath, host = "127.0.0.1", port = 4300 }) {
-  const server = createCatalogServer({ catalogRoot, registryRoot, telemetryPath });
+async function startCatalogServer({ catalogRoot, registryRoot, telemetryPath, host = "127.0.0.1", port = 4300, ...securityOptions }) {
+  const server = createCatalogServer({ catalogRoot, registryRoot, telemetryPath, ...securityOptions });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(port, host, () => {

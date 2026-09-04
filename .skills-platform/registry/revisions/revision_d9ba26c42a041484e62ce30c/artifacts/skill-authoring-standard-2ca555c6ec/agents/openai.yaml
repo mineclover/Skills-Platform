@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Authoring Standard"
+  short_description: "Provider-aware skill authoring conventions"
+  default_prompt: "Use $skill-authoring-standard to author or review a skill for Codex or Google Antigravity."

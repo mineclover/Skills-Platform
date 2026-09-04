@@ -1,5 +1,8 @@
+let ledgerStore;
 try {
-  module.exports = require("@skills-platform/ledger-store");
+  ledgerStore = require("@skills-platform/ledger-store");
 } catch {
-  module.exports = require("../../packages/ledger-store");
+  ledgerStore = require("../../packages/ledger-store");
 }
+
+module.exports = ledgerStore;

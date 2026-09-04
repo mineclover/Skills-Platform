@@ -1,14 +1,17 @@
 const fs = require("node:fs/promises");
+const os = require("node:os");
 const path = require("node:path");
-const { getRegistrySkills } = require("./registry");
+const { getRegistrySkills, getSkillLineage } = require("./registry");
 const { validateActivationPlan } = require("../../../packages/skill-contracts/src");
 
 const crypto = require("node:crypto");
 
-const CATALOG_SCHEMA_VERSION = 9;
+const CATALOG_SCHEMA_VERSION = 11;
 const PRISTINE_PRESET_ID = "builtin-pristine";
 const TEMPLATE_LIFECYCLES = new Set(["draft", "reviewed", "deprecated"]);
 const PROJECT_PRESET_ROLES = new Set(["default", "recommended", "work_scope_overlay"]);
+const SKILL_OVERRIDE_STATES = new Set(["enabled", "disabled"]);
+const catalogMutationLocks = new Map();
 
 function now() {
   return new Date().toISOString();
@@ -16,6 +19,23 @@ function now() {
 
 function catalogFile(catalogRoot) {
   return path.join(catalogRoot, "catalog.json");
+}
+
+async function withCatalogMutationLock(catalogRoot, operation) {
+  const key = path.resolve(catalogRoot);
+  const previous = catalogMutationLocks.get(key) ?? Promise.resolve();
+  let release;
+  const current = new Promise((resolve) => {
+    release = resolve;
+  });
+  catalogMutationLocks.set(key, current);
+  try {
+    await previous;
+    return await operation();
+  } finally {
+    release();
+    if (catalogMutationLocks.get(key) === current) catalogMutationLocks.delete(key);
+  }
 }
 
 function blankCatalog() {
@@ -70,6 +90,9 @@ function normalizePreset(preset) {
   }
   const current = preset.versions.find((version) => version.version === preset.active_version) ?? preset.versions.at(-1);
   preset.active_version = current.version;
+  // selected_version is a presentation field. Persisted legacy values must
+  // never override the current active template during catalog-wide exports.
+  preset.selected_version = current.version;
   preset.registry_skill_ids = current.registry_skill_ids;
   preset.entries = current.entries;
   return preset;
@@ -85,11 +108,91 @@ function normalizeAssignment(assignment) {
   return assignment;
 }
 
-function normalizeProject(project) {
+function normalizeSkillOverride(override) {
+  if (!override || typeof override !== "object" || Array.isArray(override)) {
+    throw new Error("Project skill override must be an object");
+  }
+  const lineageId = requireIdentifier(override.lineage_id, "Project skill override lineage id");
+  const registrySkillId = requireIdentifier(override.registry_skill_id, "Project skill override registry skill id");
+  if (!SKILL_OVERRIDE_STATES.has(override.desired_state)) {
+    throw new Error("Project skill override desired state must be enabled or disabled");
+  }
+  const updatedAt = requireIdentifier(override.updated_at, "Project skill override updated at");
+  if (Number.isNaN(Date.parse(updatedAt))) {
+    throw new Error("Project skill override updated at must be an ISO timestamp");
+  }
+  return {
+    lineage_id: lineageId,
+    registry_skill_id: registrySkillId,
+    desired_state: override.desired_state,
+    updated_at: updatedAt,
+  };
+}
+
+function normalizeSkillOverrides(overrides) {
+  if (!Array.isArray(overrides)) throw new Error("Project skill overrides must be an array");
+  const latestByLineage = new Map();
+  for (const override of overrides ?? []) {
+    const normalized = normalizeSkillOverride(override);
+    const current = latestByLineage.get(normalized.lineage_id);
+    if (!current || current.updated_at <= normalized.updated_at) {
+      latestByLineage.set(normalized.lineage_id, normalized);
+    }
+  }
+  return [...latestByLineage.values()].sort((left, right) => left.lineage_id.localeCompare(right.lineage_id));
+}
+
+function isWindowsAbsolute(value) {
+  return typeof value === "string" && (/^[A-Za-z]:[\\/]/.test(value) || /^\\\\/.test(value));
+}
+
+function pathsEqualForHost(left, right) {
+  if (typeof left !== "string" || typeof right !== "string") return false;
+  if (isWindowsAbsolute(left) || isWindowsAbsolute(right)) {
+    return path.win32.resolve(left.replace(/\//g, "\\")).toLowerCase()
+      === path.win32.resolve(right.replace(/\//g, "\\")).toLowerCase();
+  }
+  const resolvedLeft = path.resolve(left);
+  const resolvedRight = path.resolve(right);
+  return process.platform === "win32"
+    ? resolvedLeft.toLowerCase() === resolvedRight.toLowerCase()
+    : resolvedLeft === resolvedRight;
+}
+
+function isAntigravityProvider(providerId) {
+  return ["antigravity", "agy", "gemini"].includes(String(providerId ?? "").trim().toLowerCase());
+}
+
+function migrateLegacyCodexDeliveryRoot(project, sourceSchemaVersion) {
+  if (sourceSchemaVersion > 9 || String(project.provider_id ?? "").toLowerCase() !== "codex") return;
+  if (project.scope === "project" && typeof project.project_path === "string") {
+    const pathApi = isWindowsAbsolute(project.project_path) ? path.win32 : path;
+    const legacyDefault = pathApi.join(project.project_path, "skills");
+    if (pathsEqualForHost(project.delivery_root, legacyDefault)) {
+      project.delivery_root = pathApi.join(project.project_path, ".agents", "skills");
+    }
+    return;
+  }
+  if (project.scope === "global" && pathsEqualForHost(project.delivery_root, path.resolve("skills"))) {
+    project.delivery_root = path.join(os.homedir(), ".agents", "skills");
+  }
+}
+
+function migrateLegacyAntigravityDeliveryRoot(project, sourceSchemaVersion) {
+  if (sourceSchemaVersion > 10 || !isAntigravityProvider(project.provider_id)) return;
+  if (project.scope === "global" && pathsEqualForHost(project.delivery_root, path.resolve("skills"))) {
+    project.delivery_root = path.join(os.homedir(), ".gemini", "config", "skills");
+  }
+}
+
+function normalizeProject(project, { sourceSchemaVersion = CATALOG_SCHEMA_VERSION } = {}) {
+  migrateLegacyCodexDeliveryRoot(project, sourceSchemaVersion);
+  migrateLegacyAntigravityDeliveryRoot(project, sourceSchemaVersion);
   project.upstream_project_id ??= project.id;
   project.default_preset_id ??= PRISTINE_PRESET_ID;
   project.default_preset_version ??= 1;
   project.preset_assignments = (project.preset_assignments ?? []).map(normalizeAssignment);
+  project.skill_overrides = normalizeSkillOverrides(project.skill_overrides ?? []);
   if (!project.preset_assignments.some((assignment) => assignment.role === "default")) {
     project.preset_assignments.unshift({
       preset_id: project.default_preset_id,
@@ -119,10 +222,11 @@ function presentPreset(preset, version = preset.active_version) {
 }
 
 function normalizeCatalog(catalog) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, CATALOG_SCHEMA_VERSION].includes(catalog.schema_version)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, CATALOG_SCHEMA_VERSION].includes(catalog.schema_version)) {
     throw new Error(`Unsupported catalog schema: ${catalog.schema_version}`);
   }
-  catalog.projects = (catalog.projects ?? []).map(normalizeProject);
+  const sourceSchemaVersion = catalog.schema_version;
+  catalog.projects = (catalog.projects ?? []).map((project) => normalizeProject(project, { sourceSchemaVersion }));
   catalog.presets = (catalog.presets ?? []).map(normalizePreset);
   catalog.skill_profiles ??= [];
   catalog.skill_notes ??= [];
@@ -167,9 +271,19 @@ async function loadCatalog(catalogRoot) {
 
 async function saveCatalog(catalogRoot, catalog) {
   await fs.mkdir(catalogRoot, { recursive: true });
-  const temporary = `${catalogFile(catalogRoot)}.tmp`;
-  await fs.writeFile(temporary, `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
-  await fs.rename(temporary, catalogFile(catalogRoot));
+  const temporary = `${catalogFile(catalogRoot)}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    const handle = await fs.open(temporary, "wx", 0o600);
+    try {
+      await handle.writeFile(`${JSON.stringify(catalog, null, 2)}\n`, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await fs.rename(temporary, catalogFile(catalogRoot));
+  } finally {
+    await fs.rm(temporary, { force: true }).catch(() => {});
+  }
 }
 
 function requireIdentifier(value, label) {
@@ -178,9 +292,16 @@ function requireIdentifier(value, label) {
 }
 
 function defaultDeliveryRoot(providerId, projectPath) {
-  if (!projectPath) return path.resolve("skills");
-  const base = path.resolve(projectPath);
   const normalized = (providerId ?? "").toLowerCase();
+  if (!projectPath) {
+    if (normalized === "codex") return path.join(os.homedir(), ".agents", "skills");
+    if (isAntigravityProvider(normalized)) return path.join(os.homedir(), ".gemini", "config", "skills");
+    return path.resolve("skills");
+  }
+  const base = path.resolve(projectPath);
+  if (normalized === "codex") {
+    return path.join(base, ".agents", "skills");
+  }
   if (normalized === "antigravity" || normalized === "agy" || normalized === "gemini") {
     return path.join(base, ".agents", "skills");
   }
@@ -196,7 +317,25 @@ async function createProject({ catalogRoot, id, name, projectPath, providerId, d
   providerId = requireIdentifier(providerId, "Provider id");
   if (scope !== "project" && scope !== "global") throw new Error("Project scope must be project or global");
   if (scope === "project") projectPath = requireIdentifier(projectPath, "Project path");
-  const resolvedDeliveryRoot = deliveryRoot ? requireIdentifier(deliveryRoot, "Delivery root") : defaultDeliveryRoot(providerId, projectPath);
+  const scopedProjectPath = scope === "project" ? projectPath : null;
+  const resolvedDeliveryRoot = deliveryRoot ? requireIdentifier(deliveryRoot, "Delivery root") : defaultDeliveryRoot(providerId, scopedProjectPath);
+  if (providerId.toLowerCase() === "codex") {
+    const expectedRoot = defaultDeliveryRoot(providerId, scopedProjectPath);
+    if (!pathsEqualForHost(resolvedDeliveryRoot, expectedRoot)) {
+      throw new Error(`Codex delivery root must be ${expectedRoot}; received ${path.resolve(resolvedDeliveryRoot)}`);
+    }
+  }
+  if (isAntigravityProvider(providerId)) {
+    const expectedRoot = defaultDeliveryRoot(providerId, scopedProjectPath);
+    const acceptedRoots = scope === "project"
+      ? [expectedRoot, path.join(path.resolve(scopedProjectPath), ".agent", "skills")]
+      : [expectedRoot];
+    if (!acceptedRoots.some((candidate) => pathsEqualForHost(resolvedDeliveryRoot, candidate))) {
+      throw new Error(
+        `Antigravity delivery root must be one of ${acceptedRoots.join(", ")}; received ${path.resolve(resolvedDeliveryRoot)}`,
+      );
+    }
+  }
 
   const catalog = await loadCatalog(catalogRoot);
   if (catalog.projects.some((project) => project.id === id)) throw new Error(`Project already exists: ${id}`);
@@ -204,7 +343,7 @@ async function createProject({ catalogRoot, id, name, projectPath, providerId, d
     id,
     name,
     upstream_project_id: requireIdentifier(upstreamProjectId, "Upstream Skills Manager project id"),
-    project_path: scope === "project" ? path.resolve(projectPath) : null,
+    project_path: scope === "project" ? path.resolve(scopedProjectPath) : null,
     provider_id: providerId,
     delivery_root: path.resolve(resolvedDeliveryRoot),
     scope,
@@ -219,6 +358,7 @@ async function createProject({ catalogRoot, id, name, projectPath, providerId, d
       enabled: true,
       created_at: now(),
     }],
+    skill_overrides: [],
     created_at: now(),
   };
   catalog.projects.push(project);
@@ -475,6 +615,67 @@ async function listProjectPresetAssignments(catalogRoot, projectId) {
   });
 }
 
+async function setProjectSkillOverride({
+  catalogRoot,
+  registryRoot,
+  projectId,
+  lineageId,
+  registrySkillId,
+  desiredState,
+  updatedAt,
+}) {
+  projectId = requireIdentifier(projectId, "Project id");
+  lineageId = requireIdentifier(lineageId, "Skill lineage id");
+  registrySkillId = requireIdentifier(registrySkillId, "Registry skill id");
+  if (!SKILL_OVERRIDE_STATES.has(desiredState)) {
+    throw new Error("Project skill override desired state must be enabled or disabled");
+  }
+
+  const [registrySkill] = await getRegistrySkills(registryRoot, [registrySkillId]);
+  if (registrySkill.lineage_id !== lineageId) {
+    throw new Error(`Registry skill ${registrySkillId} does not belong to lineage ${lineageId}`);
+  }
+
+  const override = normalizeSkillOverride({
+    lineage_id: lineageId,
+    registry_skill_id: registrySkillId,
+    desired_state: desiredState,
+    updated_at: updatedAt ?? now(),
+  });
+  return withCatalogMutationLock(catalogRoot, async () => {
+    const catalog = await loadCatalog(catalogRoot);
+    const project = catalog.projects.find((item) => item.id === projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+    const index = project.skill_overrides.findIndex((item) => item.lineage_id === lineageId);
+    if (index < 0) project.skill_overrides.push(override);
+    else project.skill_overrides[index] = override;
+    project.skill_overrides = normalizeSkillOverrides(project.skill_overrides);
+    project.updated_at = override.updated_at;
+    await saveCatalog(catalogRoot, catalog);
+    return override;
+  });
+}
+
+async function clearProjectSkillOverride({ catalogRoot, registryRoot, projectId, lineageId }) {
+  projectId = requireIdentifier(projectId, "Project id");
+  lineageId = requireIdentifier(lineageId, "Skill lineage id");
+  await getSkillLineage(registryRoot, lineageId);
+
+  return withCatalogMutationLock(catalogRoot, async () => {
+    const catalog = await loadCatalog(catalogRoot);
+    const project = catalog.projects.find((item) => item.id === projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+    const index = project.skill_overrides.findIndex((item) => item.lineage_id === lineageId);
+    if (index < 0) {
+      return { cleared: false, project_id: projectId, lineage_id: lineageId, override: null };
+    }
+    const [removed] = project.skill_overrides.splice(index, 1);
+    project.updated_at = now();
+    await saveCatalog(catalogRoot, catalog);
+    return { cleared: true, project_id: projectId, lineage_id: lineageId, override: removed };
+  });
+}
+
 function activationPlanDigest(plan) {
   return crypto.createHash("sha256").update(JSON.stringify(plan)).digest("hex");
 }
@@ -487,27 +688,29 @@ async function recordActivationPlan({ catalogRoot, plan, projectId, assignments 
     error.issues = validation.issues;
     throw error;
   }
-  const catalog = await loadCatalog(catalogRoot);
-  const effectiveProjectId = projectId ?? plan.target?.project_id;
-  if (!effectiveProjectId || !catalog.projects.some((project) => project.id === effectiveProjectId)) {
-    throw new Error("Activation plan must reference a registered project");
-  }
-  if (catalog.activation_plans.some((item) => item.plan_id === plan.plan_id)) {
-    throw new Error(`Activation plan already recorded: ${plan.plan_id}`);
-  }
-  const record = {
-    plan_id: plan.plan_id,
-    project_id: effectiveProjectId,
-    mode: plan.mode,
-    created_at: plan.created_at,
-    recorded_at: now(),
-    digest: activationPlanDigest(plan),
-    assignments: assignments.map((assignment) => ({ ...assignment })),
-    plan,
-  };
-  catalog.activation_plans.push(record);
-  await saveCatalog(catalogRoot, catalog);
-  return record;
+  return withCatalogMutationLock(catalogRoot, async () => {
+    const catalog = await loadCatalog(catalogRoot);
+    const effectiveProjectId = projectId ?? plan.target?.project_id;
+    if (!effectiveProjectId || !catalog.projects.some((project) => project.id === effectiveProjectId)) {
+      throw new Error("Activation plan must reference a registered project");
+    }
+    if (catalog.activation_plans.some((item) => item.plan_id === plan.plan_id)) {
+      throw new Error(`Activation plan already recorded: ${plan.plan_id}`);
+    }
+    const record = {
+      plan_id: plan.plan_id,
+      project_id: effectiveProjectId,
+      mode: plan.mode,
+      created_at: plan.created_at,
+      recorded_at: now(),
+      digest: activationPlanDigest(plan),
+      assignments: assignments.map((assignment) => ({ ...assignment })),
+      plan,
+    };
+    catalog.activation_plans.push(record);
+    await saveCatalog(catalogRoot, catalog);
+    return record;
+  });
 }
 
 async function recordActivationReport({ catalogRoot, planId, report }) {
@@ -517,18 +720,20 @@ async function recordActivationReport({ catalogRoot, planId, report }) {
   if (!report.summary || typeof report.summary !== "object" || Array.isArray(report.summary)) {
     throw new Error("Activation report summary must be an object");
   }
-  const catalog = await loadCatalog(catalogRoot);
-  if (!catalog.activation_plans.some((item) => item.plan_id === planId)) throw new Error(`Activation plan not found: ${planId}`);
-  const record = {
-    report_id: `activation_report_${crypto.randomUUID()}`,
-    plan_id: planId,
-    recorded_at: now(),
-    status: report.status ?? (report.completed_at ? "completed" : "reported"),
-    report: { ...report, plan_id: planId },
-  };
-  catalog.activation_reports.push(record);
-  await saveCatalog(catalogRoot, catalog);
-  return record;
+  return withCatalogMutationLock(catalogRoot, async () => {
+    const catalog = await loadCatalog(catalogRoot);
+    if (!catalog.activation_plans.some((item) => item.plan_id === planId)) throw new Error(`Activation plan not found: ${planId}`);
+    const record = {
+      report_id: `activation_report_${crypto.randomUUID()}`,
+      plan_id: planId,
+      recorded_at: now(),
+      status: report.status ?? (report.completed_at ? "completed" : "reported"),
+      report: { ...report, plan_id: planId },
+    };
+    catalog.activation_reports.push(record);
+    await saveCatalog(catalogRoot, catalog);
+    return record;
+  });
 }
 
 async function listActivationHistory({ catalogRoot, projectId, planId }) {
@@ -556,8 +761,10 @@ module.exports = {
   CATALOG_SCHEMA_VERSION,
   PRISTINE_PRESET_ID,
   PROJECT_PRESET_ROLES,
+  SKILL_OVERRIDE_STATES,
   assignPreset,
   addPresetTemplateNote,
+  clearProjectSkillOverride,
   clonePresetTemplate,
   comparePresetVersions,
   createPlanFileName,
@@ -571,6 +778,7 @@ module.exports = {
   listProjects,
   loadCatalog,
   saveCatalog,
+  setProjectSkillOverride,
   recordActivationPlan,
   recordActivationReport,
   replaceWorkScopeOverlay,

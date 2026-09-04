@@ -6,18 +6,49 @@
 
 ## How to use this catalog
 
-1. Start with **Skill anatomy and progressive disclosure**.
-2. Add only the domain, runtime, safety, or delivery references required for
+1. Select the target provider. Use the
+   [provider-aware authoring router](../skills-packages/platform-core/skill-authoring-standard/SKILL.md)
+   and load only its Codex or Antigravity reference.
+2. Start with **Skill anatomy and progressive disclosure** for that provider.
+3. Add only the domain, runtime, safety, or delivery references required for
    the proposed skill.
-3. Keep `SKILL.md` procedural and concise. Put detailed schemas, policies,
+4. Keep `SKILL.md` procedural and concise. Put detailed schemas, policies,
    and variants in directly linked `references/` files.
-4. Validate the skill against a realistic task before it is marked reviewed.
+5. Validate the skill against a realistic task before it is marked reviewed.
+
+## Provider contracts
+
+Do not merge provider conventions into a stricter fictional common format.
+When portability is requested, inspect each provider independently and report
+separate findings.
+
+| Contract | Codex | Google Antigravity |
+| --- | --- | --- |
+| Official source | [Build skills](https://developers.openai.com/codex/skills) | [Agent Skills](https://antigravity.google/docs/skills) |
+| Required frontmatter | `name`, `description` | `description`; `name` is optional and defaults to the folder name |
+| Project discovery | `.agents/skills` from CWD through repository root | `<workspace-root>/.agents/skills`; legacy `.agent/skills` is supported |
+| Global discovery | `$HOME/.agents/skills`; admin `/etc/codex/skills` | `~/.gemini/config/skills` |
+| Documented optional directories | `scripts/`, `references/`, `assets/`, `agents/` | `scripts/`, `examples/`, `resources/` |
+| Provider extension | Optional `agents/openai.yaml` for interface, invocation policy, and tool dependencies | No `agents/openai.yaml` extension is documented |
+
+For Codex, `description` remains required for explicit-only skills. Configure
+explicit-only invocation with `agents/openai.yaml`:
+
+```yaml
+policy:
+  allow_implicit_invocation: false
+```
+
+The existing Ralph loop, teamwork, scheduling, and Generative UI references in
+`skill-authoring-standard` are Antigravity workflow guidance. Load them only
+after selecting Antigravity and only when that workflow is relevant.
 
 ## Authoring foundations
 
 | Reference | Read when | Summary |
 | --- | --- | --- |
 | [OpenAI: Build skills for ChatGPT and Codex](https://developers.openai.com/codex/skills) | Creating or revising any Codex skill. | Defines `SKILL.md`, clear trigger descriptions, progressive disclosure, and repository/user/admin skill locations. |
+| [Google Antigravity: Agent Skills](https://antigravity.google/docs/skills) | Creating or revising an Antigravity skill. | Defines optional `name`, required `description`, workspace/global discovery roots, and the `scripts`/`examples`/`resources` package shape. |
 | [Open Agent Skills specification](https://agentskills.io/specification) | Checking portable skill structure or interoperability. | Defines the open skill package format shared across compatible agent hosts. |
 | [Skills usage guide](./skills-usage.md) | Importing, reviewing, selecting, or delivering a skill through this Platform. | Separates Catalog policy and immutable revisions from Skills Manager delivery. |
 | [Skills Platform roadmap](./roadmap.md) | Deciding where profiles, notes, evaluations, presets, and source provenance belong. | Explains the intended lifecycle and the management data that must not overwrite canonical `SKILL.md` content. |
@@ -42,16 +73,21 @@
 
 ## Domain references to bundle with a skill
 
-Do not copy general reference material into `SKILL.md`. For a recurring,
-domain-specific workflow, add only the files that another agent cannot infer
-reliably:
+Do not copy general reference material into `SKILL.md`. Use the selected
+provider's documented directory names rather than presenting one host's names
+as universal:
 
-| Need | Put in the skill package | Example |
+| Need | Codex package | Antigravity package |
 | --- | --- | --- |
-| Durable procedure | Concise instructions in `SKILL.md` | Required sequence, decision points, completion checks. |
-| Large or variant-specific knowledge | `references/<topic>.md` | API schema, company policy, product taxonomy, provider-specific steps. |
-| Fragile or repeated transformation | `scripts/` | Deterministic converter, validator, or report generator. |
-| Output material | `assets/` | Approved template, image, font, or starter project. |
+| Durable procedure | Concise instructions in `SKILL.md` | Concise instructions in `SKILL.md` |
+| Large or conditional knowledge | `references/<topic>.md` | `resources/<topic>.md` |
+| Reference implementation | A focused linked reference or asset when genuinely needed | `examples/<scenario>.*` |
+| Fragile or repeated transformation | `scripts/` | `scripts/` |
+| Output material | `assets/` | `resources/` |
+
+For a portable package, keep the shared entrypoint small and report each
+provider's directory compatibility independently; do not silently duplicate
+the same content across both directory trees.
 
 ## Minimum review checklist
 
@@ -65,6 +101,10 @@ reliably:
 - Is the expected result testable with a realistic example or evaluation?
 - Has the source, review state, and intended work scope been recorded in the
   Catalog before delivery?
+- If more than one provider is targeted, were differences reported separately
+  instead of treating provider-specific metadata as universal?
+- Did static analysis remain advisory, with no change to canonical content,
+  prompt injection, enablement, or activation plans?
 
 ## Maintenance rule
 

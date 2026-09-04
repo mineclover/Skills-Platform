@@ -42,7 +42,7 @@ test("Tier 2 - B10.2: Fails Cleanly When Symlink Target Path Does Not Exist", as
   assert.equal(errorOccurred, true);
 });
 
-test("Tier 2 - B10.3: Atomic Hot-Swap with Re-linking", async (t) => {
+test("Tier 2 - B10.3: Portable Re-linking Smoke Test", async (t) => {
   const { sandboxPath, cleanup } = await createSandbox("tier2-b10-");
   t.after(cleanup);
 
@@ -57,7 +57,8 @@ test("Tier 2 - B10.3: Atomic Hot-Swap with Re-linking", async (t) => {
   await fs.symlink(targetA, link, "junction");
   assert.equal(await fs.readFile(path.join(link, "id.txt"), "utf8"), "A");
 
-  // Atomic swap
+  // Low-level smoke test only. Atomic swap and rollback are covered by the
+  // reference adapter transaction tests.
   await fs.unlink(link);
   await fs.symlink(targetB, link, "junction");
   assert.equal(await fs.readFile(path.join(link, "id.txt"), "utf8"), "B");
@@ -67,8 +68,9 @@ test("Tier 2 - B10.4: Path Normalization (Windows / POSIX Slashing)", () => {
   const inputPosix = "apps/skills-catalog/recipes";
   const inputWin = "apps\\skills-catalog\\recipes";
 
-  const norm1 = path.normalize(inputPosix);
-  const norm2 = path.normalize(inputWin);
+  const portableNormalize = (value) => path.normalize(value.replaceAll("\\", path.sep));
+  const norm1 = portableNormalize(inputPosix);
+  const norm2 = portableNormalize(inputWin);
 
   assert.equal(norm1, norm2);
 });

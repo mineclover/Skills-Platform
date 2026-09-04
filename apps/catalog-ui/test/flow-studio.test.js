@@ -339,12 +339,13 @@ test("Junction Delivery: Resolves multi-provider roots and detects drift states"
   const junctions = [
     { providerId: "antigravity", deliveryPath: ".agents/skills/", syncState: "insync" },
     { providerId: "claude", deliveryPath: ".claude/skills/", syncState: "insync" },
-    { providerId: "codex", deliveryPath: "skills/", syncState: "drift" },
+    { providerId: "codex", deliveryPath: ".agents/skills/", syncState: "drift" },
   ];
 
   assert.equal(junctions.length, 3);
   assert.equal(junctions.find((j) => j.providerId === "antigravity")?.deliveryPath, ".agents/skills/");
   assert.equal(junctions.find((j) => j.providerId === "claude")?.deliveryPath, ".claude/skills/");
+  assert.equal(junctions.find((j) => j.providerId === "codex")?.deliveryPath, ".agents/skills/");
   assert.equal(junctions.find((j) => j.providerId === "codex")?.syncState, "drift");
 });
 

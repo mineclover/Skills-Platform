@@ -32,9 +32,13 @@ import type {
 export function ProjectSkillGrid({
   skills,
   providerId = "antigravity",
+  onSkillStateChange,
+  updatingSkillId,
 }: {
   skills: DisplaySkill[];
   providerId?: string;
+  onSkillStateChange?: (skill: DisplaySkill, state: "enabled" | "disabled" | "inherit") => void;
+  updatingSkillId?: string | null;
 }) {
   if (skills.length === 0) {
     return (
@@ -54,7 +58,7 @@ export function ProjectSkillGrid({
         const invMode = skill.invocation_mode ?? "unspecified";
         return (
           <div
-            key={skill.name}
+            key={skill.registry_skill_id ?? skill.name}
             className={`skill-card project-skill-card ${skill.enabled ? "enabled" : "disabled"}`}
           >
             <div className="skill-card-header">
@@ -76,7 +80,7 @@ export function ProjectSkillGrid({
             </div>
 
             <div className="skill-card-path-row">
-              <span className="path-label">Active Binding:</span>
+              <span className="path-label">Desired binding path:</span>
               <DeliveryPathIndicator providerId={providerId} skillName={skill.name} showTooltip={true} />
             </div>
 
@@ -84,8 +88,30 @@ export function ProjectSkillGrid({
 
             <div className="skill-card-footer">
               <span className="source-detail">
-                {skill.source === "Pristine" ? "Managed baseline" : "Pinned template"}
+                {skill.override ? "Explicit project override" : skill.source === "Pristine" ? "Managed baseline" : "Pinned template"}
               </span>
+              {onSkillStateChange && skill.lineage_id && skill.registry_skill_id ? (
+                <div className="skill-state-actions">
+                  <button
+                    type="button"
+                    className="quiet-action"
+                    disabled={updatingSkillId === skill.registry_skill_id}
+                    onClick={() => onSkillStateChange(skill, skill.enabled ? "disabled" : "enabled")}
+                  >
+                    {skill.enabled ? "Disable" : "Enable"}
+                  </button>
+                  {skill.override ? (
+                    <button
+                      type="button"
+                      className="quiet-action"
+                      disabled={updatingSkillId === skill.registry_skill_id}
+                      onClick={() => onSkillStateChange(skill, "inherit")}
+                    >
+                      Use template
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         );
@@ -97,9 +123,13 @@ export function ProjectSkillGrid({
 export function SkillTable({
   skills,
   providerId = "antigravity",
+  onSkillStateChange,
+  updatingSkillId,
 }: {
   skills: DisplaySkill[];
   providerId?: string;
+  onSkillStateChange?: (skill: DisplaySkill, state: "enabled" | "disabled" | "inherit") => void;
+  updatingSkillId?: string | null;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [invocationFilter, setInvocationFilter] = useState<InvocationFilterMode>("all");
@@ -147,7 +177,12 @@ export function SkillTable({
       />
 
       {viewMode === "grid" ? (
-        <ProjectSkillGrid skills={filteredSkills} providerId={providerId} />
+        <ProjectSkillGrid
+          skills={filteredSkills}
+          providerId={providerId}
+          onSkillStateChange={onSkillStateChange}
+          updatingSkillId={updatingSkillId}
+        />
       ) : (
         <section className="skill-table" aria-labelledby="effective-set-title">
           <div className="table-head">
@@ -164,7 +199,7 @@ export function SkillTable({
             </div>
           ) : (
             filteredSkills.map((skill) => (
-              <article className="skill-row" key={skill.name}>
+              <article className="skill-row" key={skill.registry_skill_id ?? skill.name}>
                 <div className="skill-name">
                   <span className={skill.enabled ? "checkbox checked" : "checkbox"}>
                     {skill.enabled ? <Check size={16} /> : null}
@@ -187,7 +222,28 @@ export function SkillTable({
                   </small>
                 </div>
                 <span className="reason">{skill.reason}</span>
-                <ChevronDown size={20} className="row-chevron" aria-hidden="true" />
+                {onSkillStateChange && skill.lineage_id && skill.registry_skill_id ? (
+                  <div className="skill-state-actions">
+                    <button
+                      type="button"
+                      className="quiet-action"
+                      disabled={updatingSkillId === skill.registry_skill_id}
+                      onClick={() => onSkillStateChange(skill, skill.enabled ? "disabled" : "enabled")}
+                    >
+                      {skill.enabled ? "Disable" : "Enable"}
+                    </button>
+                    {skill.override ? (
+                      <button
+                        type="button"
+                        className="quiet-action"
+                        disabled={updatingSkillId === skill.registry_skill_id}
+                        onClick={() => onSkillStateChange(skill, "inherit")}
+                      >
+                        Inherit
+                      </button>
+                    ) : null}
+                  </div>
+                ) : <ChevronDown size={20} className="row-chevron" aria-hidden="true" />}
               </article>
             ))
           )}
@@ -255,6 +311,7 @@ export function TemplateInspector({
   copyingPrompt,
   updatingDefault,
   updatingOverlay,
+  planReady,
 }: {
   scope: Scope;
   pristine: boolean;
@@ -277,6 +334,7 @@ export function TemplateInspector({
   copyingPrompt: boolean;
   updatingDefault: boolean;
   updatingOverlay: boolean;
+  planReady: boolean;
 }) {
   const overlayShown = overlayActive && !pristine;
   const providerMeta = getProviderInfo(providerId);
@@ -389,10 +447,10 @@ export function TemplateInspector({
           className="quiet-action apply-action"
           type="button"
           onClick={onApply}
-          disabled={applying || previewing}
+          disabled={applying || previewing || !planReady}
         >
           {applying ? <LoaderCircle size={17} className="spin" /> : <Check size={17} />}{" "}
-          {applying ? "Applying through CLI…" : "Apply through Skills Manager CLI"}
+          {applying ? "Applying through CLI…" : planReady ? "Apply previewed plan" : "Preview required before apply"}
         </button>
         <ApplyProgressView progress={applyProgress} />
         <button
@@ -408,8 +466,8 @@ export function TemplateInspector({
           <RefreshCcw size={17} /> {pristine ? "Restore project template" : "Return to Pristine"}
         </button>
         <p>
-          Apply records the immutable plan, previews every upstream binding, then runs the
-          confirmed Skills Manager CLI command. Copy never changes a delivery path.
+          Preview records one immutable plan and checks every upstream binding. Apply can run
+          only that exact plan. Copy never changes a delivery path.
         </p>
       </div>
     </aside>
@@ -529,4 +587,3 @@ export function PlanHistory({
     </section>
   );
 }
-

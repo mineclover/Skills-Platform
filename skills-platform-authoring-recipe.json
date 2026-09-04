@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "recipe_id": "skills-platform-authoring",
+  "name": "Skills Platform Authoring Packages",
+  "description": "Project-managed Codex and Antigravity skill-authoring packages with provider-specific presets.",
+  "created_at": "2026-09-04T00:00:00.000Z",
+  "created_by": "Skills Platform Catalog",
+  "sources": [
+    {
+      "source_id": "skills-platform-authoring-standard-source",
+      "type": "local",
+      "locator": "./skills-packages/platform-core/skill-authoring-standard"
+    },
+    {
+      "source_id": "skills-platform-writing-great-source",
+      "type": "local",
+      "locator": "./skills-packages/community-codex/writing-great-skills"
+    },
+    {
+      "source_id": "skills-platform-skill-creator-source",
+      "type": "local",
+      "locator": "./skills-packages/community-codex/skill-creator"
+    }
+  ],
+  "skills": [
+    {
+      "name": "skill-authoring-standard",
+      "artifact_type": "skill",
+      "invocation_mode": "hybrid",
+      "source_id": "skills-platform-authoring-standard-source",
+      "source_relative_path": ".",
+      "content_digest": "2ca555c6ecc42b954baf84a89e9a1a10b8a663f0dbe75765c83d0065d3857caf",
+      "description": "Route skill authoring and review through separate Codex and Antigravity provider rulesets."
+    },
+    {
+      "name": "writing-great-skills",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_id": "skills-platform-writing-great-source",
+      "source_relative_path": ".",
+      "content_digest": "65fe32b948c832390e19dba6991ac8f24f40184f5dc555cb68db26d4cf46c3c6",
+      "description": "Review Codex skill instructions for predictable discovery, execution, and pruning."
+    },
+    {
+      "name": "skill-creator",
+      "artifact_type": "skill",
+      "invocation_mode": "hybrid",
+      "source_id": "skills-platform-skill-creator-source",
+      "source_relative_path": ".",
+      "content_digest": "37ddb8d30bfd5d06e701d1b565f7b167e4ade8d5c2eb9d23c037417ebc722bba",
+      "description": "Repository-pinned Skill Creator source retained for validation and update review; the bundled system skill remains the active Codex copy."
+    }
+  ],
+  "presets": [
+    {
+      "id": "skills-platform-authoring-codex",
+      "name": "Skills Platform Authoring · Codex",
+      "version": 1,
+      "owner": "Skills Platform",
+      "lifecycle": "reviewed",
+      "description": "Project-local Codex authoring router and explicit review reference.",
+      "purpose": "Author and review repository skills against Codex conventions without shadowing the bundled system skill-creator.",
+      "work_scope_tags": [
+        "curation",
+        "governance"
+      ],
+      "skills": [
+        {
+          "skill_name": "skill-authoring-standard",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_name": "writing-great-skills",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "skills-platform-authoring-antigravity",
+      "name": "Skills Platform Authoring · Antigravity",
+      "version": 1,
+      "owner": "Skills Platform",
+      "lifecycle": "reviewed",
+      "description": "Antigravity authoring router using the provider-specific package and discovery contract.",
+      "purpose": "Author and review Antigravity skills without applying Codex-only invocation policy or interface metadata.",
+      "work_scope_tags": [
+        "curation",
+        "governance"
+      ],
+      "skills": [
+        {
+          "skill_name": "skill-authoring-standard",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "project_id": "skills-platform-codex",
+      "project_name": "Skills Platform · Codex",
+      "provider_id": "codex",
+      "scope": "project",
+      "delivery_root_relative": ".agents/skills",
+      "default_preset_id": "skills-platform-authoring-codex",
+      "default_preset_version": 1
+    }
+  ],
+  "hooks": []
+}

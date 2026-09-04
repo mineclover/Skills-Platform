@@ -176,7 +176,7 @@ test("Lifecycle Loop: NTFS Junction Swapping Across Lifecycle Phases", async (t)
     assert.equal(mount.preset_id, "task-planning-suite");
     assert.equal(mount.applied, true);
 
-    const deliveryRoot = path.join(projectPath, "skills");
+    const deliveryRoot = path.join(projectPath, ".agents", "skills");
     const skillA = path.join(deliveryRoot, "task-decomposer", "SKILL.md");
     const skillB = path.join(deliveryRoot, "horizontal-topic-scanner", "SKILL.md");
 
@@ -199,7 +199,7 @@ test("Lifecycle Loop: NTFS Junction Swapping Across Lifecycle Phases", async (t)
     assert.equal(mount.preset_id, "scoped-inner-loop-suite");
     assert.equal(mount.applied, true);
 
-    const deliveryRoot = path.join(projectPath, "skills");
+    const deliveryRoot = path.join(projectPath, ".agents", "skills");
 
     // Phase 1 skills should be removed/unlinked
     await assert.rejects(() => fs.lstat(path.join(deliveryRoot, "task-decomposer")));
@@ -230,7 +230,7 @@ test("Lifecycle Loop: NTFS Junction Swapping Across Lifecycle Phases", async (t)
     assert.equal(mount.preset_id, "release-governance-suite");
     assert.equal(mount.applied, true);
 
-    const deliveryRoot = path.join(projectPath, "skills");
+    const deliveryRoot = path.join(projectPath, ".agents", "skills");
 
     // Phase 2 skills should be removed
     await assert.rejects(() => fs.lstat(path.join(deliveryRoot, "vertical-context-extractor")));

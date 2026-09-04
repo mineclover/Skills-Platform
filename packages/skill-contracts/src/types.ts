@@ -78,6 +78,199 @@ export interface ValidationResult {
   issues: ValidationIssue[];
 }
 
+// Shared, provider-aware skill authoring inspection contracts. These describe
+// advisory static analysis only; they are intentionally separate from
+// activation-plan validation and never carry an execution control.
+export type SkillAuthoringPlatform = "codex" | "antigravity";
+export const SKILL_AUTHORING_PLATFORMS: ReadonlySet<SkillAuthoringPlatform> = new Set([
+  "codex",
+  "antigravity",
+]);
+
+export type SkillAuthoringSeverity = "error" | "warning" | "info";
+export const SKILL_AUTHORING_SEVERITIES: ReadonlySet<SkillAuthoringSeverity> = new Set([
+  "error",
+  "warning",
+  "info",
+]);
+
+export type SkillAuthoringConfidence = "certain" | "likely" | "heuristic";
+export const SKILL_AUTHORING_CONFIDENCES: ReadonlySet<SkillAuthoringConfidence> = new Set([
+  "certain",
+  "likely",
+  "heuristic",
+]);
+
+export type SkillAuthoringBasisKind =
+  | "official"
+  | "platform_policy"
+  | "bundled_validator"
+  | "heuristic";
+export const SKILL_AUTHORING_BASIS_KINDS: ReadonlySet<SkillAuthoringBasisKind> = new Set([
+  "official",
+  "platform_policy",
+  "bundled_validator",
+  "heuristic",
+]);
+
+export type SkillAuthoringCategory =
+  | "structure"
+  | "identity"
+  | "trigger"
+  | "scope"
+  | "progressive_disclosure"
+  | "resources"
+  | "provider_metadata"
+  | "portability"
+  | "security";
+export const SKILL_AUTHORING_CATEGORIES: ReadonlySet<SkillAuthoringCategory> = new Set([
+  "structure",
+  "identity",
+  "trigger",
+  "scope",
+  "progressive_disclosure",
+  "resources",
+  "provider_metadata",
+  "portability",
+  "security",
+]);
+
+export interface SkillAuthoringFindingBasis {
+  kind: SkillAuthoringBasisKind;
+  source_url?: string | null;
+  statement?: string | null;
+}
+
+export interface SkillAuthoringFindingLocation {
+  relative_path: string;
+  start_line?: number | null;
+  end_line?: number | null;
+  yaml_path?: string | null;
+}
+
+export interface SkillAuthoringFinding {
+  rule_id: string;
+  severity: SkillAuthoringSeverity;
+  confidence: SkillAuthoringConfidence;
+  category: SkillAuthoringCategory;
+  basis: SkillAuthoringFindingBasis;
+  message: string;
+  location?: SkillAuthoringFindingLocation | null;
+  evidence?: Record<string, unknown>;
+  recommendation?: string | null;
+}
+
+export interface SkillAuthoringProviderSummary {
+  compatible: boolean;
+  status: "conformant" | "review_recommended" | "nonconformant";
+  finding_count: number;
+  error_count: number;
+  warning_count: number;
+  info_count: number;
+}
+
+export type SkillAuthoringInvocationMode =
+  | "implicit_and_explicit"
+  | "explicit_only"
+  | "unspecified";
+
+export interface SkillAuthoringOpenAIInterfaceMetadata {
+  display_name?: string;
+  short_description?: string;
+  icon_small?: string;
+  icon_large?: string;
+  brand_color?: string;
+  default_prompt?: string;
+}
+
+export interface SkillAuthoringOpenAIPolicyMetadata {
+  allow_implicit_invocation?: boolean;
+}
+
+export interface SkillAuthoringOpenAIToolDependency {
+  type: string;
+  value: string;
+  description?: string;
+  transport?: string;
+  url?: string;
+}
+
+export interface SkillAuthoringOpenAIDependenciesMetadata {
+  tools: SkillAuthoringOpenAIToolDependency[];
+}
+
+export interface SkillAuthoringOpenAIMetadataInspection {
+  present: boolean;
+  interface?: SkillAuthoringOpenAIInterfaceMetadata;
+  policy?: SkillAuthoringOpenAIPolicyMetadata;
+  dependencies?: SkillAuthoringOpenAIDependenciesMetadata;
+}
+
+export interface SkillAuthoringAntigravityMetadataInspection {
+  name_defaulted: boolean;
+  examples: string[];
+  resources: string[];
+}
+
+export interface SkillAuthoringProviderInspection {
+  manifest_path: string | null;
+  manifest_exact_case: boolean | null;
+  resolved_name: string | null;
+  invocation_mode: SkillAuthoringInvocationMode;
+  frontmatter_fields: string[];
+  optional_directories_present: string[];
+  provider_extensions_present: string[];
+  discovery_root?: string | null;
+  openai?: SkillAuthoringOpenAIMetadataInspection;
+  antigravity?: SkillAuthoringAntigravityMetadataInspection;
+}
+
+export interface SkillAuthoringRulesetRef {
+  id: string;
+  version: string;
+  source: string;
+}
+
+export interface SkillAuthoringRulesetDescriptor {
+  platform: SkillAuthoringPlatform;
+  ruleset_id: string;
+  version: string;
+  source_url: string;
+  project_discovery_roots: string[];
+  global_discovery_roots: string[];
+  required_frontmatter: string[];
+  optional_directories: string[];
+  provider_extensions: string[];
+}
+
+export interface SkillAuthoringPlatformResult {
+  platform: SkillAuthoringPlatform;
+  ruleset: SkillAuthoringRulesetRef;
+  summary: SkillAuthoringProviderSummary;
+  findings: SkillAuthoringFinding[];
+  observations: Record<string, unknown>;
+  provider_metadata: SkillAuthoringProviderInspection;
+}
+
+export interface SkillAuthoringAnalysis {
+  results: Partial<Record<SkillAuthoringPlatform, SkillAuthoringPlatformResult>>;
+  execution_effect: "none";
+}
+
+export interface SkillAuthoringVirtualFile {
+  relative_path: string;
+  content: string;
+}
+
+export interface SkillAuthoringVirtualValidationRequest {
+  platforms: SkillAuthoringPlatform[];
+  files: SkillAuthoringVirtualFile[];
+}
+
+export interface SkillAuthoringVirtualValidationResponse {
+  authoring: SkillAuthoringAnalysis;
+}
+
 export interface ActivationReportSummary {
   applied?: number;
   skipped?: number;
@@ -131,6 +324,23 @@ export interface SkillLineage {
   created_at: string;
 }
 
+/**
+ * Minimal canonical manifest snapshot retained by the registry. Resolved name
+ * and description already live on RegistrySkill, while the body and complete
+ * frontmatter remain in the immutable canonical artifact.
+ */
+export interface RegistrySkillManifestSnapshot {
+  declared_name: string | null;
+  license: string | null;
+  allowed_tools: unknown | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface SkillAuthoringProviderCompatibility {
+  codex: boolean;
+  antigravity: boolean;
+}
+
 export interface RegistrySkill {
   id: string;
   source_id: string;
@@ -142,8 +352,12 @@ export interface RegistrySkill {
   artifact_key?: string;
   lineage_id: string;
   description: string | null;
+  manifest?: RegistrySkillManifestSnapshot | null;
+  provider_compatibility?: SkillAuthoringProviderCompatibility | null;
+  authoring_ruleset_fingerprint?: string | null;
   content_digest: string;
   canonical_path: string;
+  canonical_relative_path?: string;
   imported_at: string;
   review_state: "imported" | "reviewed" | "rejected";
 }
@@ -453,6 +667,8 @@ export interface RecipePreset {
   id: string;
   name: string;
   version: number;
+  owner?: string | null;
+  lifecycle?: "draft" | "reviewed" | "deprecated";
   description?: string | null;
   purpose?: string | null;
   work_scope_tags?: string[];
@@ -521,6 +737,80 @@ export const HOOK_HANDLER_TYPES: ReadonlySet<HookHandlerType> = new Set([
   "module",
 ]);
 
+export type HookFailurePolicy = "open" | "closed";
+export const HOOK_FAILURE_POLICIES: ReadonlySet<HookFailurePolicy> = new Set([
+  "open",
+  "closed",
+]);
+
+export type HookProvider = "antigravity" | "claude" | "codex";
+export const HOOK_PROVIDERS: ReadonlySet<HookProvider> = new Set([
+  "antigravity",
+  "claude",
+  "codex",
+]);
+
+export type CodexHookEvent =
+  | "SessionStart"
+  | "SessionEnd"
+  | "PreToolUse"
+  | "PermissionRequest"
+  | "PostToolUse"
+  | "PreCompact"
+  | "PostCompact"
+  | "UserPromptSubmit"
+  | "SubagentStart"
+  | "SubagentStop"
+  | "Stop"
+  | "Interrupt";
+
+export const CODEX_HOOK_EVENTS: ReadonlySet<CodexHookEvent> = new Set([
+  "SessionStart",
+  "SessionEnd",
+  "PreToolUse",
+  "PermissionRequest",
+  "PostToolUse",
+  "PreCompact",
+  "PostCompact",
+  "UserPromptSubmit",
+  "SubagentStart",
+  "SubagentStop",
+  "Stop",
+  "Interrupt",
+]);
+
+/** Native command hook accepted by `<repo>/.codex/hooks.json`. */
+export interface CodexCommandHook {
+  type: "command";
+  command: string;
+  commandWindows?: string;
+  timeout?: number;
+  statusMessage?: string;
+  async?: boolean;
+  additionalContextLimit?: number;
+}
+
+export interface CodexMcpToolHook {
+  type: "mcp_tool";
+  server: string;
+  tool: string;
+  input?: Record<string, any>;
+  timeout?: number;
+  statusMessage?: string;
+}
+
+export type CodexNativeHookHandler = CodexCommandHook | CodexMcpToolHook;
+
+export interface CodexHookGroup {
+  matcher?: string;
+  hooks: CodexNativeHookHandler[];
+}
+
+export interface CodexHooksConfig {
+  description?: string;
+  hooks: Partial<Record<CodexHookEvent, CodexHookGroup[]>>;
+}
+
 export interface HookHandler {
   type: HookHandlerType;
   command?: string;
@@ -539,7 +829,12 @@ export interface HookDefinition {
   matcher?: string | null;
   handler: HookHandler;
   priority?: number;
-  providers?: string[];
+  providers?: HookProvider[];
+  /**
+   * Controls what happens when the handler cannot run or times out. Existing
+   * manifests default to `open` for backwards compatibility.
+   */
+  failure_policy?: HookFailurePolicy;
   metadata?: Record<string, any>;
 }
 
@@ -655,6 +950,3 @@ export interface CreateProcedureWorkspaceOptions {
   metadata?: Record<string, any>;
   now?: Date;
 }
-
-
-

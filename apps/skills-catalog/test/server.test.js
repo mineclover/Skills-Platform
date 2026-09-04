@@ -36,15 +36,16 @@ async function setup(context) {
     registrySkillIds: [imported.skills[0].id],
   });
   await assignPreset({ catalogRoot, projectId: project.id, presetId: preset.id });
-  return { catalogRoot, registryRoot, imported, sourcePath };
+  return { catalogRoot, registryRoot, imported, sourcePath, root };
 }
 
-test("catalog bridge exposes projects, effective set, history, and read-only plan preview", async (context) => {
-  const { catalogRoot, registryRoot, imported, sourcePath } = await setup(context);
+test("catalog bridge exposes projects, effective set, history, and an immutable recorded plan preview", async (context) => {
+  const { catalogRoot, registryRoot, imported, sourcePath, root } = await setup(context);
   const inspectedProjectIds = [];
   const server = createCatalogServer({
     catalogRoot,
     registryRoot,
+    hookProjectRoots: [root],
     upstreamInspector: {
       inspect: async ({ projectId } = {}) => {
         inspectedProjectIds.push(projectId ?? null);
@@ -79,6 +80,13 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   const systemPrompt = await (await fetch(`${base}/projects/demo/system-prompt?include_notes=true`)).json();
   const globalUpstreamStatus = await (await fetch(`${base}/upstream-status`)).json();
   const projectUpstreamStatus = await (await fetch(`${base}/projects/demo/upstream-status`)).json();
+  const hookDiagnostics = await (await fetch(`${base}/hooks/diagnostics?project_path=${encodeURIComponent(root)}`)).json();
+  const hookSyncResponse = await fetch(`${base}/hooks/sync`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ project_path: root }),
+  });
+  const hookSync = await hookSyncResponse.json();
 
   assert.equal(projects.projects[0].id, "demo");
   assert.ok(presets.presets.some((preset) => preset.id === "builtin-pristine"));
@@ -87,7 +95,8 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(effective.skills[0].skill_name, "planning");
   assert.equal(preview.plan.operations[0].registry_skill_id, imported.skills[0].id);
   assert.equal(preview.plan.operations[0].skill_name, "planning");
-  assert.deepEqual(history.history, []);
+  assert.equal(history.history.length, 1);
+  assert.equal(history.history[0].plan_id, preview.plan.plan_id);
   assert.equal(systemPrompt.project_id, "demo");
   assert.match(systemPrompt.content, /# Planning/);
   assert.equal(globalUpstreamStatus.status.scope, "global");
@@ -96,6 +105,28 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   assert.equal(projectUpstreamStatus.status.manager_project_id, "demo");
   assert.equal(projectUpstreamStatus.status.summary.enabled, 1);
   assert.deepEqual(inspectedProjectIds, [null, "demo"]);
+  assert.equal(hookDiagnostics.providers.codex.status, "not_configured");
+  assert.equal(hookDiagnostics.providers.codex.supported, true);
+  assert.equal(hookDiagnostics.providers.codex.runtimeReady, false);
+  assert.equal(hookSyncResponse.status, 207);
+  assert.equal(hookSync.providers.codex.status, "synced");
+  assert.equal(hookSync.providers.claude.status, "unsupported");
+  assert.equal(hookSync.fullySynced, false);
+
+  const disabledOverride = await (await fetch(`${base}/projects/demo/skill-overrides/${imported.skills[0].lineage_id}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ registry_skill_id: imported.skills[0].id, desired_state: "disabled" }),
+  })).json();
+  const overrideEffective = await (await fetch(`${base}/projects/demo/effective-set`)).json();
+  assert.equal(disabledOverride.override.desired_state, "disabled");
+  assert.equal(overrideEffective.skills[0].lineage_id, imported.skills[0].lineage_id);
+  assert.equal(overrideEffective.skills[0].desired_state, "disabled");
+  await fetch(`${base}/projects/demo/skill-overrides/${imported.skills[0].lineage_id}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ desired_state: "inherit" }),
+  });
 
   const updatedProfile = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/profile`, {
     method: "POST",
@@ -105,6 +136,27 @@ test("catalog bridge exposes projects, effective set, history, and read-only pla
   const loadedProfile = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/profile`)).json();
   assert.equal(updatedProfile.profile.review_state, "reviewed");
   assert.equal(loadedProfile.profile.purpose, "Plan a verified implementation.");
+
+  const createdAnnotation = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/annotations`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      source_revision_id: imported.skills[0].source_revision_id,
+      kind: "plain_language",
+      title: "Plain explanation",
+      body: "Explains the planning skill without changing its prompt.",
+      locale: "en",
+    }),
+  })).json();
+  const annotations = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/annotations`)).json();
+  const analysis = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/analysis`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ source_revision_id: imported.skills[0].source_revision_id }),
+  })).json();
+  assert.equal(createdAnnotation.execution_effect, "none");
+  assert.equal(annotations.annotations[0].body, "Explains the planning skill without changing its prompt.");
+  assert.equal(analysis.execution_effect, "none");
 
   const createdNote = await (await fetch(`${base}/skills/${imported.skills[0].lineage_id}/notes`, {
     method: "POST",

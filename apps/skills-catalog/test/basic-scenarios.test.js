@@ -35,7 +35,7 @@ test("basic scenario: select, confirm, apply, return to Pristine, and reject an 
     name: "Demo",
     projectPath: path.join(root, "project"),
     providerId: "codex",
-    deliveryRoot: path.join(root, "project", ".codex", "skills"),
+    deliveryRoot: path.join(root, "project", ".agents", "skills"),
     upstreamProjectId: "manager-demo",
   });
   const preset = await createPreset({
@@ -50,6 +50,7 @@ test("basic scenario: select, confirm, apply, return to Pristine, and reject an 
   const calls = [];
   let canonicalPath = null;
   let upstreamSkillAvailable = true;
+  let upstreamEnabled = false;
   const upstreamCli = {
     execute: async (args) => {
       calls.push(args);
@@ -64,10 +65,15 @@ test("basic scenario: select, confirm, apply, return to Pristine, and reject an 
       }
       if (args[0] === "skill" && args[1] === "preview") return { requires_confirmation: false, impacts: [] };
       if (args[0] === "skill" && (args[1] === "enable" || args[1] === "disable")) {
+        upstreamEnabled = args[1] === "enable";
         return { applied_count: 1, skipped_count: 0, failed_count: 0 };
       }
       if (args[0] === "providers") return { providers: [{ provider_id: "codex", detected: true, reachable: true }] };
-      if (args[0] === "bindings") return [];
+      if (args[0] === "bindings") return upstreamSkillAvailable ? [{
+        skill_instance_id: "project:manager-demo:planning",
+        provider_id: "codex",
+        state: upstreamEnabled ? "enabled" : "disabled",
+      }] : [];
       throw new Error(`Unexpected CLI command: ${args.join(" ")}`);
     },
   };
@@ -79,7 +85,10 @@ test("basic scenario: select, confirm, apply, return to Pristine, and reject an 
   const prompt = await request(base, "/projects/demo/system-prompt?include_notes=true");
   assert.match(prompt.body.content, /# Planning/);
 
-  const recorded = await request(base, "/projects/demo/activation-plan", {});
+  canonicalPath = imported.skills[0].canonical_path;
+  const recorded = await request(base, "/projects/demo/activation-plan/preview", { preflight: true });
+  assert.equal(recorded.body.preflight.status, "confirmation_required");
+  assert.equal(recorded.body.preflight.plan_id, recorded.body.plan.plan_id);
   canonicalPath = recorded.body.plan.operations[0].canonical_path;
   const pending = await request(base, `/activation-plans/${recorded.body.plan.plan_id}/apply`, {});
   assert.equal(pending.response.status, 409);

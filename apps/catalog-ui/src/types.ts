@@ -25,6 +25,34 @@ import type {
   ResponsibilityInvariants,
   ProcedureWorkspace,
   CreateProcedureWorkspaceOptions,
+  SkillAuthoringAnalysis,
+  SkillAuthoringFinding,
+  SkillAuthoringPlatform,
+  SkillAuthoringPlatformResult,
+  SkillAuthoringProviderSummary,
+  SkillAuthoringRulesetDescriptor,
+  SkillAuthoringVirtualValidationRequest,
+  SkillAuthoringVirtualValidationResponse,
+} from "@skills-platform/contracts";
+
+export type {
+  SkillAuthoringAnalysis,
+  SkillAuthoringBasisKind,
+  SkillAuthoringCategory,
+  SkillAuthoringConfidence,
+  SkillAuthoringFinding,
+  SkillAuthoringFindingBasis,
+  SkillAuthoringFindingLocation,
+  SkillAuthoringPlatform,
+  SkillAuthoringPlatformResult,
+  SkillAuthoringProviderInspection,
+  SkillAuthoringProviderSummary,
+  SkillAuthoringRulesetDescriptor,
+  SkillAuthoringRulesetRef,
+  SkillAuthoringSeverity,
+  SkillAuthoringVirtualFile,
+  SkillAuthoringVirtualValidationRequest,
+  SkillAuthoringVirtualValidationResponse,
 } from "@skills-platform/contracts";
 
 export type Scope =
@@ -51,12 +79,29 @@ export type SkillRow = {
 
 export type DisplaySkill = {
   name: string;
+  registry_skill_id?: string;
+  lineage_id?: string;
   source: string;
   enabled: boolean;
   reason: string;
+  override?: ProjectSkillOverride;
   artifact_type?: ArtifactType;
   invocation_mode?: InvocationMode;
 };
+
+export interface ProjectSkillOverride {
+  lineage_id: string;
+  registry_skill_id: string;
+  desired_state: "enabled" | "disabled";
+  updated_at: string;
+}
+
+export interface ProjectSkillOverrideResult {
+  override: ProjectSkillOverride | null;
+  cleared?: boolean;
+  project_id?: string;
+  lineage_id?: string;
+}
 
 export type Assignment = {
   preset_id: string;
@@ -68,12 +113,16 @@ export type Assignment = {
 export type RemoteSet = {
   project: { id: string; name: string };
   assignments: Assignment[];
+  skill_overrides?: ProjectSkillOverride[];
   skills: Array<{
     skill_name: string;
+    registry_skill_id: string;
+    lineage_id?: string;
     artifact_type?: ArtifactType;
     invocation_mode?: InvocationMode;
     desired_state: "enabled" | "disabled";
     reason: string;
+    override?: ProjectSkillOverride;
     selected_by: { preset_id?: string } | null;
   }>;
 };
@@ -176,6 +225,118 @@ export type EvaluationSummary = {
   latest_outcome: string | null;
 };
 
+export type SkillAnnotationKind =
+  | "plain_language"
+  | "rationale"
+  | "example"
+  | "warning"
+  | "glossary";
+
+export interface SkillAnnotationAnchor {
+  relative_manifest_path: string;
+  start_line: number;
+  end_line: number;
+  selected_text_sha256: string;
+}
+
+export interface SkillAnnotationHistoryEntry {
+  version: number;
+  changed_at?: string;
+  changed_by?: string;
+  patch?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** Reader-facing metadata only. It is never injected into execution prompts. */
+export interface SkillAnnotation {
+  id: string;
+  lineage_id: string;
+  source_revision_id: string | null;
+  kind: SkillAnnotationKind;
+  title: string | null;
+  body: string;
+  locale: string;
+  anchor: SkillAnnotationAnchor | null;
+  author: string;
+  origin: "user" | "generated";
+  version: number;
+  history: SkillAnnotationHistoryEntry[];
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  deleted_by: string | null;
+  execution_effect: "none";
+}
+
+export interface CreateSkillAnnotationInput {
+  source_revision_id?: string;
+  kind?: SkillAnnotationKind;
+  title?: string | null;
+  body: string;
+  locale?: string;
+  anchor?: SkillAnnotationAnchor | null;
+  author?: string;
+  origin?: "user" | "generated";
+}
+
+export interface UpdateSkillAnnotationInput {
+  lineage_id: string;
+  expected_version: number;
+  patch: Partial<
+    Pick<SkillAnnotation, "kind" | "title" | "body" | "locale" | "anchor">
+  >;
+  author?: string;
+}
+
+export type SkillAuthoringStatus = SkillAuthoringProviderSummary["status"];
+
+export interface SkillAuthoringRulesetsResponse {
+  rulesets: SkillAuthoringRulesetDescriptor[];
+  /** False means the Catalog could not inspect its live analyzer/ruleset registry. */
+  available?: boolean;
+  message?: string | null;
+}
+
+export type ValidateSkillDraftInput = SkillAuthoringVirtualValidationRequest;
+export type ValidateSkillDraftResult = SkillAuthoringVirtualValidationResponse;
+
+export interface SkillStaticAnalysis {
+  id: string;
+  lineage_id: string;
+  source_revision_id: string;
+  input_content_digest: string;
+  analysis_digest: string;
+  analyzer: { id: string; version: string };
+  manifest_path: string;
+  identity: {
+    name: string;
+    description: string | null;
+    frontmatter_fields: string[];
+  };
+  readability: {
+    line_count: number;
+    non_empty_line_count: number;
+    section_count: number;
+    instruction_line_count: number;
+    fenced_code_block_count: number;
+  };
+  sections: Array<{ level: number; title: string; line: number }>;
+  references: {
+    markdown_link_count: number;
+    relative: string[];
+    external: string[];
+  };
+  support_files: { total: number; executable_like: string[] };
+  warnings: string[];
+  /** Additive provider-aware authoring analysis of the same immutable revision. */
+  authoring?: SkillAuthoringAnalysis;
+  generated_at: string;
+  stale: boolean;
+  is_latest_revision?: boolean;
+  outdated?: boolean;
+  execution_effect: "none";
+}
+
 export type DiagnosticStage =
   | "plan"
   | "inspect"
@@ -218,6 +379,14 @@ export type ApplyResult = {
       skipped: number;
       failed: number;
     };
+    operations?: Array<{
+      restart_required?: boolean;
+      codex_config?: {
+        changed?: boolean;
+        enabled?: boolean;
+        config_path?: string | null;
+      };
+    }>;
   };
   error?: string;
 };
@@ -389,6 +558,150 @@ export interface SecurityFeedEvent {
   latency_ms?: number;
 }
 
+export type HookProviderStatus =
+  | "synced"
+  | "drift"
+  | "not_configured"
+  | "unsupported"
+  | "invalid";
+
+export interface HookConfigParseDiagnostic {
+  exists: boolean;
+  jsonParsed: boolean;
+  strictValid: boolean;
+  issues: Array<string | { field?: string; message: string }>;
+}
+
+export interface CodexHookFeatureDiagnostic {
+  found: boolean;
+  stage: string | null;
+  enabled: boolean | null;
+}
+
+export interface CodexHookCapabilityDiagnostic {
+  command?: string;
+  installed: boolean;
+  version: string | null;
+  versionSupported: boolean;
+  minimumVersion: string;
+  strictConfig: {
+    supported: boolean;
+    parsed: boolean | null;
+    status: "unsupported" | "valid" | "invalid";
+    error: string | null;
+  };
+  featuresList: {
+    available: boolean;
+    error: string | null;
+  };
+  hooksFeature: CodexHookFeatureDiagnostic;
+  supportedEvents: string[];
+  excludedEvents: string[];
+  asyncSupported: boolean;
+  mcpToolSupported: boolean;
+}
+
+export interface HookRuntimeTrustDiagnostic {
+  observed: boolean;
+  status: "trusted" | "untrusted" | "unknown";
+}
+
+export interface HookProviderDiagnostic {
+  provider: string;
+  supported: boolean;
+  unsupported: boolean;
+  configured: boolean;
+  synced: boolean;
+  drift: boolean;
+  status: HookProviderStatus;
+  configPath: string | null;
+  configParse?: HookConfigParseDiagnostic;
+  expectedHookIds: string[];
+  actualHookIds: string[];
+  missingHookIds: string[];
+  unexpectedHookIds: string[];
+  unmanagedHookIds?: string[];
+  expectedDigest?: string | null;
+  actualDigest?: string | null;
+  capability?: CodexHookCapabilityDiagnostic;
+  /** Compatibility alias for capability.hooksFeature. */
+  feature?: CodexHookFeatureDiagnostic;
+  trust?: HookRuntimeTrustDiagnostic;
+  runtimeReady: boolean;
+  runtimeBlockers?: string[];
+  error: string | null;
+}
+
+export interface HookEntryProviderDiagnostic {
+  requested: boolean;
+  supported: boolean;
+  unsupported: boolean;
+  configured: boolean;
+  present: boolean;
+  synced: boolean;
+  status: HookProviderStatus | "not_requested" | "disabled";
+  runtimeReady: boolean;
+}
+
+export interface HookRuntimeDiagnostic {
+  id: string;
+  name?: string;
+  event: string;
+  priority: number;
+  desiredEnabled: boolean;
+  failurePolicy?: string;
+  handler: {
+    type: string;
+    target: string | null;
+    resolvedTarget?: string | null;
+    exists: boolean | null;
+    supported: boolean;
+    error: string | null;
+  };
+  providers: Record<string, HookEntryProviderDiagnostic>;
+  runtimeReady: boolean;
+  issues: string[];
+}
+
+export interface HookSyncIssue {
+  provider?: string;
+  code?: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+export interface HookSyncResult {
+  antigravityHooks: number;
+  claudeHooks: number;
+  codexHooks: number;
+  providers: Record<string, HookProviderDiagnostic>;
+  unsupportedProviders: string[];
+  fullySynced: boolean;
+  ok: boolean;
+  issues: HookSyncIssue[];
+  syncedAt: string;
+}
+
+export interface HookDiagnostics {
+  analyzedAt: string;
+  projectPath: string | null;
+  manifestPath: string | null;
+  manifestUpdatedAt?: string;
+  desired: { total: number; enabled: number; disabled: number };
+  summary: {
+    configuredProviders: number;
+    syncedProviders: number;
+    driftedProviders: number;
+    unsupportedProviders: number;
+    missingHandlers: number;
+    runtimeReadyHooks: number;
+  };
+  healthy: boolean;
+  providers: Record<string, HookProviderDiagnostic>;
+  hooks: HookRuntimeDiagnostic[];
+  issues: string[];
+}
+
 export interface VerifyWorkspaceResult {
   verified: boolean;
   workspace_id?: string;
@@ -491,6 +804,3 @@ export type {
   ProcedureWorkspace,
   CreateProcedureWorkspaceOptions,
 };
-
-
-

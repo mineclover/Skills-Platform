@@ -9,6 +9,8 @@ module.exports = {
   ...require("./source-review"),
   ...require("./registry"),
   ...require("./skill-management"),
+  ...require("./skill-authoring"),
+  ...require("./skill-annotations"),
   ...require("./recipes"),
   ...require("./server"),
   ...require("./workspace-manager"),

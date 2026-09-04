@@ -36,6 +36,15 @@ node src/cli.js serve --catalog ../example/.skills-platform/catalog \
 
 Then launch the UI with the bridge URL:
 
+macOS / Linux:
+
+```bash
+export VITE_CATALOG_API="http://127.0.0.1:4300"
+npm run dev
+```
+
+Windows PowerShell:
+
 ```bash
 $env:VITE_CATALOG_API = "http://127.0.0.1:4300"
 npm run dev
@@ -83,6 +92,13 @@ note for system-prompt injection. Its evaluation card reports the active-case
 coverage, pass rate, and latest outcome for the current immutable revision;
 the detailed evaluation-case authoring workflow remains available in the
 Catalog CLI.
+
+Reader annotations are deliberately separate from those runtime notes. A user
+can add a plain-language explanation, rationale, example, warning, or glossary
+entry and run deterministic static analysis for an immutable revision. These
+records live outside the registry artifact, always report
+`execution_effect: "none"`, and are never included in a system prompt,
+activation plan, recipe, or provider delivery.
 
 When connected to the local bridge, the same inspector can pin any registered
 template—including `Pristine`—as that project's default. This changes only the

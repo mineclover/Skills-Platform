@@ -3,6 +3,7 @@ const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const { listSourceUpdateCandidates, importGitSource, loadRegistry } = require("./registry");
+const { inspectSkillVirtualFiles } = require("./skill-authoring");
 
 const execFileAsync = promisify(execFile);
 
@@ -24,20 +25,23 @@ function timestampId() {
 async function validateSkillFrontmatter(skillFilePath) {
   try {
     const content = await fs.readFile(skillFilePath, "utf8");
-    if (!content.startsWith("---")) {
-      return { valid: false, reason: "Missing frontmatter start marker (---)" };
+    const inspection = inspectSkillVirtualFiles({
+      platforms: ["codex", "antigravity"],
+      skillName: path.basename(path.dirname(path.resolve(skillFilePath))),
+      files: [{ relative_path: "SKILL.md", content }],
+    });
+    const errors = Object.values(inspection.results)
+      .flatMap((result) => result.findings)
+      .filter((item) => item.severity === "error");
+    if (errors.length > 0) {
+      return {
+        valid: false,
+        reason: errors.map((item) => item.message).filter((value, index, values) => values.indexOf(value) === index).join("; "),
+        findings: errors,
+        inspection,
+      };
     }
-    const endMarkerIndex = content.indexOf("\n---", 3);
-    if (endMarkerIndex === -1) {
-      return { valid: false, reason: "Missing frontmatter end marker (---)" };
-    }
-    const frontmatterBlock = content.slice(3, endMarkerIndex);
-    const hasName = /^\s*name\s*:/m.test(frontmatterBlock);
-    const hasDesc = /^\s*description\s*:/m.test(frontmatterBlock);
-    if (!hasName || !hasDesc) {
-      return { valid: false, reason: "Frontmatter must include 'name' and 'description'" };
-    }
-    return { valid: true };
+    return { valid: true, findings: [], inspection };
   } catch (error) {
     return { valid: false, reason: error.message };
   }

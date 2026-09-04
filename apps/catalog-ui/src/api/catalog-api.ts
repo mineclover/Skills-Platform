@@ -24,9 +24,72 @@ import type {
   MergeQueueItem,
   MergeQueueStatus,
   ProcessQueueResult,
+  ProjectSkillOverrideResult,
+  CreateSkillAnnotationInput,
+  HookDiagnostics,
+  HookSyncResult,
+  SkillAnnotation,
+  SkillAuthoringAnalysis,
+  SkillAuthoringCategory,
+  SkillAuthoringConfidence,
+  SkillAuthoringFinding,
+  SkillAuthoringPlatform,
+  SkillAuthoringPlatformResult,
+  SkillAuthoringRulesetsResponse,
+  SkillStaticAnalysis,
+  UpdateSkillAnnotationInput,
+  ValidateSkillDraftInput,
+  ValidateSkillDraftResult,
 } from "../types";
 
 export const catalogApi = import.meta.env.VITE_CATALOG_API?.replace(/\/$/, "") ?? "";
+
+async function throwCatalogApiError(response: Response, fallbackMessage: string): Promise<never> {
+  const body = await response.json().catch(() => null) as
+    | { error?: unknown; code?: unknown; issues?: unknown }
+    | null;
+  const message = typeof body?.error === "string" && body.error.trim()
+    ? body.error
+    : `${fallbackMessage} (HTTP ${response.status})`;
+  const error = new Error(message) as Error & {
+    status?: number;
+    code?: string;
+    issues?: unknown;
+  };
+  error.status = response.status;
+  if (typeof body?.code === "string") error.code = body.code;
+  if (body?.issues !== undefined) error.issues = body.issues;
+  throw error;
+}
+
+export async function setProjectSkillOverrideApi(params: {
+  projectId: string;
+  lineageId: string;
+  registrySkillId: string;
+  desiredState: "enabled" | "disabled" | "inherit";
+}): Promise<ProjectSkillOverrideResult> {
+  if (!catalogApi) {
+    throw new Error(
+      "Catalog API is not configured. Individual skill overrides are unavailable in demo mode.",
+    );
+  }
+
+  const response = await fetch(
+    `${catalogApi}/api/projects/${encodeURIComponent(params.projectId)}/skill-overrides/${encodeURIComponent(params.lineageId)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        registry_skill_id: params.registrySkillId,
+        desired_state: params.desiredState,
+      }),
+    },
+  );
+  if (!response.ok) {
+    await throwCatalogApiError(response, "The project skill state change was rejected");
+  }
+  return response.json();
+}
 
 export async function copyText(content: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
@@ -700,6 +763,497 @@ export function subscribeTelemetryPolling(
 }
 
 // ==========================================
+// Reader annotations & static skill analysis
+// ==========================================
+
+function authoringRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function normalizeAuthoringConfidence(value: unknown): SkillAuthoringConfidence {
+  if (value === "certain" || value === "likely" || value === "heuristic") return value;
+  if (value === "high") return "certain";
+  if (value === "medium") return "likely";
+  return "heuristic";
+}
+
+function normalizeAuthoringCategory(value: unknown): SkillAuthoringCategory {
+  const supported = new Set<SkillAuthoringCategory>([
+    "structure",
+    "identity",
+    "trigger",
+    "scope",
+    "progressive_disclosure",
+    "resources",
+    "provider_metadata",
+    "portability",
+    "security",
+  ]);
+  if (typeof value === "string" && supported.has(value as SkillAuthoringCategory)) {
+    return value as SkillAuthoringCategory;
+  }
+  if (value === "manifest") return "structure";
+  if (value === "focus") return "scope";
+  if (value === "dependencies" || value === "invocation") return "provider_metadata";
+  return "structure";
+}
+
+function normalizeAuthoringFinding(value: unknown, index: number): SkillAuthoringFinding {
+  const raw = authoringRecord(value) ?? {};
+  const rawBasis = authoringRecord(raw.basis);
+  const basisText = typeof raw.basis === "string" ? raw.basis : null;
+  const sourceUrl = typeof rawBasis?.source_url === "string"
+    ? rawBasis.source_url
+    : basisText && /^https?:\/\//i.test(basisText)
+      ? basisText
+      : null;
+  const rawLocation = authoringRecord(raw.location);
+  const severity = raw.severity === "error" || raw.severity === "warning" || raw.severity === "info"
+    ? raw.severity
+    : "info";
+  const ruleId = typeof raw.rule_id === "string"
+    ? raw.rule_id
+    : typeof raw.code === "string"
+      ? raw.code
+      : `authoring.finding.${index}`;
+  return {
+    rule_id: ruleId,
+    severity,
+    confidence: normalizeAuthoringConfidence(raw.confidence),
+    category: normalizeAuthoringCategory(raw.category),
+    basis: {
+      kind:
+        rawBasis?.kind === "official" || rawBasis?.kind === "platform_policy"
+          || rawBasis?.kind === "bundled_validator" || rawBasis?.kind === "heuristic"
+          ? rawBasis.kind
+          : sourceUrl
+            ? "official"
+            : "platform_policy",
+      source_url: sourceUrl,
+      statement:
+        typeof rawBasis?.statement === "string"
+          ? rawBasis.statement
+          : basisText && basisText !== sourceUrl
+            ? basisText
+            : null,
+    },
+    message: typeof raw.message === "string" ? raw.message : ruleId,
+    location: rawLocation ? {
+      relative_path:
+        typeof rawLocation.relative_path === "string"
+          ? rawLocation.relative_path
+          : typeof rawLocation.path === "string"
+            ? rawLocation.path
+            : "SKILL.md",
+      start_line:
+        typeof rawLocation.start_line === "number"
+          ? rawLocation.start_line
+          : typeof rawLocation.line === "number"
+            ? rawLocation.line
+            : null,
+      end_line: typeof rawLocation.end_line === "number" ? rawLocation.end_line : null,
+      yaml_path:
+        typeof rawLocation.yaml_path === "string"
+          ? rawLocation.yaml_path
+          : typeof rawLocation.field === "string"
+            ? rawLocation.field
+            : null,
+    } : null,
+    evidence: authoringRecord(raw.evidence) ?? undefined,
+    recommendation: typeof raw.recommendation === "string" ? raw.recommendation : null,
+  };
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function normalizeAuthoringPlatformResult(
+  platform: SkillAuthoringPlatform,
+  value: unknown,
+): SkillAuthoringPlatformResult | undefined {
+  const raw = authoringRecord(value);
+  if (!raw) return undefined;
+  const findings = Array.isArray(raw.findings)
+    ? raw.findings.map(normalizeAuthoringFinding)
+    : [];
+  const errors = findings.filter((finding) => finding.severity === "error").length;
+  const warnings = findings.filter((finding) => finding.severity === "warning").length;
+  const info = findings.filter((finding) => finding.severity === "info").length;
+  const rawRuleset = authoringRecord(raw.ruleset) ?? {};
+  const observations = authoringRecord(raw.observations) ?? {};
+  const metadata = authoringRecord(raw.provider_metadata) ?? {};
+  const rawOpenai = authoringRecord(metadata.openai);
+  const rawAntigravity = authoringRecord(metadata.antigravity);
+  const rawPolicy = authoringRecord(rawOpenai?.policy);
+  const invocationValue = metadata.invocation_mode;
+  const invocationMode = invocationValue === "explicit_only" || invocationValue === "user_invoked"
+    ? "explicit_only"
+    : invocationValue === "implicit_and_explicit" || invocationValue === "hybrid"
+      ? "implicit_and_explicit"
+      : "unspecified";
+  return {
+    platform,
+    ruleset: {
+      id: typeof rawRuleset.id === "string" ? rawRuleset.id : `${platform}-authoring`,
+      version: typeof rawRuleset.version === "string" ? rawRuleset.version : "unknown",
+      source: typeof rawRuleset.source === "string" ? rawRuleset.source : "unreported",
+    },
+    summary: {
+      compatible: errors === 0,
+      status: errors > 0 ? "nonconformant" : warnings > 0 ? "review_recommended" : "conformant",
+      finding_count: findings.length,
+      error_count: errors,
+      warning_count: warnings,
+      info_count: info,
+    },
+    findings,
+    observations,
+    provider_metadata: {
+      manifest_path:
+        typeof metadata.manifest_path === "string"
+          ? metadata.manifest_path
+          : typeof observations.manifest_path === "string"
+            ? observations.manifest_path
+            : null,
+      manifest_exact_case:
+        typeof metadata.manifest_exact_case === "boolean" ? metadata.manifest_exact_case : null,
+      resolved_name: typeof metadata.resolved_name === "string" ? metadata.resolved_name : null,
+      invocation_mode: invocationMode,
+      frontmatter_fields: normalizeStringArray(metadata.frontmatter_fields),
+      optional_directories_present: normalizeStringArray(metadata.optional_directories_present),
+      provider_extensions_present: normalizeStringArray(metadata.provider_extensions_present),
+      discovery_root:
+        typeof metadata.discovery_root === "string"
+          ? metadata.discovery_root
+          : normalizeStringArray(metadata.project_discovery_roots)[0] ?? null,
+      openai: rawOpenai ? {
+        present: rawOpenai.present === true,
+        interface: authoringRecord(rawOpenai.interface) as any ?? undefined,
+        policy: rawPolicy ? {
+          allow_implicit_invocation:
+            typeof rawPolicy.allow_implicit_invocation === "boolean"
+              ? rawPolicy.allow_implicit_invocation
+              : undefined,
+        } : undefined,
+        dependencies: authoringRecord(rawOpenai.dependencies) as any ?? undefined,
+      } : undefined,
+      antigravity: platform === "antigravity" ? {
+        name_defaulted: rawAntigravity?.name_defaulted === true || metadata.name_source === "folder",
+        examples: normalizeStringArray(rawAntigravity?.examples ?? metadata.examples),
+        resources: normalizeStringArray(rawAntigravity?.resources ?? metadata.resources),
+      } : undefined,
+    },
+  };
+}
+
+function normalizeSkillAuthoringAnalysis(value: unknown): SkillAuthoringAnalysis | undefined {
+  const raw = authoringRecord(value);
+  const rawResults = authoringRecord(raw?.results);
+  if (!rawResults) return undefined;
+  const codex = normalizeAuthoringPlatformResult("codex", rawResults.codex);
+  const antigravity = normalizeAuthoringPlatformResult("antigravity", rawResults.antigravity);
+  return {
+    results: {
+      ...(codex ? { codex } : {}),
+      ...(antigravity ? { antigravity } : {}),
+    },
+    execution_effect: "none",
+  };
+}
+
+function normalizeSkillStaticAnalysis(value: SkillStaticAnalysis): SkillStaticAnalysis {
+  return {
+    ...value,
+    authoring: normalizeSkillAuthoringAnalysis(value.authoring),
+  };
+}
+
+const localSkillAnnotationsMemory: SkillAnnotation[] = [];
+const localSkillAnalysesMemory: SkillStaticAnalysis[] = [];
+
+function localRecordId(prefix: string): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  return uuid ? `${prefix}_${uuid}` : `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export async function fetchSkillAnnotationsApi(
+  lineageId: string,
+  options?: { includeDeleted?: boolean },
+): Promise<{ annotations: SkillAnnotation[] }> {
+  if (catalogApi) {
+    const query = new URLSearchParams();
+    if (options?.includeDeleted) query.set("include_deleted", "true");
+    const suffix = query.size > 0 ? `?${query}` : "";
+    const response = await fetch(
+      `${catalogApi}/api/skills/${encodeURIComponent(lineageId)}/annotations${suffix}`,
+    );
+    if (!response.ok) {
+      await throwCatalogApiError(response, "Failed to load skill annotations");
+    }
+    return response.json();
+  }
+
+  return {
+    annotations: localSkillAnnotationsMemory.filter(
+      (annotation) =>
+        annotation.lineage_id === lineageId &&
+        (options?.includeDeleted === true || annotation.deleted_at === null),
+    ),
+  };
+}
+
+export async function createSkillAnnotationApi(
+  lineageId: string,
+  input: CreateSkillAnnotationInput,
+): Promise<SkillAnnotation> {
+  if (catalogApi) {
+    const response = await fetch(
+      `${catalogApi}/api/skills/${encodeURIComponent(lineageId)}/annotations`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!response.ok) {
+      await throwCatalogApiError(response, "Failed to create skill annotation");
+    }
+    return response.json();
+  }
+
+  const now = new Date().toISOString();
+  const annotation: SkillAnnotation = {
+    id: localRecordId("annotation"),
+    lineage_id: lineageId,
+    source_revision_id: input.source_revision_id ?? null,
+    kind: input.kind ?? "plain_language",
+    title: input.title ?? null,
+    body: input.body,
+    locale: input.locale ?? "en",
+    anchor: input.anchor ?? null,
+    author: input.author ?? "catalog-ui",
+    origin: input.origin ?? "user",
+    version: 1,
+    history: [],
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+    deleted_by: null,
+    execution_effect: "none",
+  };
+  localSkillAnnotationsMemory.unshift(annotation);
+  return annotation;
+}
+
+export async function updateSkillAnnotationApi(
+  annotationId: string,
+  input: UpdateSkillAnnotationInput,
+): Promise<SkillAnnotation> {
+  if (catalogApi) {
+    const response = await fetch(`${catalogApi}/api/annotations/${encodeURIComponent(annotationId)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      await throwCatalogApiError(response, "Failed to update skill annotation");
+    }
+    return response.json();
+  }
+
+  const index = localSkillAnnotationsMemory.findIndex((annotation) => annotation.id === annotationId);
+  if (index < 0) throw new Error(`Annotation not found: ${annotationId}`);
+  const current = localSkillAnnotationsMemory[index];
+  if (current.version !== input.expected_version) {
+    throw new Error("Annotation changed since it was loaded. Refresh and try again.");
+  }
+  const updated: SkillAnnotation = {
+    ...current,
+    ...input.patch,
+    version: current.version + 1,
+    updated_at: new Date().toISOString(),
+    history: [
+      ...current.history,
+      { version: current.version, changed_at: current.updated_at, changed_by: input.author },
+    ],
+  };
+  localSkillAnnotationsMemory[index] = updated;
+  return updated;
+}
+
+export async function deleteSkillAnnotationApi(
+  annotationId: string,
+  input: { lineage_id: string; expected_version: number; author?: string },
+): Promise<SkillAnnotation> {
+  if (catalogApi) {
+    const response = await fetch(
+      `${catalogApi}/api/annotations/${encodeURIComponent(annotationId)}/delete`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!response.ok) {
+      await throwCatalogApiError(response, "Failed to delete skill annotation");
+    }
+    return response.json();
+  }
+
+  const updated = await updateSkillAnnotationApi(annotationId, {
+    lineage_id: input.lineage_id,
+    expected_version: input.expected_version,
+    author: input.author,
+    patch: {},
+  });
+  updated.deleted_at = updated.updated_at;
+  updated.deleted_by = input.author ?? "catalog-ui";
+  return updated;
+}
+
+export async function restoreSkillAnnotationApi(
+  annotationId: string,
+  input: { lineage_id: string; expected_version: number; author?: string },
+): Promise<SkillAnnotation> {
+  if (catalogApi) {
+    const response = await fetch(
+      `${catalogApi}/api/annotations/${encodeURIComponent(annotationId)}/restore`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!response.ok) {
+      await throwCatalogApiError(response, "Failed to restore skill annotation");
+    }
+    return response.json();
+  }
+
+  const restored = await updateSkillAnnotationApi(annotationId, {
+    lineage_id: input.lineage_id,
+    expected_version: input.expected_version,
+    author: input.author,
+    patch: {},
+  });
+  restored.deleted_at = null;
+  restored.deleted_by = null;
+  return restored;
+}
+
+export async function fetchSkillAnalysesApi(
+  lineageId: string,
+): Promise<{ analyses: SkillStaticAnalysis[] }> {
+  if (catalogApi) {
+    const response = await fetch(
+      `${catalogApi}/api/skills/${encodeURIComponent(lineageId)}/analyses`,
+    );
+    if (!response.ok) {
+      await throwCatalogApiError(response, "Failed to load static skill analyses");
+    }
+    const body = await response.json() as { analyses: SkillStaticAnalysis[] };
+    return { analyses: body.analyses.map(normalizeSkillStaticAnalysis) };
+  }
+  return {
+    analyses: localSkillAnalysesMemory.filter((analysis) => analysis.lineage_id === lineageId),
+  };
+}
+
+export async function fetchSkillAuthoringRulesetsApi(): Promise<SkillAuthoringRulesetsResponse> {
+  if (catalogApi) {
+    const response = await fetch(`${catalogApi}/api/skill-authoring/rulesets`);
+    if (!response.ok) {
+      await throwCatalogApiError(response, "Failed to load skill authoring rulesets");
+    }
+    const body = await response.json() as SkillAuthoringRulesetsResponse;
+    return { ...body, available: body.available ?? true };
+  }
+
+  return {
+    rulesets: [],
+    available: false,
+    message:
+      "Catalog API is not configured; Codex and Antigravity authoring rulesets were not inspected.",
+  };
+}
+
+/**
+ * Validates virtual draft files without writing them to the source package or registry.
+ * Configured API failures are surfaced and never converted into a conformant demo result.
+ */
+export async function validateSkillDraftApi(
+  input: ValidateSkillDraftInput,
+): Promise<ValidateSkillDraftResult> {
+  if (!catalogApi) {
+    throw new Error(
+      "Catalog API is not configured. Virtual skill draft validation is unavailable in demo mode.",
+    );
+  }
+
+  const response = await fetch(`${catalogApi}/api/skill-authoring/validate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    await throwCatalogApiError(response, "Failed to validate the virtual skill draft");
+  }
+  return response.json();
+}
+
+export async function runSkillAnalysisApi(
+  lineageId: string,
+  input: { source_revision_id: string; analyzer_version?: string },
+): Promise<SkillStaticAnalysis> {
+  if (catalogApi) {
+    const response = await fetch(
+      `${catalogApi}/api/skills/${encodeURIComponent(lineageId)}/analysis`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!response.ok) {
+      await throwCatalogApiError(response, "Failed to analyze skill revision");
+    }
+    return normalizeSkillStaticAnalysis(await response.json() as SkillStaticAnalysis);
+  }
+
+  const analysis: SkillStaticAnalysis = {
+    id: localRecordId("analysis"),
+    lineage_id: lineageId,
+    source_revision_id: input.source_revision_id,
+    input_content_digest: "demo:unavailable",
+    analysis_digest: "demo:unavailable",
+    analyzer: { id: "catalog-ui-demo", version: input.analyzer_version ?? "1" },
+    manifest_path: "",
+    identity: { name: lineageId, description: null, frontmatter_fields: [] },
+    readability: {
+      line_count: 0,
+      non_empty_line_count: 0,
+      section_count: 0,
+      instruction_line_count: 0,
+      fenced_code_block_count: 0,
+    },
+    sections: [],
+    references: { markdown_link_count: 0, relative: [], external: [] },
+    support_files: { total: 0, executable_like: [] },
+    warnings: ["Demo mode cannot read the immutable skill revision; configure VITE_CATALOG_API."],
+    generated_at: new Date().toISOString(),
+    stale: false,
+    is_latest_revision: true,
+    outdated: false,
+    execution_effect: "none",
+  };
+  localSkillAnalysesMemory.unshift(analysis);
+  return analysis;
+}
+
+// ==========================================
 // Hook Ecosystem & Governance Studio API
 // ==========================================
 
@@ -843,19 +1397,138 @@ export const BUILTIN_GUARD_HOOKS: HookDefinition[] = [
 
 let localHooksMemory: HookDefinition[] = JSON.parse(JSON.stringify(BUILTIN_GUARD_HOOKS));
 
+export async function fetchHookDiagnosticsApi(params?: {
+  projectPath?: string;
+}): Promise<HookDiagnostics> {
+  if (catalogApi) {
+    const query = new URLSearchParams();
+    if (params?.projectPath) query.set("project_path", params.projectPath);
+    const suffix = query.size > 0 ? `?${query}` : "";
+    const response = await fetch(`${catalogApi}/api/hooks/diagnostics${suffix}`);
+    if (!response.ok) {
+      await throwCatalogApiError(response, "Failed to analyze hook configuration");
+    }
+    return response.json();
+  }
+
+  const expectedHookIds = localHooksMemory.filter((hook) => hook.enabled).map((hook) => hook.id);
+  const demoProvider = (provider: string, supported: boolean): HookDiagnostics["providers"][string] => {
+    const hooksFeature = { found: false, stage: null, enabled: null };
+    return {
+      provider,
+      supported,
+      unsupported: !supported,
+      configured: false,
+      synced: false,
+      drift: false,
+      status: supported ? "not_configured" : "unsupported",
+      configPath: null,
+      configParse: { exists: false, jsonParsed: false, strictValid: false, issues: [] },
+      expectedHookIds: supported ? expectedHookIds : [],
+      actualHookIds: [],
+      missingHookIds: supported ? expectedHookIds : [],
+      unexpectedHookIds: [],
+      capability: provider === "codex"
+        ? {
+            installed: false,
+            version: null,
+            versionSupported: false,
+            minimumVersion: "0.144.4",
+            strictConfig: {
+              supported: false,
+              parsed: null,
+              status: "unsupported",
+              error: "Catalog API is not configured; Codex strict config cannot be inspected.",
+            },
+            featuresList: {
+              available: false,
+              error: "Catalog API is not configured; Codex features cannot be inspected.",
+            },
+            hooksFeature,
+            supportedEvents: [],
+            excludedEvents: [],
+            asyncSupported: false,
+            mcpToolSupported: false,
+          }
+        : undefined,
+      feature: provider === "codex" ? hooksFeature : undefined,
+      trust: provider === "codex" ? { observed: false, status: "unknown" } : undefined,
+      runtimeReady: false,
+      error: supported ? "Catalog API is not configured; runtime state cannot be inspected." : null,
+    };
+  };
+  const providers = {
+    antigravity: demoProvider("antigravity", true),
+    claude: demoProvider("claude", false),
+    codex: demoProvider("codex", true),
+  };
+  return {
+    analyzedAt: new Date().toISOString(),
+    projectPath: params?.projectPath ?? null,
+    manifestPath: null,
+    desired: {
+      total: localHooksMemory.length,
+      enabled: expectedHookIds.length,
+      disabled: localHooksMemory.length - expectedHookIds.length,
+    },
+    summary: {
+      configuredProviders: 0,
+      syncedProviders: 0,
+      driftedProviders: 0,
+      unsupportedProviders: 1,
+      missingHandlers: 0,
+      runtimeReadyHooks: 0,
+    },
+    healthy: false,
+    providers,
+    hooks: localHooksMemory.map((hook) => {
+      const requestedProviders = hook.providers ?? ["antigravity", "claude"];
+      return {
+        id: hook.id,
+        name: hook.name,
+        event: hook.event,
+        priority: hook.priority ?? 100,
+        desiredEnabled: hook.enabled,
+        handler: {
+          type: hook.handler.type,
+          target: hook.handler.target ?? hook.handler.command ?? null,
+          exists: null,
+          supported: false,
+          error: "Runtime handler state is unavailable in demo mode.",
+        },
+        providers: Object.fromEntries(
+          Object.entries(providers).map(([provider, state]) => {
+            const requested = requestedProviders.some((candidate) => candidate === provider);
+            return [provider, {
+              requested,
+              supported: state.supported,
+              unsupported: state.unsupported,
+              configured: false,
+              present: false,
+              synced: false,
+              status: requested ? state.status : "not_requested",
+              runtimeReady: false,
+            }];
+          }),
+        ),
+        runtimeReady: false,
+        issues: ["Catalog API is not configured."],
+      };
+    }),
+    issues: ["Demo catalog only: configure VITE_CATALOG_API to inspect runtime hook activation."],
+  };
+}
+
 export async function fetchHooksApi(params?: { projectPath?: string; event?: string }): Promise<{ hooks: HookDefinition[] }> {
   if (catalogApi) {
-    try {
-      const query = new URLSearchParams();
-      if (params?.projectPath) query.set("project_path", params.projectPath);
-      if (params?.event) query.set("event", params.event);
-      const res = await fetch(`${catalogApi}/api/hooks?${query}`);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Fallback
+    const query = new URLSearchParams();
+    if (params?.projectPath) query.set("project_path", params.projectPath);
+    if (params?.event) query.set("event", params.event);
+    const res = await fetch(`${catalogApi}/api/hooks?${query}`);
+    if (!res.ok) {
+      await throwCatalogApiError(res, "Failed to load hooks");
     }
+    return res.json();
   }
 
   let hooks = [...localHooksMemory];
@@ -872,23 +1545,20 @@ export async function toggleHookApi(params: {
   sync?: boolean;
 }): Promise<HookDefinition> {
   if (catalogApi) {
-    try {
-      const res = await fetch(`${catalogApi}/api/hooks/toggle`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          hook_id: params.hookId,
-          enabled: params.enabled,
-          project_path: params.projectPath,
-          sync: params.sync !== false,
-        }),
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Fallback
+    const res = await fetch(`${catalogApi}/api/hooks/toggle`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        hook_id: params.hookId,
+        enabled: params.enabled,
+        project_path: params.projectPath,
+        sync: params.sync !== false,
+      }),
+    });
+    if (!res.ok) {
+      await throwCatalogApiError(res, `Failed to ${params.enabled ? "enable" : "disable"} hook`);
     }
+    return res.json();
   }
 
   const hook = localHooksMemory.find((h) => h.id === params.hookId);
@@ -903,22 +1573,19 @@ export async function registerHookApi(params: {
   sync?: boolean;
 }): Promise<HookDefinition> {
   if (catalogApi) {
-    try {
-      const res = await fetch(`${catalogApi}/api/hooks/register`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          hook: params.hook,
-          project_path: params.projectPath,
-          sync: params.sync !== false,
-        }),
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Fallback
+    const res = await fetch(`${catalogApi}/api/hooks/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        hook: params.hook,
+        project_path: params.projectPath,
+        sync: params.sync !== false,
+      }),
+    });
+    if (!res.ok) {
+      await throwCatalogApiError(res, "Failed to register hook");
     }
+    return res.json();
   }
 
   const idx = localHooksMemory.findIndex((h) => h.id === params.hook.id);
@@ -936,22 +1603,19 @@ export async function removeHookApi(params: {
   sync?: boolean;
 }): Promise<{ ok: boolean; removedHookId?: string }> {
   if (catalogApi) {
-    try {
-      const res = await fetch(`${catalogApi}/api/hooks/remove`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          hook_id: params.hookId,
-          project_path: params.projectPath,
-          sync: params.sync !== false,
-        }),
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Fallback
+    const res = await fetch(`${catalogApi}/api/hooks/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        hook_id: params.hookId,
+        project_path: params.projectPath,
+        sync: params.sync !== false,
+      }),
+    });
+    if (!res.ok) {
+      await throwCatalogApiError(res, "Failed to remove hook");
     }
+    return res.json();
   }
 
   localHooksMemory = localHooksMemory.filter((h) => h.id !== params.hookId);
@@ -960,26 +1624,36 @@ export async function removeHookApi(params: {
 
 export async function syncHooksApi(params?: {
   projectPath?: string;
-}): Promise<{ antigravityHooks: number; claudeHooks: number; syncedAt: string }> {
+}): Promise<HookSyncResult> {
   if (catalogApi) {
-    try {
-      const res = await fetch(`${catalogApi}/api/hooks/sync`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ project_path: params?.projectPath }),
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Fallback
+    const res = await fetch(`${catalogApi}/api/hooks/sync`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project_path: params?.projectPath }),
+    });
+    if (!res.ok) {
+      await throwCatalogApiError(res, "Failed to synchronize hooks");
     }
+    return res.json();
   }
 
   const enabled = localHooksMemory.filter((h) => h.enabled);
+  const diagnostics = await fetchHookDiagnosticsApi(params);
   return {
     antigravityHooks: enabled.length,
-    claudeHooks: enabled.length,
+    claudeHooks: 0,
+    codexHooks: enabled.length,
+    providers: diagnostics.providers,
+    unsupportedProviders: ["claude"],
+    fullySynced: false,
+    ok: false,
+    issues: [
+      {
+        provider: "catalog-ui",
+        code: "api_not_configured",
+        message: "Demo mode cannot write provider hook files or observe Codex trust.",
+      },
+    ],
     syncedAt: new Date().toISOString(),
   };
 }
@@ -992,22 +1666,19 @@ export async function triggerHookSimulationApi(params: {
 }): Promise<HookSimulationResult> {
   const startTime = Date.now();
   if (catalogApi) {
-    try {
-      const res = await fetch(`${catalogApi}/api/hooks/trigger`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          event: params.event,
-          payload: params.payload,
-          project_path: params.projectPath,
-        }),
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Fallback
+    const res = await fetch(`${catalogApi}/api/hooks/trigger`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        event: params.event,
+        payload: params.payload,
+        project_path: params.projectPath,
+      }),
+    });
+    if (!res.ok) {
+      await throwCatalogApiError(res, "Failed to trigger hook simulation");
     }
+    return res.json();
   }
 
   // Fast client-side fallback simulation engine (< 200ms)
@@ -1835,6 +2506,3 @@ export async function processMergeQueueApi(projectPath?: string): Promise<Proces
     pending: finalStatus.pending || [],
   };
 }
-
-
-

@@ -77,8 +77,8 @@ const PROVIDER_INFO = {
     displayName: "Codex",
     alias: "Codex CLI",
     badgeClass: "provider-badge codex",
-    deliveryRootRelative: "skills",
-    deliveryPathPattern: "skills/<skill_name>",
+    deliveryRootRelative: ".agents/skills",
+    deliveryPathPattern: ".agents/skills/<skill_name>",
     colorTheme: "amber",
   },
   claude: {
@@ -291,7 +291,7 @@ test("Visual Identity: Active filesystem delivery paths resolve accurately acros
   );
   assert.equal(
     resolveDeliveryPath("codex", "testing"),
-    "skills/testing",
+    ".agents/skills/testing",
   );
   assert.equal(
     resolveDeliveryPath("claude", "code-review"),
@@ -305,7 +305,7 @@ test("Visual Identity: Active filesystem delivery paths resolve accurately acros
   );
   assert.equal(
     resolveDeliveryPath("codex"),
-    "skills/<skill_name>",
+    ".agents/skills/<skill_name>",
   );
   assert.equal(
     resolveDeliveryPath("claude"),
@@ -320,7 +320,7 @@ test("Visual Identity: Active filesystem delivery paths resolve accurately acros
   );
   assert.equal(
     resolveDeliveryPath("codex", "testing", workspaceRoot),
-    "/workspace/repo/skills/testing",
+    "/workspace/repo/.agents/skills/testing",
   );
   assert.equal(
     resolveDeliveryPath("claude", "code-review", workspaceRoot),
@@ -336,11 +336,11 @@ test("Visual Identity: Active filesystem delivery paths resolve accurately acros
 
 test("Visual Identity: Active delivery roots resolve accurately", () => {
   assert.equal(resolveDeliveryRoot("antigravity"), ".agents/skills/");
-  assert.equal(resolveDeliveryRoot("codex"), "skills/");
+  assert.equal(resolveDeliveryRoot("codex"), ".agents/skills/");
   assert.equal(resolveDeliveryRoot("claude"), ".claude/skills/");
 
   assert.equal(resolveDeliveryRoot("antigravity", "C:/Users/app"), "C:/Users/app/.agents/skills/");
-  assert.equal(resolveDeliveryRoot("codex", "C:/Users/app"), "C:/Users/app/skills/");
+  assert.equal(resolveDeliveryRoot("codex", "C:/Users/app"), "C:/Users/app/.agents/skills/");
   assert.equal(resolveDeliveryRoot("claude", "C:/Users/app"), "C:/Users/app/.claude/skills/");
 });
 

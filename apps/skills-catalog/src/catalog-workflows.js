@@ -5,26 +5,93 @@ const { getPreset, getProject, PRISTINE_PRESET_ID } = require("./catalog-state")
 const { getRegistrySkills, latestSkillsByArtifact, listRegistrySkills } = require("./registry");
 const { listSkillNotes } = require("./skill-management");
 
+const PROJECT_OVERRIDE_TARGETS = Symbol("projectOverrideTargets");
+
 function hasAllTags(candidateTags, requestedTags) {
   return candidateTags.every((tag) => requestedTags.has(tag));
 }
 
-async function resolveProjectSelection({ catalogRoot, projectId, presetId, workScopeTags = [] }) {
+function overrideReason(desiredState) {
+  return desiredState === "enabled" ? "enabled_by_project_override" : "disabled_by_project_override";
+}
+
+async function applyProjectSkillOverrides({ project, selection, selectedByLineage, registryRoot }) {
+  const overrides = project.skill_overrides ?? [];
+  if (overrides.length === 0) return selection;
+
+  const resolvedByLineage = new Map([...selectedByLineage].filter(([, item]) => item));
+  const mappedSkillIds = new Set([...resolvedByLineage.values()].map((item) => item.registry_skill_id));
+  const unmappedSkillIds = selection.selected
+    .map((item) => item.registry_skill_id)
+    .filter((registrySkillId) => !mappedSkillIds.has(registrySkillId));
+  if (registryRoot && unmappedSkillIds.length > 0) {
+    const skills = await getRegistrySkills(registryRoot, unmappedSkillIds);
+    const selectedById = new Map(selection.selected.map((item) => [item.registry_skill_id, item]));
+    for (const skill of skills) resolvedByLineage.set(skill.lineage_id, selectedById.get(skill.id));
+  } else {
+    const selectedById = new Map(selection.selected.map((item) => [item.registry_skill_id, item]));
+    for (const registrySkillId of unmappedSkillIds) {
+      resolvedByLineage.set(`registry_skill:${registrySkillId}`, selectedById.get(registrySkillId));
+    }
+  }
+
+  const overrideTargets = new Map();
+  for (const override of overrides) {
+    const currentSelection = resolvedByLineage.get(override.lineage_id);
+    overrideTargets.set(
+      override.lineage_id,
+      override.desired_state === "enabled"
+        ? override.registry_skill_id
+        : currentSelection?.registry_skill_id ?? null,
+    );
+    resolvedByLineage.delete(override.lineage_id);
+    for (const [key, selected] of resolvedByLineage) {
+      if (selected.registry_skill_id === override.registry_skill_id) resolvedByLineage.delete(key);
+    }
+    if (override.desired_state === "enabled") {
+      resolvedByLineage.set(override.lineage_id, {
+        lineage_id: override.lineage_id,
+        registry_skill_id: override.registry_skill_id,
+        reason: overrideReason(override.desired_state),
+        override: { ...override },
+      });
+    }
+  }
+
+  const selected = [...resolvedByLineage.values()];
+  return {
+    ...selection,
+    mode: selected.length === 0 ? "pristine" : "apply",
+    selected,
+    skill_overrides: overrides.map((override) => ({ ...override })),
+    [PROJECT_OVERRIDE_TARGETS]: overrideTargets,
+  };
+}
+
+async function resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId, workScopeTags = [] }) {
   const project = await getProject(catalogRoot, projectId);
   if (presetId) {
     const preset = await getPreset(catalogRoot, presetId);
-    return {
+    const selected = preset.registry_skill_ids.map((registrySkillId) => ({
+      registry_skill_id: registrySkillId,
+      reason: "selected_by_explicit_template",
+      preset_id: preset.id,
+      template_version: preset.selected_version,
+    }));
+    const selectedById = new Map(selected.map((item) => [item.registry_skill_id, item]));
+    const selectedByLineage = new Map(preset.entries.map((entry) => [entry.lineage_id, selectedById.get(entry.registry_skill_id)]));
+    return applyProjectSkillOverrides({
       project,
-      requested_work_scope_tags: workScopeTags,
-      mode: preset.id === PRISTINE_PRESET_ID ? "pristine" : "apply",
-      assignments: [{ preset_id: preset.id, template_version: preset.selected_version, role: "explicit", priority: 0, work_scope_tags: [] }],
-      selected: preset.registry_skill_ids.map((registrySkillId) => ({
-        registry_skill_id: registrySkillId,
-        reason: "selected_by_explicit_template",
-        preset_id: preset.id,
-        template_version: preset.selected_version,
-      })),
-    };
+      registryRoot,
+      selectedByLineage,
+      selection: {
+        project,
+        requested_work_scope_tags: workScopeTags,
+        mode: preset.id === PRISTINE_PRESET_ID ? "pristine" : "apply",
+        assignments: [{ preset_id: preset.id, template_version: preset.selected_version, role: "explicit", priority: 0, work_scope_tags: [] }],
+        selected,
+      },
+    });
   }
   const requestedTags = new Set(workScopeTags);
   const assignments = project.preset_assignments.filter((assignment) => assignment.enabled !== false);
@@ -50,40 +117,79 @@ async function resolveProjectSelection({ catalogRoot, projectId, presetId, workS
       });
     }
   }
-  return {
+  return applyProjectSkillOverrides({
     project,
-    requested_work_scope_tags: workScopeTags,
-    mode: selectedByLineage.size === 0 ? "pristine" : "apply",
-    assignments: resolvedAssignments.map(({ preset, ...assignment }) => ({ ...assignment, name: preset.name, purpose: preset.purpose })),
-    selected: [...selectedByLineage.values()],
-  };
+    registryRoot,
+    selectedByLineage,
+    selection: {
+      project,
+      requested_work_scope_tags: workScopeTags,
+      mode: selectedByLineage.size === 0 ? "pristine" : "apply",
+      assignments: resolvedAssignments.map(({ preset, ...assignment }) => ({ ...assignment, name: preset.name, purpose: preset.purpose })),
+      selected: [...selectedByLineage.values()],
+    },
+  });
 }
 
-async function createProjectPlan({ catalogRoot, registryRoot, projectId, presetId, workScopeTags, distribution }) {
-  const selection = await resolveProjectSelection({ catalogRoot, projectId, presetId, workScopeTags });
+async function createProjectPlan({
+  catalogRoot,
+  registryRoot,
+  projectId,
+  presetId,
+  workScopeTags,
+  distribution,
+  enabledOnly = false,
+}) {
+  const selection = await resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId, workScopeTags });
   const { project } = selection;
   const isPristine = selection.mode === "pristine";
+  if (enabledOnly && isPristine) {
+    throw new Error("enabledOnly cannot be used with the pristine baseline because pristine requires explicit disable operations");
+  }
   const registeredSkills = await listRegistrySkills(registryRoot);
-  const selectedSkills = isPristine
+  const selectedSkills = selection.selected.length === 0
     ? []
     : await getRegistrySkills(registryRoot, selection.selected.map((item) => item.registry_skill_id));
+  const overrides = selection.skill_overrides ?? [];
+  const overrideTargets = selection[PROJECT_OVERRIDE_TARGETS] ?? new Map();
+  const overrideTargetIds = overrides
+    .map((override) => override.desired_state === "enabled"
+      ? override.registry_skill_id
+      : overrideTargets.get(override.lineage_id))
+    .filter(Boolean);
+  const overrideTargetSkills = overrideTargetIds.length === 0
+    ? []
+    : await getRegistrySkills(registryRoot, overrideTargetIds);
   const selectedByArtifact = new Map(selectedSkills.map((skill) => [
     skill.artifact_key ?? `${skill.source_id}:${skill.source_relative_path}`,
     skill,
   ]));
-  const effectiveSkills = latestSkillsByArtifact(registeredSkills).map((latest) => {
+  let effectiveSkills = latestSkillsByArtifact(registeredSkills).map((latest) => {
     const key = latest.artifact_key ?? `${latest.source_id}:${latest.source_relative_path}`;
     return selectedByArtifact.get(key) ?? latest;
   });
+  if (overrideTargetSkills.length > 0) {
+    const effectiveByArtifact = new Map(effectiveSkills.map((skill) => [
+      skill.artifact_key ?? `${skill.source_id}:${skill.source_relative_path}`,
+      skill,
+    ]));
+    for (const skill of overrideTargetSkills) {
+      effectiveByArtifact.set(skill.artifact_key ?? `${skill.source_id}:${skill.source_relative_path}`, skill);
+    }
+    effectiveSkills = [...effectiveByArtifact.values()];
+  }
   const selectedIds = new Set(selectedSkills.map((skill) => skill.id));
   const desiredStateBySkillId = Object.fromEntries(effectiveSkills.map((skill) => [
     skill.id,
     selectedIds.has(skill.id) ? "enabled" : "disabled",
   ]));
+  const plannedSkills = enabledOnly
+    ? effectiveSkills.filter((skill) => desiredStateBySkillId[skill.id] === "enabled")
+    : effectiveSkills;
 
-  return createPlanFromRegistry({
+  const plan = await createPlanFromRegistry({
     registryRoot,
-    skillIds: effectiveSkills.map((skill) => skill.id),
+    skillIds: plannedSkills.map((skill) => skill.id),
     target: {
       project_id: project.scope === "project" ? project.id : undefined,
       project_path: project.project_path ?? undefined,
@@ -96,6 +202,20 @@ async function createProjectPlan({ catalogRoot, registryRoot, projectId, presetI
     desiredStateBySkillId,
     mode: isPristine ? "pristine" : "apply",
   });
+  if (overrides.length === 0) return plan;
+
+  const lineageByRegistrySkillId = new Map(plannedSkills.map((skill) => [skill.id, skill.lineage_id]));
+  const overrideByLineage = new Map(overrides.map((override) => [override.lineage_id, override]));
+  plan.operations = plan.operations.map((operation) => {
+    const override = overrideByLineage.get(lineageByRegistrySkillId.get(operation.registry_skill_id));
+    if (!override) return operation;
+    return {
+      ...operation,
+      reason: overrideReason(override.desired_state),
+      override: { ...override },
+    };
+  });
+  return plan;
 }
 
 async function readPrimaryManifest(canonicalPath) {
@@ -113,29 +233,37 @@ async function readPrimaryManifest(canonicalPath) {
 }
 
 async function resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId, workScopeTags }) {
-  const selection = await resolveProjectSelection({ catalogRoot, projectId, presetId, workScopeTags });
+  const selection = await resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId, workScopeTags });
   const plan = await createProjectPlan({ catalogRoot, registryRoot, projectId, presetId, workScopeTags });
+  const operationSkills = await getRegistrySkills(registryRoot, plan.operations.map((operation) => operation.registry_skill_id));
+  const lineageByRegistrySkillId = new Map(operationSkills.map((skill) => [skill.id, skill.lineage_id]));
   const selected = new Map(selection.selected.map((item) => [item.registry_skill_id, item]));
-  return {
+  const effectiveSet = {
     project: selection.project,
     requested_work_scope_tags: selection.requested_work_scope_tags,
     assignments: selection.assignments,
     mode: plan.mode,
     skills: plan.operations.map((operation) => ({
       registry_skill_id: operation.registry_skill_id,
+      lineage_id: lineageByRegistrySkillId.get(operation.registry_skill_id),
       skill_name: operation.skill_name,
       artifact_type: operation.artifact_type ?? "skill",
       invocation_mode: operation.invocation_mode ?? "unspecified",
       source_revision_id: operation.source_revision_id,
       desired_state: operation.desired_state,
-      reason: plan.mode === "pristine"
+      reason: operation.reason ?? (plan.mode === "pristine"
         ? "pristine_baseline"
         : selected.has(operation.registry_skill_id)
           ? selected.get(operation.registry_skill_id).reason
-          : "not_selected_by_template",
+          : "not_selected_by_template"),
       selected_by: selected.get(operation.registry_skill_id) ?? null,
+      ...(operation.override ? { override: { ...operation.override } } : {}),
     })),
   };
+  if (selection.skill_overrides) {
+    effectiveSet.skill_overrides = selection.skill_overrides.map((override) => ({ ...override }));
+  }
+  return effectiveSet;
 }
 
 async function exportActivationPlan({ outputPath, plan }) {
@@ -189,7 +317,7 @@ async function buildSystemPrompt({ catalogRoot, registryRoot, presetId, includeI
 }
 
 async function buildProjectSystemPrompt({ catalogRoot, registryRoot, projectId, presetId, workScopeTags = [], includeInjectedNotes = false }) {
-  const selection = await resolveProjectSelection({ catalogRoot, projectId, presetId, workScopeTags });
+  const selection = await resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId, workScopeTags });
   if (selection.mode === "pristine") {
     return {
       project_id: selection.project.id,

@@ -113,16 +113,16 @@ export function JunctionDeliveryMap({ selectedNodeId, onSelectNode }: JunctionDe
         category: "Multi-Provider Delivery",
         status: "drift",
         description:
-          "Symlink delivery root at skills/ for OpenAI Codex and command-line execution tools.",
+          "Symlink delivery root at .agents/skills/ for OpenAI Codex repository skills.",
         lineage: {
           topicId: "JUNC-CODEX",
           canonicalName: "codex_delivery_junction",
-          path: ["skills"],
+          path: [".agents", "skills"],
           lifecycleState: "IN_PROGRESS",
         },
         junction: {
           providerId: "codex",
-          deliveryPath: "skills/",
+          deliveryPath: ".agents/skills/",
           syncState: "drift",
           symlinkTarget: "packages/skill-contracts/dist",
           managedCount: 5,
@@ -133,7 +133,7 @@ export function JunctionDeliveryMap({ selectedNodeId, onSelectNode }: JunctionDe
           allowedCommand: "skills-manager apply --provider codex",
           prohibitedCommands: [],
           invariants: {
-            preConditions: ["skills/ directory exists"],
+            preConditions: [".agents/skills/ directory exists"],
             strictInvariants: [
               "Detect missing/stale symlinks and trigger drift warning",
               "Offer 1-click reconcile drift action in Live Activation Drawer",
@@ -194,7 +194,7 @@ export function JunctionDeliveryMap({ selectedNodeId, onSelectNode }: JunctionDe
           <div>
             <h3>Symlink Junction & Multi-Provider Delivery Map</h3>
             <p>
-              Active presets mapped across multi-provider delivery roots (<code>.agents/skills/</code>, <code>.claude/skills/</code>, <code>skills/</code>) with Live Sync & Drift Watcher
+              Active presets mapped across multi-provider delivery roots (<code>.agents/skills/</code> for Codex and Antigravity, <code>.claude/skills/</code> for Claude) with Live Sync & Drift Watcher
             </p>
           </div>
         </div>

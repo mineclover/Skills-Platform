@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@skills-platform/contracts": "*",
-    "@skills-platform/ledger-store": "*"
+    "@skills-platform/ledger-store": "*",
+    "yaml": "^2.9.0"
   }
 }

@@ -427,19 +427,11 @@ function parsePrdDocument(rawContent, prdPath = "PRD.md") {
   };
 }
 
-async function saveRegistryFile(registryRoot, registry) {
-  await fs.mkdir(registryRoot, { recursive: true });
-  const targetFile = path.join(registryRoot, "registry.json");
-  const temporaryFile = `${targetFile}.tmp`;
-  await fs.writeFile(temporaryFile, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
-  await fs.rename(temporaryFile, targetFile);
-}
-
 /**
  * Ensures canonical lifecycle skills exist in the registry revisions directory.
  */
 async function ensureCanonicalSkillsInRegistry(registryRoot, skills = []) {
-  const { loadRegistry } = require("./registry");
+  const { loadRegistry, saveRegistry } = require("./registry");
   const { digestDirectory } = require("@skills-platform/contracts");
 
   const registry = await loadRegistry(registryRoot);
@@ -517,6 +509,7 @@ async function ensureCanonicalSkillsInRegistry(registryRoot, skills = []) {
         invocation_mode: skill.invocation_mode || "model_invoked",
         source_relative_path: skill.name,
         canonical_path: revDir,
+        canonical_relative_path: path.relative(path.resolve(registryRoot), revDir).replaceAll("\\", "/"),
         content_digest: digest,
         description: skill.description || null,
         imported_at: new Date().toISOString(),
@@ -526,7 +519,7 @@ async function ensureCanonicalSkillsInRegistry(registryRoot, skills = []) {
   }
 
   if (changed) {
-    await saveRegistryFile(registryRoot, registry);
+    await saveRegistry(registryRoot, registry);
   }
 }
 
@@ -585,6 +578,9 @@ async function mountLifecycleRecipe(phaseOrRecipe, {
 
   const { loadRegistry } = require("./registry");
   const registry = await loadRegistry(resolvedRegistry);
+  const providerSlug = String(providerId).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") || "provider";
+  const projectSlug = path.basename(resolvedProject).toLowerCase().replace(/[^a-z0-9]+/g, "-") || "project";
+  const defaultPreset = recipe.presets?.[0] ?? null;
   const normalizedRecipe = {
     ...recipe,
     skills: (recipe.skills || []).map((skill) => {
@@ -594,6 +590,17 @@ async function mountLifecycleRecipe(phaseOrRecipe, {
         content_digest: regSkill?.content_digest || skill.content_digest || crypto.createHash("sha256").update(skill.name).digest("hex"),
       };
     }),
+    // Lifecycle phases may intentionally exercise different providers against
+    // one checkout. Keep their Catalog identities separate so a provider
+    // transition cannot silently rewrite an existing project's contract.
+    projects: defaultPreset ? [{
+      project_id: `${projectSlug}-${providerSlug}`,
+      project_name: `${path.basename(resolvedProject)} · ${providerId}`,
+      provider_id: providerId,
+      scope: "project",
+      default_preset_id: defaultPreset.id,
+      default_preset_version: defaultPreset.version ?? 1,
+    }] : [],
   };
 
   const { applyRecipe } = require("./recipes");
@@ -604,6 +611,7 @@ async function mountLifecycleRecipe(phaseOrRecipe, {
     projectPath: resolvedProject,
     providerId,
     confirm,
+    reuseRegistryLocalSource: true,
   });
 
   return {

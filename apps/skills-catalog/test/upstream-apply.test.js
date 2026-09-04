@@ -23,7 +23,7 @@ test("CLI apply resolves immutable upstream instances, previews, confirms, appli
   const registryRoot = path.join(root, "registry");
   const catalogRoot = path.join(root, "catalog");
   const imported = await importLocalSource({ registryRoot, sourcePath: path.join(root, "source") });
-  await createProject({ catalogRoot, id: "demo", name: "Demo", projectPath: path.join(root, "project"), providerId: "codex", deliveryRoot: path.join(root, "project", ".codex", "skills"), upstreamProjectId: "manager-demo" });
+  await createProject({ catalogRoot, id: "demo", name: "Demo", projectPath: path.join(root, "project"), providerId: "codex", deliveryRoot: path.join(root, "project", ".agents", "skills"), upstreamProjectId: "manager-demo" });
   await createPreset({ catalogRoot, registryRoot, id: "planning", name: "Planning", registrySkillIds: [imported.skills[0].id] });
   await assignPreset({ catalogRoot, projectId: "demo", presetId: "planning" });
   const plan = await createProjectPlan({ catalogRoot, registryRoot, projectId: "demo" });
@@ -36,7 +36,14 @@ test("CLI apply resolves immutable upstream instances, previews, confirms, appli
       if (args[0] === "skill" && args[1] === "preview") return { requires_confirmation: false, impacts: [] };
       if (args[0] === "skill" && args[1] === "enable") return { applied_count: 1, skipped_count: 0, failed_count: 0 };
       if (args[0] === "providers") return { providers: [] };
-      if (args[0] === "bindings") return [];
+      if (args[0] === "bindings") return [{
+        skill_instance_id: "project:manager-demo:planning",
+        provider_id: "codex",
+        state: "enabled",
+        target_path: plan.operations[0].delivery_path,
+        content_digest: plan.operations[0].content_digest,
+        source_revision_id: plan.operations[0].source_revision_id,
+      }];
       throw new Error(`Unexpected CLI command: ${args.join(" ")}`);
     },
   };
@@ -76,4 +83,75 @@ test("CLI apply resolves immutable upstream instances, previews, confirms, appli
   assert.equal(failed.report.summary.failed, 1);
   assert.match(failed.error, /upstream write failed/);
   assert.equal((await listActivationHistory({ catalogRoot, projectId: "demo" }))[0].reports.length, 2);
+
+  let enableCalled = false;
+  const raced = await applyRecordedActivationPlan({
+    catalogRoot,
+    planId: plan.plan_id,
+    confirmed: true,
+    upstreamCli: {
+      execute: async (args) => {
+        if (args[0] === "inspect") return { skills: [{ name: "planning", instance_id: "project:manager-demo:planning", project_id: "manager-demo", scope: "project", path: plan.operations[0].canonical_path }] };
+        if (args[0] === "skill" && args[1] === "preview") {
+          await fs.appendFile(path.join(plan.operations[0].canonical_path, "SKILL.md"), "\nChanged after preview.\n", "utf8");
+          return { requires_confirmation: false, impacts: [] };
+        }
+        if (args[0] === "skill" && args[1] === "enable") {
+          enableCalled = true;
+          return { applied_count: 1, skipped_count: 0, failed_count: 0 };
+        }
+        if (args[0] === "providers") return { providers: [] };
+        if (args[0] === "bindings") return [];
+        throw new Error(`Unexpected CLI command: ${args.join(" ")}`);
+      },
+    },
+  });
+  assert.equal(raced.status, "failed");
+  assert.match(raced.error, /digest changed after preview/);
+  assert.equal(enableCalled, false);
+});
+
+test("CLI apply treats reported operation failures and post-apply drift as failures", async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-cli-reported-failure-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const source = path.join(root, "source", "planning");
+  await fs.mkdir(source, { recursive: true });
+  await fs.writeFile(path.join(source, "SKILL.md"), "---\nname: planning\ndescription: Plan.\n---\n", "utf8");
+  const registryRoot = path.join(root, "registry");
+  const catalogRoot = path.join(root, "catalog");
+  const imported = await importLocalSource({ registryRoot, sourcePath: path.join(root, "source") });
+  await createProject({ catalogRoot, id: "demo", name: "Demo", projectPath: path.join(root, "project"), providerId: "codex", upstreamProjectId: "manager-demo" });
+  await createPreset({ catalogRoot, registryRoot, id: "planning", name: "Planning", registrySkillIds: [imported.skills[0].id] });
+  await assignPreset({ catalogRoot, projectId: "demo", presetId: "planning" });
+  const plan = await createProjectPlan({ catalogRoot, registryRoot, projectId: "demo" });
+  await recordActivationPlan({ catalogRoot, plan, projectId: "demo" });
+
+  const base = async (args, applyResult) => {
+    if (args[0] === "inspect") return { skills: [{ name: "planning", instance_id: "planning", project_id: "manager-demo", scope: "project", path: plan.operations[0].canonical_path }] };
+    if (args[0] === "skill" && args[1] === "preview") return { requires_confirmation: false };
+    if (args[0] === "skill" && args[1] === "enable") return applyResult;
+    if (args[0] === "providers") return { providers: [] };
+    if (args[0] === "bindings") return [];
+    throw new Error(`Unexpected command: ${args.join(" ")}`);
+  };
+
+  const reported = await applyRecordedActivationPlan({
+    catalogRoot,
+    planId: plan.plan_id,
+    confirmed: true,
+    upstreamCli: { execute: (args) => base(args, { applied_count: 0, skipped_count: 0, failed_count: 1, error: "provider rejected" }) },
+  });
+  assert.equal(reported.status, "failed");
+  assert.equal(reported.report.summary.failed, 1);
+  assert.match(reported.error, /provider rejected/);
+
+  const drifted = await applyRecordedActivationPlan({
+    catalogRoot,
+    planId: plan.plan_id,
+    confirmed: true,
+    upstreamCli: { execute: (args) => base(args, { applied_count: 1, skipped_count: 0, failed_count: 0 }) },
+  });
+  assert.equal(drifted.status, "failed");
+  assert.equal(drifted.report.post_apply.verification.verified, false);
+  assert.match(drifted.error, /verification/);
 });

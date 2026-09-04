@@ -95,8 +95,8 @@ const PROVIDER_INFO = {
     displayName: "Codex",
     alias: "Codex CLI",
     badgeClass: "provider-badge codex",
-    deliveryRootRelative: "skills",
-    deliveryPathPattern: "skills/<skill_name>",
+    deliveryRootRelative: ".agents/skills",
+    deliveryPathPattern: ".agents/skills/<skill_name>",
     colorTheme: "amber",
   },
   claude: {
@@ -825,13 +825,13 @@ test("Tier 1 - F3.7: Inspect collects and reports schema validation issues", () 
   assert.ok(inspected.issues.length >= 3);
 });
 
-test("Tier 1 - F4.1: Apply with project path sets correct delivery root for Codex (skills/)", () => {
+test("Tier 1 - F4.1: Apply with project path sets correct delivery root for Codex (.agents/skills/)", () => {
   const res = simulateRecipeApply({
     recipe: { schema_version: 1, recipe_id: "r", name: "N", sources: [], skills: [{ name: "s" }], presets: [] },
     project_path: "/ws/codex-app",
     provider_id: "codex",
   });
-  assert.equal(res.delivery.delivery_root, "/ws/codex-app/skills/");
+  assert.equal(res.delivery.delivery_root, "/ws/codex-app/.agents/skills/");
 });
 
 test("Tier 1 - F4.2: Apply with project path sets correct delivery root for Antigravity (.agents/skills/)", () => {
@@ -1604,7 +1604,7 @@ test("Tier 4 - Scenario S1: Multi-Machine Recipe Export and Re-Import Workflow",
   });
 
   assert.equal(destinationApply.delivery.applied, true);
-  assert.equal(destinationApply.delivery.delivery_root, "/home/user/workspaces/project-b/skills/");
+  assert.equal(destinationApply.delivery.delivery_root, "/home/user/workspaces/project-b/.agents/skills/");
   assert.equal(destinationApply.delivery.preview.operations, 3);
 });
 
@@ -1647,8 +1647,8 @@ test("Tier 4 - Scenario S3: Multi-Provider Switching and Delivery Path Verificat
 
   const codexRoot = resolveDeliveryRoot("codex", projectRoot);
   const codexSkillPath = resolveDeliveryPath("codex", "planner", projectRoot);
-  assert.equal(codexRoot, "/workspace/repo/skills/");
-  assert.equal(codexSkillPath, "/workspace/repo/skills/planner");
+  assert.equal(codexRoot, "/workspace/repo/.agents/skills/");
+  assert.equal(codexSkillPath, "/workspace/repo/.agents/skills/planner");
 });
 
 test("Tier 4 - Scenario S4: 5-Step Live Activation and Streaming Diagnostics", async () => {

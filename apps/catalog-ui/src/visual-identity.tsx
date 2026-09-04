@@ -129,10 +129,10 @@ export const PROVIDER_INFO: Record<ProviderId, ProviderMeta> = {
     displayName: "Codex",
     alias: "Codex CLI",
     badgeClass: "provider-badge codex",
-    deliveryRootRelative: "skills",
-    deliveryPathPattern: "skills/<skill_name>",
+    deliveryRootRelative: ".agents/skills",
+    deliveryPathPattern: ".agents/skills/<skill_name>",
     colorTheme: "amber",
-    description: "Codex CLI standard repository delivery root.",
+    description: "Codex repository skill discovery root.",
   },
   claude: {
     id: "claude",

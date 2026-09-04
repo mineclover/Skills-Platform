@@ -343,6 +343,9 @@ export function ActivationProgressModal({
   const percent = calculateStageProgressPercent(progress, isCompleted, isFailed);
   const currentStage = progress?.stage || (isCompleted ? "completed" : isFailed ? "failed" : "plan");
   const providerMeta = getProviderInfo(providerId);
+  const requiresCodexRestart = providerMeta.id === "codex" && Boolean(
+    result?.report?.operations?.some((operation) => operation.restart_required === true),
+  );
 
   const metricText = useMemo(() => {
     if (isCompleted && result?.report?.summary) {
@@ -485,6 +488,32 @@ export function ActivationProgressModal({
                 </strong>
                 <small>Pipeline operations</small>
               </div>
+            </div>
+          </div>
+        )}
+
+        {isCompleted && requiresCodexRestart && (
+          <div
+            role="status"
+            aria-label="Codex restart required"
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.65rem",
+              marginTop: "0.9rem",
+              padding: "0.8rem 0.9rem",
+              borderRadius: "8px",
+              border: "1px solid rgba(250, 204, 21, 0.4)",
+              background: "rgba(234, 179, 8, 0.1)",
+              color: "#fde68a",
+            }}
+          >
+            <AlertTriangle size={18} />
+            <div>
+              <strong>Restart Codex to apply the skill state change</strong>
+              <p style={{ margin: "0.2rem 0 0", color: "#fef3c7", fontSize: "0.8rem" }}>
+                The filesystem binding and Codex skills configuration are synchronized, but Codex reads the updated enablement on restart.
+              </p>
             </div>
           </div>
         )}

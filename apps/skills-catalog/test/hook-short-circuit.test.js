@@ -386,6 +386,49 @@ test("Short-Circuit Engine: Timeout handling and clean child process termination
   }
 });
 
+test("Short-Circuit Engine: Closed timeout policy halts while open timeout policy continues", async () => {
+  const tmpDir = createTempProject({ emptyManifest: true });
+  try {
+    const baseHook = {
+      name: "Timeout Policy Hook",
+      event: "pre_tool_use",
+      enabled: true,
+      priority: 10,
+      handler: {
+        type: "command",
+        command: 'node -e "setTimeout(() => {}, 5000)"',
+        timeout_ms: 100,
+      },
+    };
+
+    const openResult = await executeHook({
+      hook: { ...baseHook, id: "timeout-open", failure_policy: "open" },
+      eventName: "pre_tool_use",
+      projectPath: tmpDir,
+    });
+    assert.equal(openResult.status, "timed_out");
+    assert.equal(openResult.allow, true);
+
+    registerHook({
+      projectPath: tmpDir,
+      sync: false,
+      hook: { ...baseHook, id: "timeout-closed", failure_policy: "closed" },
+    });
+    const closedReport = await triggerHookEvent({
+      projectPath: tmpDir,
+      eventName: "pre_tool_use",
+      payload: {},
+    });
+    assert.equal(closedReport.allow, false);
+    assert.equal(closedReport.halted, true);
+    assert.equal(closedReport.blockedBy, "timeout-closed");
+    assert.equal(closedReport.results[0].status, "timed_out");
+    assert.equal(closedReport.results[0].failurePolicy, "closed");
+  } finally {
+    cleanupTempProject(tmpDir);
+  }
+});
+
 test("Short-Circuit Engine: Disabled hook handling", async () => {
   const tmpDir = createTempProject({ emptyManifest: true });
   try {
@@ -530,7 +573,7 @@ test("Integration with Real Guards: Destructive command blocker rejects rm -rf /
   }
 });
 
-test("Provider Config Compilation: Compiles .agents/hooks.json and .claude/hooks.json with 5 guard hooks", () => {
+test("Provider Config Compilation: Compiles Antigravity guards and reports Claude unsupported", () => {
   const tmpDir = createTempProject({ emptyManifest: false });
   try {
     // Initializes default manifest which contains 5 guards + telemetry hooks
@@ -538,13 +581,13 @@ test("Provider Config Compilation: Compiles .agents/hooks.json and .claude/hooks
     const syncResult = compileProviderConfigs({ projectPath: tmpDir });
 
     assert.ok(syncResult.antigravityHooks >= 5);
-    assert.ok(syncResult.claudeHooks >= 5);
+    assert.equal(syncResult.claudeHooks, 0);
+    assert.equal(syncResult.providers.claude.status, "unsupported");
 
     const agentsPath = path.join(tmpDir, ".agents", "hooks.json");
-    const claudePath = path.join(tmpDir, ".claude", "hooks.json");
 
     assert.ok(fs.existsSync(agentsPath));
-    assert.ok(fs.existsSync(claudePath));
+    assert.equal(fs.existsSync(path.join(tmpDir, ".claude", "settings.json")), false);
 
     const agentsConfig = JSON.parse(fs.readFileSync(agentsPath, "utf8"));
     assert.ok(agentsConfig["secret-leak-guard"]);
@@ -560,14 +603,6 @@ test("Provider Config Compilation: Compiles .agents/hooks.json and .claude/hooks
     assert.ok(agentsConfig["scope-boundary-enforcer"]);
     assert.ok(agentsConfig["scope-boundary-enforcer"].PostToolUse);
 
-    const claudeConfig = JSON.parse(fs.readFileSync(claudePath, "utf8"));
-    assert.equal(claudeConfig.version, 1);
-    const claudeGuardIds = claudeConfig.hooks.map((h) => h.id);
-    assert.ok(claudeGuardIds.includes("secret-leak-guard"));
-    assert.ok(claudeGuardIds.includes("destructive-command-blocker"));
-    assert.ok(claudeGuardIds.includes("context-budget-guard"));
-    assert.ok(claudeGuardIds.includes("scope-boundary-enforcer"));
-    assert.ok(claudeGuardIds.includes("subagent-recursion-limiter"));
   } finally {
     cleanupTempProject(tmpDir);
   }
@@ -686,4 +721,3 @@ test("Short-Circuit Engine: Parses JSON interception when logs precede JSON in s
     cleanupTempProject(tmpDir);
   }
 });
-

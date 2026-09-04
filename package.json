@@ -8,9 +8,15 @@
     "apps/catalog-ui",
     "packages/*"
   ],
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
-    "build": "npm run --workspaces --if-present build",
+    "build:packages": "npm run build --workspace @skills-platform/contracts && npm run build --workspace @skills-platform/ledger-store && npm run build --workspace @skills-platform/skills-manager-adapter",
+    "build": "npm run build:packages && npm run build --workspace @skills-platform/catalog-ui",
+    "precheck": "npm run build --workspace @skills-platform/contracts",
     "check": "npm run --workspaces --if-present check",
+    "pretest": "npm run build:packages",
     "test": "npm run --workspaces --if-present test"
   },
   "devDependencies": {
