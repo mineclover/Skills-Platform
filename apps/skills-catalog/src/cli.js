@@ -127,6 +127,7 @@ function parseArguments(argv) {
 function usage() {
   return [
     "Usage:",
+    "  skills-catalog sync <skill-path-or-name> [--project <id>] [--provider <id>] [--confirm] [--copy]",
     "  skills-catalog import-local <source-path> [--registry <path>] [--skill <name>]...",
     "  skills-catalog import-git <repository> [--ref <commit-or-ref>] [--registry <path>] [--skill <name>]...",
     "  skills-catalog source inspect <source-path> | source updates [--registry <path>]",
@@ -190,6 +191,114 @@ async function run(argv) {
   const [command, sourcePath] = positional;
   const registryRoot = path.resolve(flags.registry ?? defaultRegistryRoot());
   const catalogRoot = path.resolve(flags.catalog ?? path.join(registryRoot, "..", "catalog"));
+
+  if (command === "sync") {
+    const rawTarget = sourcePath ?? flags.path ?? flags.source ?? process.cwd();
+    let skillPath = path.resolve(rawTarget);
+    try {
+      await fs.access(skillPath);
+    } catch {
+      const candidate1 = path.resolve(process.cwd(), "skills-packages", rawTarget);
+      const candidate2 = path.resolve(process.cwd(), "skills-packages", "platform-core", rawTarget);
+      try {
+        await fs.access(candidate1);
+        skillPath = candidate1;
+      } catch {
+        try {
+          await fs.access(candidate2);
+          skillPath = candidate2;
+        } catch {
+          // keep skillPath
+        }
+      }
+    }
+
+    const provider = flags.provider?.[0] ?? "portable";
+
+    // 1. Preflight lint
+    const inspection = await inspectSkillPackage({ skillPath, provider });
+    if (!inspection.valid) {
+      const errors = inspection.findings.filter((f) => f.level === "error");
+      const err = new Error(`Skill preflight validation failed with ${errors.length} error(s)`);
+      err.issues = inspection.findings;
+      throw err;
+    }
+
+    // 2. Ingest immutable revision into registry
+    const importResult = await importLocalSource({
+      registryRoot,
+      sourcePath: skillPath,
+      selectedSkillNames: flags.skill ?? [],
+    });
+    const importedSkill = importResult.skills[0];
+    if (!importedSkill) {
+      throw new Error(`No valid skill found in source: ${skillPath}`);
+    }
+
+    const projectId = flags.project ?? flags["project-id"];
+    if (!projectId) {
+      return {
+        status: "imported",
+        skill: importedSkill,
+        source_revision_id: importResult.source_revision_id,
+        validation: { valid: true, findings: inspection.findings },
+      };
+    }
+
+    // 3. Pin project override to newly imported skill revision
+    await setProjectSkillOverride({
+      catalogRoot,
+      registryRoot,
+      projectId,
+      lineageId: importedSkill.lineage_id,
+      registrySkillId: importedSkill.id,
+      desiredState: "enabled",
+    });
+
+    // 4. Synthesize activation plan
+    const plan = await createProjectPlan({
+      catalogRoot,
+      registryRoot,
+      projectId,
+      presetId: flags.preset,
+      workScopeTags: flags["work-scope"] ?? [],
+      distribution: { method: flags.copy === true ? "copy" : "symlink" },
+      enabledOnly: true,
+    });
+
+    // 5. Deliver via adapter
+    const adapter = require("@skills-platform/skills-manager-adapter");
+    const confirmed = flags.confirm === true;
+    if (!confirmed) {
+      const preview = await adapter.previewActivationPlan(plan);
+      return {
+        status: "preview",
+        skill: importedSkill,
+        plan,
+        preview,
+        message: "Revision imported and project binding updated. Pass --confirm to apply symlink delivery.",
+      };
+    }
+
+    const report = await adapter.applyActivationPlan(plan, { confirm: true });
+    const selection = await resolveProjectSelection({
+      catalogRoot,
+      registryRoot,
+      projectId,
+      presetId: flags.preset,
+      workScopeTags: flags["work-scope"] ?? [],
+    });
+    await recordActivationPlan({ catalogRoot, plan, projectId, assignments: selection.assignments });
+    await recordActivationReport({ catalogRoot, planId: plan.plan_id, report });
+
+    return {
+      status: "applied",
+      skill: importedSkill,
+      source_revision_id: importResult.source_revision_id,
+      plan,
+      report,
+    };
+  }
 
   if (command === "import-local") {
     if (!sourcePath) throw new Error("import-local requires a source path");

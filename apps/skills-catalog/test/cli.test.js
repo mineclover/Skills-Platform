@@ -192,3 +192,44 @@ test("CLI versions and annotates preset templates", async (context) => {
   assert.equal(note.template_version, 3);
   assert.deepEqual(compared.added_registry_skill_ids, []);
 });
+
+test("CLI sync runs preflight validation, registry import, project binding, and adapter delivery", async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-catalog-cli-sync-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const sourcePath = path.join(root, "source", "test-skill");
+  const registryRoot = path.join(root, "registry");
+  const catalogRoot = path.join(root, "catalog");
+  const projectPath = path.join(root, "project");
+  const deliveryRoot = path.join(projectPath, ".agents", "skills");
+
+  await fs.mkdir(sourcePath, { recursive: true });
+  await fs.writeFile(
+    path.join(sourcePath, "SKILL.md"),
+    "---\nname: test-skill\ndescription: Test sync command workflow.\n---\n\n# Test skill\n"
+  );
+
+  await run([
+    "project", "add", "test-project", "--catalog", catalogRoot, "--name", "Test Project",
+    "--path", projectPath, "--provider", "antigravity",
+    "--delivery-root", deliveryRoot,
+  ]);
+
+  // Preview sync (without --confirm)
+  const previewResult = await run([
+    "sync", sourcePath, "--project", "test-project",
+    "--catalog", catalogRoot, "--registry", registryRoot,
+  ]);
+  assert.equal(previewResult.status, "preview");
+  assert.equal(previewResult.skill.skill_name, "test-skill");
+
+  // Confirmed sync (with --confirm)
+  const syncResult = await run([
+    "sync", sourcePath, "--project", "test-project", "--confirm",
+    "--catalog", catalogRoot, "--registry", registryRoot,
+  ]);
+  assert.equal(syncResult.status, "applied");
+  assert.equal(syncResult.report.status, "completed");
+
+  const linkTarget = await fs.readlink(path.join(deliveryRoot, "test-skill"));
+  assert.ok(linkTarget.includes("test-skill"));
+});

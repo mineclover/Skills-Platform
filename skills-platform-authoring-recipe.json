@@ -29,7 +29,7 @@
       "invocation_mode": "hybrid",
       "source_id": "skills-platform-authoring-standard-source",
       "source_relative_path": ".",
-      "content_digest": "2ca555c6ecc42b954baf84a89e9a1a10b8a663f0dbe75765c83d0065d3857caf",
+      "content_digest": "457160c2b7fa569be80b9a36ffcf97a8c29934fef50e9ebcc61d2e25235eab85",
       "description": "Route skill authoring and review through separate Codex and Antigravity provider rulesets."
     },
     {
