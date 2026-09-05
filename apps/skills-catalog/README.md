@@ -69,17 +69,47 @@ node apps/skills-catalog/src/cli.js sync \
   ./skills-packages/local/my-skill --project demo --confirm
 ```
 
-## Two-Tier Delivery Model: Direct Reference vs. Governed Snapshot
+## Two-Tier Delivery Model: Canonical Packages vs. Dedicated Instances
 
-Skills Platform supports two complementary delivery modes (see [Skill Reference and Delivery Guide](../../docs/guides/skill-reference-and-delivery-guide.md)):
+Skills Platform enforces architectural separation between living distribution packages and immutable instances (see [Skill Reference and Delivery Guide](../../docs/guides/skill-reference-and-delivery-guide.md)):
 
-1. **Tier 1: Direct Reference Mode (Inner Loop Prototyping)**:
-   - Symlink `.agents/skills/<skill>` directly to `skills-packages/<group>/<skill>`.
-   - **Zero Sync Overhead**: File saves immediately reflect in project workspaces with no background watch daemons or compile steps. Just re-read the file in the agent.
-   - Protected by companion sidecars (`method: "direct_source_symlink"`).
-2. **Tier 2: Governed Snapshot Mode (Partial Update & Freeze)**:
-   - Use `skills-catalog sync <skill> --project <id> --confirm` to atomically validate, ingest an immutable SHA-256 revision snapshot into the registry, and pin the project symlink.
-   - Ideal for milestone releases, audit trails, and multi-machine environments.
+```text
+Skills-Platform/
+├── skills-packages/                      # 📦 Canonical Distribution & Dev Source (floating_latest)
+│   └── platform-core/
+│       └── svg-authoring/
+└── skills-instances/                     # 🏛️ Dedicated Instance Repository (version_pinned)
+    └── platform-core/
+        └── svg-authoring@1.0.0/
+```
+
+1. **Tier 1: Direct Reference Mode (`floating_latest` — Inner Loop Prototyping)**:
+   - Symlink `.agents/skills/<skill>` directly to canonical source `skills-packages/<group>/<skill>`.
+   - **Zero Sync Overhead**: File saves immediately reflect in project workspaces with no background watch daemons or compile steps. Just re-read the file in the agent ("Just Refresh").
+   - Protected by companion sidecars (`method: "direct_source_symlink"`, `binding_policy: "floating_latest"`).
+2. **Tier 2: Governed Version-Pinned Mode (`version_pinned` — Release Baselines & Freeze)**:
+   - Symlink `.agents/skills/<skill>` to an immutable instance in `skills-instances/<group>/<skill>@<version>`.
+   - Keeps `skills-packages/` 100% clean of historical version clutter.
+   - Protected from agent spec ripple effects across projects.
+
+### Delivery CLI Commands
+
+```bash
+# Freeze working source into skills-instances/<group>/<skill>@<version>
+node apps/skills-catalog/src/cli.js skill freeze svg-authoring --version 1.0.0
+
+# Link project to floating latest (Tier 1)
+node apps/skills-catalog/src/cli.js project link my-project svg-authoring --latest
+
+# Link project to specific frozen instance (Tier 2)
+node apps/skills-catalog/src/cli.js project link my-project svg-authoring --version 1.0.0
+
+# Check live project skill status, symlink targets, and binding policies
+node apps/skills-catalog/src/cli.js project status my-project
+
+# One-touch sync: validate, ingest immutable registry revision, and deliver atomically
+node apps/skills-catalog/src/cli.js sync ./skills-packages/platform-core/svg-authoring --project my-project --confirm
+```
 
 ## Portable recipes and project-local packages
 

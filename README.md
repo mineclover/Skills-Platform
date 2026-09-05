@@ -16,7 +16,8 @@ packages/
 docs/
   architecture.md    System boundaries and delivery protocol
   roadmap.md         Product roadmap for skill metadata, notes, templates, and activation
-skills-packages/     Repository-owned skill package sources
+skills-packages/     Repository-owned canonical skill package sources (distribution)
+skills-instances/    Dedicated instance repository for frozen version snapshots (@<version>)
 skills-platform-authoring-recipe.json  Pinned provider-aware authoring package declaration
 ```
 

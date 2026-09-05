@@ -60,7 +60,8 @@ project and an explicitly reviewed binding target.
 | State | Version-controlled authority | Machine-local reconstruction |
 | --- | --- | --- |
 | Package intent and provider split | `skills-platform-authoring-recipe.json` | Recipe inspection result |
-| Editable source | `skills-packages/...` | None |
+| Editable canonical source | `skills-packages/...` | None |
+| Frozen instance snapshots | `skills-instances/...` | None |
 | Immutable revision | `.skills-platform/registry/registry.json` and `revisions/` | Hydrated absolute canonical path |
 | Projects, profiles, preset assignments, analysis records | Recreated from the recipe and subsequent governance operations | `.skills-platform/catalog/` |
 | Provider discovery binding | Activation plan and adapter ownership contract | `.agents/skills/` |

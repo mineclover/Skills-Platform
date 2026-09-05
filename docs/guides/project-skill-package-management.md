@@ -16,8 +16,9 @@ The portable project source of truth is:
 1. `skills-platform-authoring-recipe.json` for declared sources, immutable
    digests, invocation profiles, provider presets, and the Codex project
    declaration with project-relative `.agents/skills` delivery;
-2. the editable packages under `skills-packages/`;
-3. `.skills-platform/registry/registry.json` and its `revisions/` directories
+2. the editable canonical packages under `skills-packages/`;
+3. the dedicated frozen instance snapshots under `skills-instances/`;
+4. `.skills-platform/registry/registry.json` and its `revisions/` directories
    for immutable imported artifacts.
 
 The following paths are ignored, local to one checkout, and reconstructible:
