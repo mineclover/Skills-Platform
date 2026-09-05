@@ -56,6 +56,13 @@
       "locator": "./skills-packages/community-codex/skill-creator",
       "requested_ref": null,
       "created_at": "2026-09-04T04:15:47.360Z"
+    },
+    {
+      "id": "source_local_0926b791b8fe5bf0",
+      "kind": "local",
+      "locator": "/Users/junwoobang/workflow/Skills-Platform/skills-packages/platform-core/svg-authoring",
+      "requested_ref": null,
+      "created_at": "2026-09-05T14:38:35.314Z"
     }
   ],
   "revisions": [
@@ -121,6 +128,22 @@
       "resolved_revision": "37ddb8d30bfd5d06e701d1b565f7b167e4ade8d5c2eb9d23c037417ebc722bba",
       "content_digest": "37ddb8d30bfd5d06e701d1b565f7b167e4ade8d5c2eb9d23c037417ebc722bba",
       "fetched_at": "2026-09-04T04:15:47.360Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_5f8ffa44887c5875b6409143",
+      "source_id": "source_local_05a23d0ba2577995",
+      "resolved_revision": "457160c2b7fa569be80b9a36ffcf97a8c29934fef50e9ebcc61d2e25235eab85",
+      "content_digest": "457160c2b7fa569be80b9a36ffcf97a8c29934fef50e9ebcc61d2e25235eab85",
+      "fetched_at": "2026-09-04T14:24:53.096Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_c9a201b4a4427ad2d7879dca",
+      "source_id": "source_local_0926b791b8fe5bf0",
+      "resolved_revision": "c5680d134aef7c39fad3fa3d3135210d8b7018c677125601ff8013701bc96fc4",
+      "content_digest": "c5680d134aef7c39fad3fa3d3135210d8b7018c677125601ff8013701bc96fc4",
+      "fetched_at": "2026-09-05T14:38:35.314Z",
       "review_state": "imported"
     }
   ],
@@ -901,6 +924,16 @@
       "source_relative_path": ".",
       "skill_name": "skill-creator",
       "created_at": "2026-09-04T04:15:47.360Z"
+    },
+    {
+      "id": "lineage_e95b938b1f1be8fc3d30",
+      "source_id": "source_local_0926b791b8fe5bf0",
+      "artifact_key": "source_local_0926b791b8fe5bf0:.",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "skill_name": "svg-authoring",
+      "created_at": "2026-09-05T14:38:35.314Z"
     }
   ],
   "skills": [
@@ -2260,6 +2293,62 @@
       "canonical_path": "revisions/revision_b0fbf1881afcfaf3a554941f/artifacts/skill-creator-37ddb8d30b",
       "canonical_relative_path": "revisions/revision_b0fbf1881afcfaf3a554941f/artifacts/skill-creator-37ddb8d30b",
       "imported_at": "2026-09-04T04:15:47.360Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_2ec88f56b527cfac61f4",
+      "source_id": "source_local_05a23d0ba2577995",
+      "source_revision_id": "revision_5f8ffa44887c5875b6409143",
+      "skill_name": "skill-authoring-standard",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_05a23d0ba2577995:.",
+      "lineage_id": "lineage_66da5b284b5655167d17",
+      "description": "Route skill authoring, review, and static validation through the official conventions for Codex or Google Antigravity. Use when creating or revising a skill, checking SKILL.md metadata and progressive disclosure, or explaining provider-specific discovery and package structure.",
+      "manifest": {
+        "declared_name": "skill-authoring-standard",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "457160c2b7fa569be80b9a36ffcf97a8c29934fef50e9ebcc61d2e25235eab85",
+      "canonical_path": "revisions/revision_5f8ffa44887c5875b6409143/artifacts/skill-authoring-standard-457160c2b7",
+      "canonical_relative_path": "revisions/revision_5f8ffa44887c5875b6409143/artifacts/skill-authoring-standard-457160c2b7",
+      "imported_at": "2026-09-04T14:24:53.096Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_91a1298f0836d33cbee5",
+      "source_id": "source_local_0926b791b8fe5bf0",
+      "source_revision_id": "revision_c9a201b4a4427ad2d7879dca",
+      "skill_name": "svg-authoring",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_0926b791b8fe5bf0:.",
+      "lineage_id": "lineage_e95b938b1f1be8fc3d30",
+      "description": "Expert guide, mathematical formulas, recipes, and validation procedures for authoring, generating, and debugging raw SVG vector graphics, diagrams, and data visualizations. Grounded in W3C SVG 1.1 (2nd Edition) and SVG 2 specifications. Use whenever creating or modifying SVG graphics, charts (pie, donut, bar, scatter, radar), curves (bezier, sankey, streamgraph), topological diagrams, gauge needles, or visual elements.",
+      "manifest": {
+        "declared_name": "svg-authoring",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "c5680d134aef7c39fad3fa3d3135210d8b7018c677125601ff8013701bc96fc4",
+      "canonical_path": "revisions/revision_c9a201b4a4427ad2d7879dca/artifacts/svg-authoring-c5680d134a",
+      "canonical_relative_path": "revisions/revision_c9a201b4a4427ad2d7879dca/artifacts/svg-authoring-c5680d134a",
+      "imported_at": "2026-09-05T14:38:35.314Z",
       "review_state": "imported"
     }
   ]

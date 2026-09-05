@@ -9,7 +9,7 @@
       "maintainer": "Skills Platform Team",
       "description": "Core architectural standards, worktree lifecycle orchestration, vertical spec compilation, and 11-stage modular logical completion harness micro-skills",
       "license": "Apache-2.0",
-      "skills_count": 18
+      "skills_count": 19
     },
     {
       "package_id": "antigravity-builtin",
