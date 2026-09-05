@@ -561,6 +561,73 @@ function authoringAnalysisDigest(inspection) {
   return crypto.createHash("sha256").update(JSON.stringify(authoringAnalysisPayload(inspection))).digest("hex");
 }
 
+async function freezeSkillPackage({
+  sourceSkillPath,
+  version,
+  outputDirectory,
+  force = false,
+  provider = "portable",
+}) {
+  if (!version || typeof version !== "string" || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version.trim())) {
+    throw new Error(`Invalid semantic version: ${version}. Expected format: X.Y.Z`);
+  }
+  const cleanVersion = version.trim();
+  const sourcePath = path.resolve(sourceSkillPath);
+  const st = await fs.stat(sourcePath);
+  if (!st.isDirectory()) {
+    throw new Error(`Source skill path must be a directory: ${sourcePath}`);
+  }
+  const sourceSkillName = path.basename(sourcePath).split("@")[0];
+  const targetDirName = `${sourceSkillName}@${cleanVersion}`;
+  const outDir = outputDirectory ? path.resolve(outputDirectory) : path.dirname(sourcePath);
+  const targetDirectory = path.join(outDir, targetDirName);
+
+  try {
+    await fs.access(targetDirectory);
+    if (!force) {
+      throw new Error(`Target frozen skill directory already exists: ${targetDirectory}. Pass --force to overwrite.`);
+    }
+    await fs.rm(targetDirectory, { recursive: true, force: true });
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  await fs.cp(sourcePath, targetDirectory, { recursive: true });
+
+  // Update or inject version in SKILL.md frontmatter
+  const skillMdPath = path.join(targetDirectory, "SKILL.md");
+  try {
+    let content = await fs.readFile(skillMdPath, "utf8");
+    if (content.startsWith("---")) {
+      const secondDashes = content.indexOf("\n---", 3);
+      if (secondDashes !== -1) {
+        const frontmatter = content.slice(3, secondDashes);
+        const body = content.slice(secondDashes);
+        let updatedFm;
+        if (/^version:\s*.+$/m.test(frontmatter)) {
+          updatedFm = frontmatter.replace(/^version:\s*.+$/m, `version: ${cleanVersion}`);
+        } else {
+          updatedFm = frontmatter.trimEnd() + `\nversion: ${cleanVersion}\n`;
+        }
+        content = `---${updatedFm}${body}`;
+        await fs.writeFile(skillMdPath, content, "utf8");
+      }
+    }
+  } catch {}
+
+  const inspection = await inspectSkillPackage({ skillPath: targetDirectory, provider });
+
+  return {
+    frozen: true,
+    skill_name: sourceSkillName,
+    version: cleanVersion,
+    source_path: sourcePath,
+    target_path: targetDirectory,
+    valid: inspection.valid,
+    findings: inspection.findings,
+  };
+}
+
 module.exports = {
   ANTIGRAVITY_RULESET,
   CODEX_RULESET,
@@ -568,6 +635,7 @@ module.exports = {
   SKILL_AUTHORING_SCHEMA_VERSION,
   authoringAnalysisDigest,
   authoringAnalysisPayload,
+  freezeSkillPackage,
   initializeSkillPackage,
   inspectSkillPackage,
   inspectSkillVirtualFiles,

@@ -137,36 +137,67 @@ The ownership sidecar (`*.skills-platform-link-ownership.json`) explicitly recor
 
 ## 4. Practical Usage & Workflows
 
-### 4.1. Establishing a Direct Reference Link (Tier 1)
+### 4.1. Mounting Links via Platform CLI (`skills-catalog project link`)
 
-To mount a skill package directly from the central store into a project:
+The Skills Platform CLI manages both `floating_latest` and `version_pinned` modes automatically, including sidecar creation:
 
 ```bash
-# 1. Mount direct symlink
-ln -sfn /path/to/Skills-Platform/skills-packages/platform-core/svg-authoring \
-  /path/to/my-project/.agents/skills/svg-authoring
+# 1. Mount directly to latest working source (floating_latest mode)
+node apps/skills-catalog/src/cli.js project link information-ui-catalog svg-authoring --latest
 
-# 2. Sidecar ownership record
-# The sidecar (.agents/skills/svg-authoring.skills-platform-link-ownership.json)
-# records ownership so the platform tracks this link without managing it destructively.
+# 2. Pin to a specific versioned package (version_pinned mode)
+node apps/skills-catalog/src/cli.js project link information-ui-catalog svg-authoring --version 1.0.0
 ```
 
-Example sidecar content (`svg-authoring.skills-platform-link-ownership.json`):
+### 4.2. Freezing a Versioned Source Package (`skills-catalog skill freeze`)
+
+To freeze the current working source into a dedicated human-readable version directory (`skill@<version>`):
+
+```bash
+# Freezes svg-authoring into svg-authoring@1.0.0 and updates SKILL.md frontmatter
+node apps/skills-catalog/src/cli.js skill freeze svg-authoring --version 1.0.0
+```
+
+Output highlights:
 ```json
 {
-  "schema_version": 1,
-  "managed_by": "skills-platform-adapter",
-  "method": "direct_source_symlink",
-  "binding_policy": "floating_latest",
+  "frozen": true,
   "skill_name": "svg-authoring",
-  "lineage_id": "lineage_e95b938b1f1be8fc3d30",
-  "canonical_path": "/path/to/Skills-Platform/skills-packages/platform-core/svg-authoring",
-  "delivery_path": "/path/to/my-project/.agents/skills/svg-authoring",
-  "delivery_name": "svg-authoring"
+  "version": "1.0.0",
+  "source_path": ".../skills-packages/platform-core/svg-authoring",
+  "target_path": ".../skills-packages/platform-core/svg-authoring@1.0.0",
+  "valid": true
 }
 ```
 
-### 4.2. Daily Development Inner Loop: "Just Refresh"
+### 4.3. Inspecting Live Project Skills (`skills-catalog project status`)
+
+To check the active binding policy, target path, and health of all skills linked in a project:
+
+```bash
+node apps/skills-catalog/src/cli.js project status information-ui-catalog
+```
+
+Output highlights:
+```json
+{
+  "project_id": "information-ui-catalog",
+  "delivery_root": "/Users/.../.agents/skills",
+  "skills": [
+    {
+      "skill_name": "svg-authoring",
+      "is_symlink": true,
+      "link_target": ".../skills-packages/platform-core/svg-authoring",
+      "target_exists": true,
+      "managed": true,
+      "binding_policy": "floating_latest",
+      "pinned_version": null
+    }
+  ]
+}
+```
+
+### 4.4. Daily Development Inner Loop: "Just Refresh"
 
 1. Open and edit the skill in your editor or IDE:
    `skills-packages/platform-core/svg-authoring/SKILL.md`
@@ -175,33 +206,14 @@ Example sidecar content (`svg-authoring.skills-platform-link-ownership.json`):
 3. In your agent session (Antigravity, Codex, etc.), **simply refresh or continue chatting**.
    The agent automatically reads the updated instructions from disk with zero intermediate steps.
 
-### 4.3. Partial Update & Snapshot Freeze (Tier 2)
+### 4.5. On-Demand Registry Ingestion (Optional Tier 2 CI/CD Audit)
 
-When you reach a stable milestone and want to freeze an immutable snapshot or register the update with the central catalog:
+When you need an immutable SHA-256 hash registered in the central `.skills-platform/registry/revisions/` store for formal audit logs:
 
 ```bash
-# Run a single-skill partial update
-# Validates rulesets, ingests SHA-256 revision, and optionally updates project binding
-node apps/skills-catalog/src/cli.js sync svg-authoring --project my-project --confirm
+# Run on-demand single-skill partial update
+node apps/skills-catalog/src/cli.js sync svg-authoring --project information-ui-catalog --confirm
 ```
-
-Output highlights:
-```json
-{
-  "status": "applied",
-  "skill": {
-    "skill_name": "svg-authoring",
-    "content_digest": "ff5d35fa...",
-    "source_revision_id": "revision_062076352c48120b83a7ac5f"
-  }
-}
-```
-
-- If `--confirm` is omitted, `skills-catalog sync` displays a **Preview** of what would be updated without applying disk mutations.
-- If you only want to validate against provider rulesets (portable, codex, antigravity) without touching the registry:
-  ```bash
-  node apps/skills-catalog/src/cli.js skill validate skills-packages/platform-core/svg-authoring --provider antigravity
-  ```
 
 ---
 

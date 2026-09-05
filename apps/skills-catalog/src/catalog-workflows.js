@@ -370,11 +370,159 @@ async function buildProjectSystemPrompt({ catalogRoot, registryRoot, projectId, 
   };
 }
 
+async function resolveSkillPackageSource({ skillName, version = null, packagesRoot = null }) {
+  const targetFolderName = version ? `${skillName}@${version}` : skillName;
+  const searchRoots = [];
+  if (packagesRoot) searchRoots.push(path.resolve(packagesRoot));
+  searchRoots.push(path.resolve(process.cwd(), "skills-packages"));
+  searchRoots.push(path.resolve(__dirname, "../../../skills-packages"));
+
+  for (const root of searchRoots) {
+    try {
+      const groups = await fs.readdir(root);
+      for (const group of groups) {
+        const candidate = path.join(root, group, targetFolderName);
+        try {
+          const st = await fs.stat(candidate);
+          if (st.isDirectory()) return candidate;
+        } catch {}
+      }
+    } catch {}
+  }
+  return null;
+}
+
+async function linkProjectSkill({
+  catalogRoot,
+  projectId,
+  skillName,
+  version = null,
+  packagesRoot = null,
+}) {
+  const project = await getProject(catalogRoot, projectId);
+  if (!project.delivery_root) {
+    throw new Error(`Project ${projectId} does not have a delivery_root defined`);
+  }
+
+  const targetSourcePath = await resolveSkillPackageSource({ skillName, version, packagesRoot });
+  if (!targetSourcePath) {
+    const requestedName = version ? `${skillName}@${version}` : skillName;
+    throw new Error(`Skill source package not found: ${requestedName}`);
+  }
+
+  await fs.mkdir(project.delivery_root, { recursive: true });
+  const deliveryPath = path.join(project.delivery_root, skillName);
+  const sidecarPath = `${deliveryPath}.skills-platform-link-ownership.json`;
+
+  try {
+    const lst = await fs.lstat(deliveryPath);
+    if (lst.isSymbolicLink()) {
+      await fs.unlink(deliveryPath);
+    } else if (lst.isDirectory()) {
+      try {
+        await fs.access(sidecarPath);
+        await fs.rm(deliveryPath, { recursive: true, force: true });
+      } catch {
+        throw new Error(`Unmanaged directory exists at ${deliveryPath}. Remove or back up before linking.`);
+      }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  const linkType = process.platform === "win32" ? "junction" : "dir";
+  await fs.symlink(targetSourcePath, deliveryPath, linkType);
+
+  const sidecarRecord = {
+    schema_version: 1,
+    managed_by: "skills-platform-adapter",
+    method: "direct_source_symlink",
+    binding_policy: version ? "version_pinned" : "floating_latest",
+    skill_name: skillName,
+    pinned_version: version ?? null,
+    canonical_path: targetSourcePath,
+    delivery_path: deliveryPath,
+    delivery_name: skillName,
+  };
+  await fs.writeFile(sidecarPath, JSON.stringify(sidecarRecord, null, 2) + "\n", "utf8");
+
+  return {
+    linked: true,
+    project_id: projectId,
+    skill_name: skillName,
+    binding_policy: version ? "version_pinned" : "floating_latest",
+    pinned_version: version ?? null,
+    canonical_path: targetSourcePath,
+    delivery_path: deliveryPath,
+  };
+}
+
+async function getProjectSkillStatus({ catalogRoot, projectId }) {
+  const project = await getProject(catalogRoot, projectId);
+  if (!project.delivery_root) {
+    throw new Error(`Project ${projectId} does not have a delivery_root defined`);
+  }
+
+  const skills = [];
+  try {
+    const entries = await fs.readdir(project.delivery_root);
+    for (const entry of entries) {
+      if (entry.endsWith(".skills-platform-link-ownership.json") || entry === "README.md") continue;
+      const fullPath = path.join(project.delivery_root, entry);
+      const sidecarPath = `${fullPath}.skills-platform-link-ownership.json`;
+      let isSymlink = false;
+      let linkTarget = null;
+      try {
+        const lst = await fs.lstat(fullPath);
+        isSymlink = lst.isSymbolicLink();
+        if (isSymlink) {
+          linkTarget = await fs.readlink(fullPath);
+        }
+      } catch {}
+
+      let sidecar = null;
+      try {
+        sidecar = JSON.parse(await fs.readFile(sidecarPath, "utf8"));
+      } catch {}
+
+      let targetExists = false;
+      if (linkTarget) {
+        try {
+          await fs.access(path.resolve(path.dirname(fullPath), linkTarget));
+          targetExists = true;
+        } catch {}
+      }
+
+      skills.push({
+        skill_name: entry,
+        is_symlink: isSymlink,
+        link_target: linkTarget,
+        target_exists: targetExists,
+        managed: !!sidecar,
+        binding_policy: sidecar?.binding_policy ?? (sidecar ? "version_pinned" : "unmanaged"),
+        pinned_version: sidecar?.pinned_version ?? null,
+        canonical_path: sidecar?.canonical_path ?? null,
+      });
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  return {
+    project_id: projectId,
+    delivery_root: project.delivery_root,
+    skills,
+  };
+}
+
 module.exports = {
   buildProjectSystemPrompt,
   buildSystemPrompt,
   createProjectPlan,
   exportActivationPlan,
+  getProjectSkillStatus,
+  linkProjectSkill,
   resolveProjectEffectiveSet,
   resolveProjectSelection,
+  resolveSkillPackageSource,
 };

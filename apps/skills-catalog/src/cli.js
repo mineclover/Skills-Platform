@@ -84,9 +84,11 @@ const {
   issuePlanCertificate,
   calculatePlanGap,
   getReadyObligations,
-  getEventHistory,
+  freezeSkillPackage,
+  getProjectSkillStatus,
   initializeSkillPackage,
   inspectSkillPackage,
+  linkProjectSkill,
   listSkillAuthoringRulesets,
 } = require(".");
 
@@ -143,6 +145,8 @@ function usage() {
     "  skills-catalog project add <id> --name <name> --path <path> --provider <id> [--delivery-root <path>] [--upstream-project-id <id>]",
     "  skills-catalog project list | project resolve <id> [--preset <id>] [--work-scope <tag>]...",
     "  skills-catalog project apply <id> [--confirm] [--preset <id>] [--work-scope <tag>]... [--enabled-only] [--copy]",
+    "  skills-catalog project link <project-id> <skill-name> [--version <semver>] [--latest]",
+    "  skills-catalog project status <project-id>",
     "  skills-catalog project skill <project-id> enable|disable <lineage-id> --skill <registry-skill-id>",
     "  skills-catalog project skill <project-id> inherit <lineage-id>",
     "  skills-catalog preset create <id> --name <name> --skill <registry-skill-id>...",
@@ -159,6 +163,7 @@ function usage() {
     "  skills-catalog skill revisions <lineage-id> | skill diff <lineage-id> <left-revision> <right-revision>",
     "  skills-catalog skill profile show <lineage-id>",
     "  skills-catalog skill profile set <lineage-id> [--purpose <text>] [--use-when <text>] [--tag <tag>]...",
+    "  skills-catalog skill freeze <skill-name> --version <semver> [--force] [--out <path>]",
     "  skills-catalog skill init <name> [--out <parent-dir>] [--provider codex|antigravity|portable] [--resources <list>] [--interface key=value]...",
     "  skills-catalog skill inspect|validate <skill-dir> [--provider codex|antigravity|portable] | skill rulesets",
     "  skills-catalog skill note add <lineage-id> --body <text> [--scope <scope>] [--kind <kind>]",
@@ -676,6 +681,40 @@ async function run(argv) {
       const skillPath = path.resolve(action ?? subject ?? flags.path ?? process.cwd());
       return inspectSkillPackage({ skillPath, provider: flags.provider?.[0] ?? "portable" });
     }
+    if (area === "freeze") {
+      const skillName = action ?? subject ?? flags.name;
+      if (!skillName) throw new Error("skill freeze requires a skill name: skills-catalog skill freeze <name> --version <v>");
+      const version = flags.version ?? flags["to-version"];
+      if (!version) throw new Error("skill freeze requires --version <semver>");
+      const packagesRoot = flags.out ? path.resolve(flags.out) : path.join(process.cwd(), "skills-packages");
+      let sourceSkillPath = null;
+      try {
+        const groups = await fs.readdir(packagesRoot);
+        for (const group of groups) {
+          const candidate = path.join(packagesRoot, group, skillName);
+          try {
+            const st = await fs.stat(candidate);
+            if (st.isDirectory()) {
+              sourceSkillPath = candidate;
+              break;
+            }
+          } catch {}
+        }
+      } catch {}
+      if (!sourceSkillPath) {
+        try {
+          const st = await fs.stat(path.resolve(skillName));
+          if (st.isDirectory()) sourceSkillPath = path.resolve(skillName);
+        } catch {}
+      }
+      if (!sourceSkillPath) throw new Error(`Skill source package not found for ${skillName}`);
+      return freezeSkillPackage({
+        sourceSkillPath,
+        version,
+        force: flags.force === true,
+        provider: flags.provider?.[0] ?? "portable",
+      });
+    }
     if (area === "rulesets") return { rulesets: listSkillAuthoringRulesets() };
   }
 
@@ -829,6 +868,25 @@ async function run(argv) {
       await recordActivationPlan({ catalogRoot, plan, projectId, assignments: selection.assignments });
       await recordActivationReport({ catalogRoot, planId: plan.plan_id, report });
       return { plan, report };
+    }
+    if (action === "link") {
+      const skillName = positional[3] ?? flags.skill?.[0];
+      if (!skillName) throw new Error("project link requires a skill name: skills-catalog project link <project-id> <skill-name>");
+      const version = flags.version ?? flags["to-version"] ?? null;
+      const packagesRoot = flags["packages-root"] ?? flags.packages ?? null;
+      return linkProjectSkill({
+        catalogRoot,
+        projectId,
+        skillName,
+        version: flags.latest === true ? null : version,
+        packagesRoot,
+      });
+    }
+    if (action === "status") {
+      return getProjectSkillStatus({
+        catalogRoot,
+        projectId,
+      });
     }
   }
 

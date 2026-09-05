@@ -233,3 +233,61 @@ test("CLI sync runs preflight validation, registry import, project binding, and 
   const linkTarget = await fs.readlink(path.join(deliveryRoot, "test-skill"));
   assert.ok(linkTarget.includes("test-skill"));
 });
+
+test("CLI manages version freezing, version-pinned linking, and floating-latest project status", async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-catalog-cli-versions-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const packagesRoot = path.join(root, "skills-packages");
+  const coreGroup = path.join(packagesRoot, "core");
+  const skillSource = path.join(coreGroup, "my-skill");
+  const catalogRoot = path.join(root, "catalog");
+  const projectPath = path.join(root, "project");
+  const deliveryRoot = path.join(projectPath, ".agents", "skills");
+
+  await fs.mkdir(skillSource, { recursive: true });
+  await fs.writeFile(
+    path.join(skillSource, "SKILL.md"),
+    "---\nname: my-skill\ndescription: Core authoring skill.\n---\n\n# My Skill\n"
+  );
+
+  await run([
+    "project", "add", "my-app", "--catalog", catalogRoot, "--name", "My App",
+    "--path", projectPath, "--provider", "antigravity",
+    "--delivery-root", deliveryRoot,
+  ]);
+
+  // 1. Freeze v1.0.0
+  const freezeResult = await run([
+    "skill", "freeze", "my-skill", "--version", "1.0.0", "--out", packagesRoot,
+  ]);
+  assert.equal(freezeResult.frozen, true);
+  assert.equal(freezeResult.version, "1.0.0");
+  assert.ok(freezeResult.target_path.endsWith("my-skill@1.0.0"));
+
+  // 2. Link with version_pinned
+  const pinResult = await run([
+    "project", "link", "my-app", "my-skill", "--version", "1.0.0",
+    "--catalog", catalogRoot, "--packages-root", packagesRoot,
+  ]);
+  assert.equal(pinResult.linked, true);
+  assert.equal(pinResult.binding_policy, "version_pinned");
+  assert.equal(pinResult.pinned_version, "1.0.0");
+
+  let statusResult = await run(["project", "status", "my-app", "--catalog", catalogRoot]);
+  assert.equal(statusResult.skills[0].binding_policy, "version_pinned");
+  assert.equal(statusResult.skills[0].pinned_version, "1.0.0");
+  assert.ok(statusResult.skills[0].link_target.endsWith("my-skill@1.0.0"));
+
+  // 3. Switch to floating_latest
+  const latestResult = await run([
+    "project", "link", "my-app", "my-skill", "--latest",
+    "--catalog", catalogRoot, "--packages-root", packagesRoot,
+  ]);
+  assert.equal(latestResult.linked, true);
+  assert.equal(latestResult.binding_policy, "floating_latest");
+
+  statusResult = await run(["project", "status", "my-app", "--catalog", catalogRoot]);
+  assert.equal(statusResult.skills[0].binding_policy, "floating_latest");
+  assert.equal(statusResult.skills[0].pinned_version, null);
+  assert.ok(statusResult.skills[0].link_target.endsWith("my-skill"));
+});
