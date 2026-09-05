@@ -145,6 +145,14 @@
       "content_digest": "c5680d134aef7c39fad3fa3d3135210d8b7018c677125601ff8013701bc96fc4",
       "fetched_at": "2026-09-05T14:38:35.314Z",
       "review_state": "imported"
+    },
+    {
+      "id": "revision_062076352c48120b83a7ac5f",
+      "source_id": "source_local_0926b791b8fe5bf0",
+      "resolved_revision": "ff5d35fab67c5d1f6279f44140f5a20c1567d0c1587d55ac0c0d0787b2cc62eb",
+      "content_digest": "ff5d35fab67c5d1f6279f44140f5a20c1567d0c1587d55ac0c0d0787b2cc62eb",
+      "fetched_at": "2026-09-05T15:18:09.227Z",
+      "review_state": "imported"
     }
   ],
   "lineages": [
@@ -2349,6 +2357,34 @@
       "canonical_path": "revisions/revision_c9a201b4a4427ad2d7879dca/artifacts/svg-authoring-c5680d134a",
       "canonical_relative_path": "revisions/revision_c9a201b4a4427ad2d7879dca/artifacts/svg-authoring-c5680d134a",
       "imported_at": "2026-09-05T14:38:35.314Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_2a6987787b3430e9190a",
+      "source_id": "source_local_0926b791b8fe5bf0",
+      "source_revision_id": "revision_062076352c48120b83a7ac5f",
+      "skill_name": "svg-authoring",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_0926b791b8fe5bf0:.",
+      "lineage_id": "lineage_e95b938b1f1be8fc3d30",
+      "description": "Expert guide, mathematical formulas, recipes, and validation procedures for authoring, generating, and debugging raw SVG vector graphics, diagrams, and data visualizations. Grounded in W3C SVG 1.1 (2nd Edition) and SVG 2 specifications. Use whenever creating or modifying SVG graphics, charts (pie, donut, bar, scatter, radar), curves (bezier, sankey, streamgraph), topological diagrams, gauge needles, or visual elements.",
+      "manifest": {
+        "declared_name": "svg-authoring",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "ff5d35fab67c5d1f6279f44140f5a20c1567d0c1587d55ac0c0d0787b2cc62eb",
+      "canonical_path": "revisions/revision_062076352c48120b83a7ac5f/artifacts/svg-authoring-ff5d35fab6",
+      "canonical_relative_path": "revisions/revision_062076352c48120b83a7ac5f/artifacts/svg-authoring-ff5d35fab6",
+      "imported_at": "2026-09-05T15:18:09.227Z",
       "review_state": "imported"
     }
   ]
