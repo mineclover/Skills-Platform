@@ -46,6 +46,8 @@ rulesets and shows their revision-pinned findings separately in the Skills UI.
 The maintained authoring packages, portable recipe, machine-local Catalog
 state, and provider bindings are covered in the
 [project skill-package management guide](./docs/guides/project-skill-package-management.md).
+For the 2-tier delivery model (direct reference linking for zero-sync inner loops vs. on-demand partial snapshot freezing), see the
+[skill reference and delivery guide](./docs/guides/skill-reference-and-delivery-guide.md).
 
 ## Bootstrap
 

@@ -63,14 +63,23 @@ node apps/skills-catalog/src/cli.js skill validate \
   ./skills-packages/local/my-skill --provider codex
 node apps/skills-catalog/src/cli.js skill validate \
   ./skills-packages/local/my-skill --provider antigravity
+
+# On-demand partial update: validate, ingest immutable revision, and deliver to project in one touch
+node apps/skills-catalog/src/cli.js sync \
+  ./skills-packages/local/my-skill --project demo --confirm
 ```
 
-`source inspect` reports `importable` from discovery and manifest parsing. It
-does not collapse provider rules into that boolean. Check
-`skills[].authoring.results.codex.summary.status` and
-`skills[].authoring.results.antigravity.summary.status` separately: an
-importable source can still be nonconformant for either provider. Import also
-does not approve, select, enable, or deliver an artifact.
+## Two-Tier Delivery Model: Direct Reference vs. Governed Snapshot
+
+Skills Platform supports two complementary delivery modes (see [Skill Reference and Delivery Guide](../../docs/guides/skill-reference-and-delivery-guide.md)):
+
+1. **Tier 1: Direct Reference Mode (Inner Loop Prototyping)**:
+   - Symlink `.agents/skills/<skill>` directly to `skills-packages/<group>/<skill>`.
+   - **Zero Sync Overhead**: File saves immediately reflect in project workspaces with no background watch daemons or compile steps. Just re-read the file in the agent.
+   - Protected by companion sidecars (`method: "direct_source_symlink"`).
+2. **Tier 2: Governed Snapshot Mode (Partial Update & Freeze)**:
+   - Use `skills-catalog sync <skill> --project <id> --confirm` to atomically validate, ingest an immutable SHA-256 revision snapshot into the registry, and pin the project symlink.
+   - Ideal for milestone releases, audit trails, and multi-machine environments.
 
 ## Portable recipes and project-local packages
 
