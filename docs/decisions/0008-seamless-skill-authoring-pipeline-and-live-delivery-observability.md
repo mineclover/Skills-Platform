@@ -26,19 +26,19 @@ For active skill authoring and project-local iteration:
 - **Bidirectional Editing**: Edits performed from within project links directly modify canonical sources, preventing fork-drift.
 - **Ownership Marker**: The accompanying sidecar records `"method": "direct_source_symlink"`, establishing platform ownership without mutating source contents.
 
-### 2. Tier 2: On-Demand Partial Update Pipeline (`skills-catalog sync`)
-When an author reaches a milestone and wishes to freeze an immutable snapshot or update catalog registrations:
-```bash
-skills-catalog sync <skill-source-or-name> --project <project-id> [--confirm]
-```
-- **Targeted Scope (Partial Update)**: Operates strictly on the requested skill rather than forcing a heavy full-catalog reconciliation.
-- **Automated Pipeline**:
-  1. **Pre-flight Lint**: Runs `inspectSkillPackage` against provider rulesets (halts on errors).
-  2. **Snapshot Ingestion**: Invokes `importLocalSource`, writing an immutable SHA-256 revision.
-  3. **Project Binding Pin**: Updates the project's lineage override to the newly minted `registry_skill_id`.
-  4. **Ephemeral Plan Synthesis**: Generates an in-memory `ActivationPlan`.
-  5. **Adapter Materialization**: Dispatches to `skills-manager-adapter`, updating the symlink to the immutable snapshot (`status: replace` / `noop`).
-- **Preview Safety**: Omitting `--confirm` outputs a dry-run preview of the resulting plan.
+### 2. Tier 2: Governed Version-Pinned Mode & Version-Named Source Directories
+To isolate production, benchmark, and audited projects from agent spec ripple effects:
+- Projects specify `binding_policy: "version_pinned"` in their ownership sidecar.
+- **Optimal Local Handling Method**: Rather than burying historical versions inside obscure cryptographic hash directories, the platform standardizes on **version-named source packages** (e.g., `skills-packages/<group>/<skill>@<version>`):
+  - `svg-authoring/`: Working tree for projects on `floating_latest`.
+  - `svg-authoring@1.0.0/`: Frozen release for projects on `version_pinned`.
+- Symlinks to versioned directories (`.agents/skills/svg-authoring -> .../svg-authoring@1.0.0`) are immediately human-readable, easily diffable (`diff -r`), and require zero database lookups.
+- **On-Demand Partial Update Pipeline (`skills-catalog sync`)**:
+  When an author publishes an official version or wishes to freeze a snapshot into the central registry:
+  ```bash
+  skills-catalog sync <skill-source-or-name> --project <project-id> [--confirm]
+  ```
+  - Preflight validation, immutable SHA-256 revision ingestion, and atomic symlink delivery executed in under 0.05 seconds.
 
 ### 3. Live Delivery & Sidecar Observability in Catalog UI (`apps/catalog-ui`)
 Extend the Catalog UI to clearly distinguish and observe both delivery tiers:
