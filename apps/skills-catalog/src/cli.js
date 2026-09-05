@@ -686,8 +686,10 @@ async function run(argv) {
       if (!skillName) throw new Error("skill freeze requires a skill name: skills-catalog skill freeze <name> --version <v>");
       const version = flags.version ?? flags["to-version"];
       if (!version) throw new Error("skill freeze requires --version <semver>");
-      const packagesRoot = flags.out ? path.resolve(flags.out) : path.join(process.cwd(), "skills-packages");
+      const packagesRoot = flags["packages-root"] ? path.resolve(flags["packages-root"]) : path.join(process.cwd(), "skills-packages");
+      const instancesRoot = flags["instances-root"] ? path.resolve(flags["instances-root"]) : path.join(process.cwd(), "skills-instances");
       let sourceSkillPath = null;
+      let matchedGroup = null;
       try {
         const groups = await fs.readdir(packagesRoot);
         for (const group of groups) {
@@ -696,6 +698,7 @@ async function run(argv) {
             const st = await fs.stat(candidate);
             if (st.isDirectory()) {
               sourceSkillPath = candidate;
+              matchedGroup = group;
               break;
             }
           } catch {}
@@ -708,9 +711,16 @@ async function run(argv) {
         } catch {}
       }
       if (!sourceSkillPath) throw new Error(`Skill source package not found for ${skillName}`);
+      const outputDirectory = flags.out
+        ? path.resolve(flags.out)
+        : matchedGroup
+        ? path.join(instancesRoot, matchedGroup)
+        : instancesRoot;
+
       return freezeSkillPackage({
         sourceSkillPath,
         version,
+        outputDirectory,
         force: flags.force === true,
         provider: flags.provider?.[0] ?? "portable",
       });
@@ -874,12 +884,14 @@ async function run(argv) {
       if (!skillName) throw new Error("project link requires a skill name: skills-catalog project link <project-id> <skill-name>");
       const version = flags.version ?? flags["to-version"] ?? null;
       const packagesRoot = flags["packages-root"] ?? flags.packages ?? null;
+      const instancesRoot = flags["instances-root"] ?? flags.instances ?? null;
       return linkProjectSkill({
         catalogRoot,
         projectId,
         skillName,
         version: flags.latest === true ? null : version,
         packagesRoot,
+        instancesRoot,
       });
     }
     if (action === "status") {

@@ -592,6 +592,7 @@ async function freezeSkillPackage({
     if (error.code !== "ENOENT") throw error;
   }
 
+  await fs.mkdir(outDir, { recursive: true });
   await fs.cp(sourcePath, targetDirectory, { recursive: true });
 
   // Update or inject version in SKILL.md frontmatter

@@ -20,24 +20,24 @@ The core value of the **Skills Manager** is:
 Skills Platform operates on a 2-tier delivery architecture:
 
 ```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                              CENTRAL SKILLS STORE                                      │
-│                      skills-packages/<group>/<skill-name>/                             │
-│                                                                                        │
-│  [Rolling Latest Source]                     [Version-Named Source Folders]            │
-│  skills-packages/.../svg-authoring           skills-packages/.../svg-authoring@1.0.0   │
-└──────────────────┬───────────────────────────────────────────┬─────────────────────────┘
-                   │                                           │
-  [Tier 1: floating_latest Mode]               [Tier 2: version_pinned Mode]
-  (Active Prototyping & Inner Loop)            (Production Baselines & Frozen Releases)
-                   │                                           │
-                   │ Direct Symlink                            │ Version-Named Symlink
-                   ▼                                           ▼
-┌──────────────────────────────────────┐    ┌──────────────────────────────────────────┐
-│   PROJECT RUNTIME: TRACKING LATEST   │    │    PROJECT RUNTIME: PINNED TO v1.0.0     │
-│   .agents/skills/svg-authoring       │    │    .agents/skills/svg-authoring          │
-│   └──> points to svg-authoring       │    │    └──> points to svg-authoring@1.0.0    │
-└──────────────────────────────────────┘    └──────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐    ┌──────────────────────────────────────────────┐
+│       CANONICAL PACKAGES (배포본 원본)        │    │        INSTANCES REPOSITORY (인스턴스)       │
+│    skills-packages/<group>/<skill-name>/     │    │   skills-instances/<group>/<skill>@<version> │
+│                                              │    │                                              │
+│  [Rolling Latest Active Dev Track]           │    │  [Immutable Frozen Version Snapshots]        │
+│  skills-packages/.../svg-authoring           │    │  skills-instances/.../svg-authoring@1.0.0   │
+└──────────────────────┬───────────────────────┘    └──────────────────────┬───────────────────────┘
+                       │                                                   │
+      [Tier 1: floating_latest Mode]                       [Tier 2: version_pinned Mode]
+      (Active Prototyping & Inner Loop)                    (Production Baselines & Frozen Releases)
+                       │                                                   │
+                       │ Direct Symlink                                    │ Version-Named Symlink
+                       ▼                                                   ▼
+    ┌──────────────────────────────────────┐            ┌──────────────────────────────────────────┐
+    │   PROJECT RUNTIME: TRACKING LATEST   │            │    PROJECT RUNTIME: PINNED TO v1.0.0     │
+    │   .agents/skills/svg-authoring       │            │    .agents/skills/svg-authoring          │
+    │   └──> points to skills-packages/... │            │    └──> points to skills-instances/...  │
+    └──────────────────────────────────────┘            └──────────────────────────────────────────┘
 ```
 
 ### Tier 1: Direct Reference Mode (Live Dev Link — "Just Refresh")
@@ -50,12 +50,13 @@ Skills Platform operates on a 2-tier delivery architecture:
   - **Agent / IDE Refresh**: After saving changes, simply re-read the file in chat or reload the IDE. The agent reads the newest instructions instantly.
   - **Ownership Protected**: Managed by a sidecar record with `"method": "direct_source_symlink"`, preventing external tools from deleting or overwriting it.
 
-### Tier 2: Governed Version-Pinned Mode ("Version Directory or Snapshot Freeze")
+### Tier 2: Governed Version-Pinned Mode ("Dedicated Instance Repository")
 - **How it works**:
-  - **Local Development Standard (Most Effective)**: The project points directly to a version-named source package (`skills-packages/<group>/<skill-name>@<version>`), keeping files human-readable and instantly diffable.
+  - **Local Development Standard (Most Effective)**: The project points directly to an instance snapshot in the dedicated instances repository (`skills-instances/<group>/<skill-name>@<version>`), keeping the distribution store (`skills-packages/`) clean while keeping instances human-readable and instantly diffable.
   - **Central/CI Registry Mode**: For air-gapped CI/CD and formal audit logs, an immutable revision is ingested into `.skills-platform/registry/revisions/<revision_id>/artifacts/` and pinned via cryptographic SHA-256 hash.
 - **Binding Policy**: `"version_pinned"`
 - **Key Characteristics**:
+  - **Distribution Tree Hygiene**: `skills-packages/` remains strictly for canonical package authoring, free from clutter of immutable historical versions.
   - **Ripple Protection**: Prevents prompt experiments in `latest` from accidentally breaking production agent behaviors.
   - **Human-Readable Clarity**: Inspecting symlinks clearly displays the target version (e.g. `@1.0.0`) without querying metadata catalogs.
   - **Review & Approval Gate**: Integrates with catalog source reviews, health evaluations, and preset versioning.
@@ -80,21 +81,24 @@ To resolve this, Skills Platform establishes a formal distinction between two bi
 
 ### 3.2. Policy B: Pinned to Specific Version (`version_pinned`)
 - **Target Environments**: Production baselines, benchmark suites, release branches, audited workspaces.
-- **The Most Effective Local Handling Method: Version-Named Source Directories**:
-  Instead of burying historical snapshots in obscure cryptographic hash directories (`.skills-platform/registry/revisions/revision_xxxx/...`), the cleanest and most practical local mechanism is **maintaining version-named canonical directories (e.g. `<skill-name>@<version>`) directly in the skills store**:
+- **The Most Effective Local Handling Method: Dedicated Instance Repository (`skills-instances/`)**:
+  Instead of burying historical snapshots in obscure cryptographic hash directories (`.skills-platform/registry/revisions/revision_xxxx/...`) or cluttering the distribution packages tree (`skills-packages/`), the cleanest and most practical local mechanism is **maintaining version-named instance directories (e.g. `<skill-name>@<version>`) in a dedicated instances repository (`skills-instances/`)**:
   ```text
   skills-packages/platform-core/
-    ├── svg-authoring/            # Rolling latest working tree (for floating_latest projects)
-    ├── svg-authoring@1.0.0/      # Frozen v1.0.0 canonical source (for version_pinned projects)
-    └── svg-authoring@2.0.0/      # Frozen v2.0.0 canonical source (for version_pinned projects)
+    └── svg-authoring/            # Canonical distribution package (for floating_latest projects)
+
+  skills-instances/platform-core/
+    ├── svg-authoring@1.0.0/      # Frozen v1.0.0 instance (for version_pinned projects)
+    └── svg-authoring@2.0.0/      # Frozen v2.0.0 instance (for version_pinned projects)
   ```
   - When a project binds to `version_pinned` at `v1.0.0`:
-    `.agents/skills/svg-authoring` simply symlinks to `skills-packages/platform-core/svg-authoring@1.0.0`.
+    `.agents/skills/svg-authoring` simply symlinks to `skills-instances/platform-core/svg-authoring@1.0.0`.
   - **Why this pattern is optimal for local development**:
-    1. **Instant Human-Readable Transparency**: Running `ls -la .agents/skills` immediately reveals the exact pinned version at a glance without reading registry databases.
-    2. **Zero Ingestion/Unpack Overhead**: Follows the identical lightweight Unix symlink mechanism as Tier 1.
-    3. **Effortless Local Diffs**: Run `diff -r svg-authoring svg-authoring@1.0.0` to immediately inspect prompt divergences.
-    4. **Isolated Breaking Changes**: Authors can introduce disruptive prompt architectures in `svg-authoring/` without breaking baseline project agents pinned to `@1.0.0`.
+    1. **Distribution Integrity**: `skills-packages/` contains only active canonical packages, preventing pollution from old snapshots.
+    2. **Instant Human-Readable Transparency**: Running `ls -la .agents/skills` immediately reveals the exact pinned version at a glance without reading registry databases.
+    3. **Zero Ingestion/Unpack Overhead**: Follows the identical lightweight Unix symlink mechanism as Tier 1.
+    4. **Effortless Local Diffs**: Run `diff -r skills-packages/platform-core/svg-authoring skills-instances/platform-core/svg-authoring@1.0.0` to immediately inspect prompt divergences.
+    5. **Isolated Breaking Changes**: Authors can introduce disruptive prompt architectures in `svg-authoring/` without breaking baseline project agents pinned to `@1.0.0`.
 
 ### 3.3. Semantic Versioning (SemVer) Contract for Skills
 
@@ -129,7 +133,7 @@ The ownership sidecar (`*.skills-platform-link-ownership.json`) explicitly recor
   "binding_policy": "version_pinned",
   "skill_name": "svg-authoring",
   "pinned_version": "1.0.0",
-  "canonical_path": "/path/to/skills-packages/platform-core/svg-authoring@1.0.0"
+  "canonical_path": "/path/to/skills-instances/platform-core/svg-authoring@1.0.0"
 }
 ```
 
@@ -145,16 +149,16 @@ The Skills Platform CLI manages both `floating_latest` and `version_pinned` mode
 # 1. Mount directly to latest working source (floating_latest mode)
 node apps/skills-catalog/src/cli.js project link information-ui-catalog svg-authoring --latest
 
-# 2. Pin to a specific versioned package (version_pinned mode)
+# 2. Pin to a specific versioned instance (version_pinned mode)
 node apps/skills-catalog/src/cli.js project link information-ui-catalog svg-authoring --version 1.0.0
 ```
 
 ### 4.2. Freezing a Versioned Source Package (`skills-catalog skill freeze`)
 
-To freeze the current working source into a dedicated human-readable version directory (`skill@<version>`):
+To freeze the current working source into a dedicated human-readable version directory (`skill@<version>`) under `skills-instances/`:
 
 ```bash
-# Freezes svg-authoring into svg-authoring@1.0.0 and updates SKILL.md frontmatter
+# Freezes svg-authoring into skills-instances/platform-core/svg-authoring@1.0.0 and updates SKILL.md frontmatter
 node apps/skills-catalog/src/cli.js skill freeze svg-authoring --version 1.0.0
 ```
 
@@ -165,7 +169,7 @@ Output highlights:
   "skill_name": "svg-authoring",
   "version": "1.0.0",
   "source_path": ".../skills-packages/platform-core/svg-authoring",
-  "target_path": ".../skills-packages/platform-core/svg-authoring@1.0.0",
+  "target_path": ".../skills-instances/platform-core/svg-authoring@1.0.0",
   "valid": true
 }
 ```

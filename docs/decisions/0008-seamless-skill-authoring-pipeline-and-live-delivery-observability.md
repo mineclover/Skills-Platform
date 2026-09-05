@@ -26,13 +26,15 @@ For active skill authoring and project-local iteration:
 - **Bidirectional Editing**: Edits performed from within project links directly modify canonical sources, preventing fork-drift.
 - **Ownership Marker**: The accompanying sidecar records `"method": "direct_source_symlink"`, establishing platform ownership without mutating source contents.
 
-### 2. Tier 2: Governed Version-Pinned Mode & Version-Named Source Directories
+### 2. Tier 2: Governed Version-Pinned Mode & Dedicated Instance Repository (`skills-instances/`)
 To isolate production, benchmark, and audited projects from agent spec ripple effects:
 - Projects specify `binding_policy: "version_pinned"` in their ownership sidecar.
-- **Optimal Local Handling Method**: Rather than burying historical versions inside obscure cryptographic hash directories, the platform standardizes on **version-named source packages** (e.g., `skills-packages/<group>/<skill>@<version>`):
-  - `svg-authoring/`: Working tree for projects on `floating_latest`.
-  - `svg-authoring@1.0.0/`: Frozen release for projects on `version_pinned`.
-- Symlinks to versioned directories (`.agents/skills/svg-authoring -> .../svg-authoring@1.0.0`) are immediately human-readable, easily diffable (`diff -r`), and require zero database lookups.
+- **Architectural Separation: Distribution Packages vs. Dedicated Instances**:
+  - `skills-packages/`: The canonical distribution & active authoring repository (`<group>/<skill>`), preserved free of version snapshot pollution.
+  - `skills-instances/`: Dedicated instance repository for immutable version snapshots and frozen releases (`<group>/<skill>@<version>`).
+  - `skills-packages/<group>/<skill>`: Active development source for projects on `floating_latest`.
+  - `skills-instances/<group>/<skill>@<version>`: Frozen release instance for projects on `version_pinned`.
+- Symlinks to versioned instances (`.agents/skills/svg-authoring -> skills-instances/.../svg-authoring@1.0.0`) are immediately human-readable, easily diffable (`diff -r`), and require zero database lookups.
 - **On-Demand Partial Update Pipeline (`skills-catalog sync`)**:
   When an author publishes an official version or wishes to freeze a snapshot into the central registry:
   ```bash

@@ -234,10 +234,11 @@ test("CLI sync runs preflight validation, registry import, project binding, and 
   assert.ok(linkTarget.includes("test-skill"));
 });
 
-test("CLI manages version freezing, version-pinned linking, and floating-latest project status", async (context) => {
+test("CLI manages version freezing to skills-instances, version-pinned linking, and floating-latest project status", async (context) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-catalog-cli-versions-"));
   context.after(() => fs.rm(root, { recursive: true, force: true }));
   const packagesRoot = path.join(root, "skills-packages");
+  const instancesRoot = path.join(root, "skills-instances");
   const coreGroup = path.join(packagesRoot, "core");
   const skillSource = path.join(coreGroup, "my-skill");
   const catalogRoot = path.join(root, "catalog");
@@ -256,22 +257,29 @@ test("CLI manages version freezing, version-pinned linking, and floating-latest 
     "--delivery-root", deliveryRoot,
   ]);
 
-  // 1. Freeze v1.0.0
+  // 1. Freeze v1.0.0 into skills-instances/core/my-skill@1.0.0
   const freezeResult = await run([
-    "skill", "freeze", "my-skill", "--version", "1.0.0", "--out", packagesRoot,
+    "skill", "freeze", "my-skill", "--version", "1.0.0",
+    "--packages-root", packagesRoot, "--instances-root", instancesRoot,
   ]);
   assert.equal(freezeResult.frozen, true);
   assert.equal(freezeResult.version, "1.0.0");
-  assert.ok(freezeResult.target_path.endsWith("my-skill@1.0.0"));
+  assert.ok(freezeResult.target_path.includes("skills-instances"));
+  assert.ok(freezeResult.target_path.endsWith(path.join("core", "my-skill@1.0.0")));
+
+  // Verify skills-packages/ remains pristine (no @ version folders created inside packages)
+  const packagesEntries = await fs.readdir(coreGroup);
+  assert.deepEqual(packagesEntries, ["my-skill"]);
 
   // 2. Link with version_pinned
   const pinResult = await run([
     "project", "link", "my-app", "my-skill", "--version", "1.0.0",
-    "--catalog", catalogRoot, "--packages-root", packagesRoot,
+    "--catalog", catalogRoot, "--packages-root", packagesRoot, "--instances-root", instancesRoot,
   ]);
   assert.equal(pinResult.linked, true);
   assert.equal(pinResult.binding_policy, "version_pinned");
   assert.equal(pinResult.pinned_version, "1.0.0");
+  assert.ok(pinResult.canonical_path.includes("skills-instances"));
 
   let statusResult = await run(["project", "status", "my-app", "--catalog", catalogRoot]);
   assert.equal(statusResult.skills[0].binding_policy, "version_pinned");
@@ -281,10 +289,11 @@ test("CLI manages version freezing, version-pinned linking, and floating-latest 
   // 3. Switch to floating_latest
   const latestResult = await run([
     "project", "link", "my-app", "my-skill", "--latest",
-    "--catalog", catalogRoot, "--packages-root", packagesRoot,
+    "--catalog", catalogRoot, "--packages-root", packagesRoot, "--instances-root", instancesRoot,
   ]);
   assert.equal(latestResult.linked, true);
   assert.equal(latestResult.binding_policy, "floating_latest");
+  assert.ok(latestResult.canonical_path.includes("skills-packages"));
 
   statusResult = await run(["project", "status", "my-app", "--catalog", catalogRoot]);
   assert.equal(statusResult.skills[0].binding_policy, "floating_latest");

@@ -370,14 +370,31 @@ async function buildProjectSystemPrompt({ catalogRoot, registryRoot, projectId, 
   };
 }
 
-async function resolveSkillPackageSource({ skillName, version = null, packagesRoot = null }) {
+async function resolveSkillPackageSource({ skillName, version = null, packagesRoot = null, instancesRoot = null }) {
   const targetFolderName = version ? `${skillName}@${version}` : skillName;
   const searchRoots = [];
-  if (packagesRoot) searchRoots.push(path.resolve(packagesRoot));
-  searchRoots.push(path.resolve(process.cwd(), "skills-packages"));
-  searchRoots.push(path.resolve(__dirname, "../../../skills-packages"));
 
-  for (const root of searchRoots) {
+  if (version) {
+    // Version requested: search instances repository first, then packages repository as fallback
+    if (instancesRoot) searchRoots.push(path.resolve(instancesRoot));
+    searchRoots.push(path.resolve(process.cwd(), "skills-instances"));
+    searchRoots.push(path.resolve(__dirname, "../../../skills-instances"));
+    if (packagesRoot) searchRoots.push(path.resolve(packagesRoot));
+    searchRoots.push(path.resolve(process.cwd(), "skills-packages"));
+    searchRoots.push(path.resolve(__dirname, "../../../skills-packages"));
+  } else {
+    // Latest requested: search packages repository first, then instances repository as fallback
+    if (packagesRoot) searchRoots.push(path.resolve(packagesRoot));
+    searchRoots.push(path.resolve(process.cwd(), "skills-packages"));
+    searchRoots.push(path.resolve(__dirname, "../../../skills-packages"));
+    if (instancesRoot) searchRoots.push(path.resolve(instancesRoot));
+    searchRoots.push(path.resolve(process.cwd(), "skills-instances"));
+    searchRoots.push(path.resolve(__dirname, "../../../skills-instances"));
+  }
+
+  const uniqueRoots = [...new Set(searchRoots)];
+
+  for (const root of uniqueRoots) {
     try {
       const groups = await fs.readdir(root);
       for (const group of groups) {
@@ -387,6 +404,11 @@ async function resolveSkillPackageSource({ skillName, version = null, packagesRo
           if (st.isDirectory()) return candidate;
         } catch {}
       }
+      const directCandidate = path.join(root, targetFolderName);
+      try {
+        const st = await fs.stat(directCandidate);
+        if (st.isDirectory()) return directCandidate;
+      } catch {}
     } catch {}
   }
   return null;
@@ -398,13 +420,14 @@ async function linkProjectSkill({
   skillName,
   version = null,
   packagesRoot = null,
+  instancesRoot = null,
 }) {
   const project = await getProject(catalogRoot, projectId);
   if (!project.delivery_root) {
     throw new Error(`Project ${projectId} does not have a delivery_root defined`);
   }
 
-  const targetSourcePath = await resolveSkillPackageSource({ skillName, version, packagesRoot });
+  const targetSourcePath = await resolveSkillPackageSource({ skillName, version, packagesRoot, instancesRoot });
   if (!targetSourcePath) {
     const requestedName = version ? `${skillName}@${version}` : skillName;
     throw new Error(`Skill source package not found: ${requestedName}`);
