@@ -41,6 +41,8 @@ For a side-by-side schema or directory audit, use the
 - Preserve provider-specific metadata already present unless the requested change requires it.
 - Validate observable structure and broken links without executing support scripts or changing the
   skill's activation behavior.
+- For canonical platform skills, include the standard governance section and lifecycle links as
+  defined in [references/golden-path-governance.md](references/golden-path-governance.md).
 
 ## Review output
 

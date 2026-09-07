@@ -242,3 +242,83 @@ node apps/skills-catalog/src/cli.js sync svg-authoring --project information-ui-
 2. **Be conscious of Agent Spec Ripple Effects**: When multiple projects or production agents consume a skill, keep production projects on `version_pinned` to isolate them from breaking changes during authoring.
 3. **Let the sidecar protect the link**: Always maintain the companion `.skills-platform-link-ownership.json` sidecar alongside the symlink so team members and automated tools recognize the managed link.
 4. **Use Partial Updates for milestones**: When you are ready to ship or share a reviewed baseline across teams, use `skills-catalog sync <skill> --confirm` to produce a permanent SHA-256 audit trail.
+
+---
+
+## 7. Multi-Location Discovery & Git Ownership Boundaries
+
+### 7.1. Git Commit Boundaries under Direct Reference (`floating_latest`)
+When a project runtime mounts a skill via `floating_latest`, editing files inside the project's `.agents/skills/<skill>/` directory actually edits the files in the Skills Platform repository (`skills-packages/<group>/<skill>/`):
+- **Skills Platform Repository**: Records all prompt, code, and reference diffs. Authors and maintainers commit these changes to `Skills-Platform` Git branches and pull requests.
+- **Target Project Repository**: Tracks only the project linkage. The project Git should never commit physical duplicates of skill contents.
+
+### 7.2. Project `.gitignore` and Link Sharing Policy
+Target project teams should decide how to track `.agents/skills/`:
+- **Shared Team Workspace (Recommended)**: Commit the symlinks, sidecars, and `.agents/skills/README.md` into the project repository so that every team member or CI runner shares the identical skill binding configuration.
+  ```gitignore
+  # Do not ignore managed skills and sidecars if team shares standard links:
+  !.agents/skills/*.skills-platform-link-ownership.json
+  !.agents/skills/README.md
+  ```
+- **Local-Only Workspaces**: If individual developers manage their own private skills, add `.agents/skills/` to the project's `.gitignore`.
+
+### 7.3. Global Host Synchronization (Antigravity & Codex)
+AI agents operating outside any specific repository (or in ad-hoc terminal sessions) discover skills from global host roots:
+- **Google Antigravity**: `~/.gemini/config/skills/`
+- **OpenAI Codex**: `~/.agents/skills/`
+
+To prevent divergence between repository agent sessions and global agent sessions, global roots should also symlink directly to canonical packages in `Skills-Platform/skills-packages/`:
+```bash
+# Antigravity global link
+ln -s ~/workflow/Skills-Platform/skills-packages/openwiki/openwiki-cli ~/.gemini/config/skills/openwiki-cli
+ln -s ~/workflow/Skills-Platform/skills-packages/openwiki/openwiki-grounding ~/.gemini/config/skills/openwiki-grounding
+
+# Codex global link
+ln -s ~/workflow/Skills-Platform/skills-packages/openwiki/openwiki-cli ~/.agents/skills/openwiki-cli
+```
+
+### 7.4. Dual-Role Repositories: Agent Skills vs. Bundled Product Skills
+Certain projects (e.g. OpenWiki, developer tooling, CLI frameworks) play a dual role:
+1. **Agent Development Runtime (`.agents/skills/`)**: Skills that autonomous coding agents consume while working on the codebase (linked to `skills-packages/`).
+2. **Product Bundled Skills (`skills/` or `dist/skills/`)**: Skills distributed with the tool binary or npm package to end-users (e.g. OpenWiki copying bundled skills to `~/.openwiki/skills/`).
+
+**Lifecycle Rule (Reverse-Sync / Release Sync)**:
+- During active development, all improvements occur in the canonical package (`skills-packages/<group>/<skill>/`).
+- Prior to creating an npm/binary release of the product, run an atomic reverse-sync to copy the validated canonical package into the product's bundled distribution directory:
+  ```bash
+  # Example: Reverse-syncing canonical openwiki-cli into product distribution
+  cp -r ~/workflow/Skills-Platform/skills-packages/openwiki/openwiki-cli/* ~/workflow/openwiki/skills/openwiki-cli/
+  ```
+
+---
+
+## 8. Multi-Skill Batch Operations & Preset Sync
+
+When a project requires multiple skills simultaneously (e.g. the 5 OpenWiki skills), you can link them sequentially or manage them through a project preset:
+
+```bash
+# Batch link multiple skills to a project
+for skill in openwiki-cli openwiki-grounding mermaid-diagrams write-connector openwiki; do
+  node apps/skills-catalog/src/cli.js project link openwiki $skill --latest
+done
+```
+
+To verify the overall status of all project links:
+```bash
+node apps/skills-catalog/src/cli.js project status openwiki
+```
+
+---
+
+## 9. Operator Quick Checklist: From Edit to Delivery
+
+Follow this checklist whenever modifying or delivering skills across the platform:
+
+| Step | Operation | Command / Action |
+| :---: | :--- | :--- |
+| **1. Edit** | Modify `SKILL.md`, `references/`, or `scripts/` | Edit canonical package under `skills-packages/<group>/<skill>/` |
+| **2. Validate** | Verify static syntax against both host platforms | `node apps/skills-catalog/src/cli.js skill validate <path> --provider portable` |
+| **3. Test** | Run unit tests or dry-run scripts | Execute accompanying test scripts or harness evaluations |
+| **4. Freeze (Optional)** | Create an immutable SemVer snapshot for production | `node apps/skills-catalog/src/cli.js skill freeze <skill> --version <semver>` |
+| **5. Link / Update** | Mount or refresh project runtime links | `node apps/skills-catalog/src/cli.js project link <project> <skill> [--latest \| --version]` |
+| **6. Health Check** | Confirm symlink and sidecar integrity | `node apps/skills-catalog/src/cli.js project status <project>` |
