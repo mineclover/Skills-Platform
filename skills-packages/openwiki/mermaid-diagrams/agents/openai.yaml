@@ -1,0 +1,8 @@
+interface:
+  display_name: Mermaid Diagrams for OpenWiki
+  short_description: Embed syntactically valid Mermaid diagrams in OpenWiki pages
+  default_prompt: Use $mermaid-diagrams to author or fix Mermaid diagrams in OpenWiki documentation.
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools: []

@@ -9,6 +9,7 @@ Authoritative provenance and origin metadata for all modular skill packages in `
 | Package Name | Origin / Provider | Spec Format | License | Key Skills Included |
 | :--- | :--- | :--- | :--- | :--- |
 | **`platform-core`** | Skills Platform Core Team | Antigravity / Open Skills | Apache-2.0 | `worktree-lifecycle-orchestrator`, `vertical-spec-documenter`, `skill-authoring-standard`, `generative-ui`, `svg-authoring`, `logical-completion-core`, `logical-completion-harness`, `lch-contract-compiler`, `lch-horizontal-explorer`, `lch-obligation-ledger`, `lch-responsibility-router`, `lch-work-unit-executor`, `lch-evidence-collector`, `lch-independent-auditor`, `lch-failure-recovery`, `lch-closure-gate`, `lch-experience-consolidator`, `lch-evolution-supervisor`, `lch-teamwork-preview` (19 skills) |
+| **`openwiki`** | OpenWiki Team (`langchain-ai/openwiki`) | Antigravity / Open Skills | MIT | `openwiki-cli`, `openwiki-grounding`, `openwiki`, `mermaid-diagrams`, `write-connector` (5 skills) |
 | **`antigravity-builtin`** | Google DeepMind (Antigravity) | Antigravity Native | Builtin | `teamwork-preview`, `agy-customizations`, `antigravity-guide`, `generative-ui`, `grill-me`, `goal`, `learn`, `schedule`, `browser`, `ralph-loop` (12 skills) |
 | **`skills-manager`** | Skills Manager System | Native Tooling | Apache-2.0 | `skills-manager-testing`, `skills-manager-architecture`, `skills-manager-orca`, `skills-manager-tauri`, `skills-manager-ui` |
 | **`shared-agents`** | Global Agent Pool (`~/.agents`) | Open Agent Spec | Internal | `find-skills`, `computer-use`, `orca-cli`, `orchestration` |
@@ -21,7 +22,8 @@ Authoritative provenance and origin metadata for all modular skill packages in `
 ## 🔗 Upstream Source URLs & References
 
 1. **Google Antigravity Documentation**: `https://antigravity.google/docs`
-2. **Paperthin Agent Reflexes Repository**: `https://github.com/LilMGenius/paperthin`
-3. **Open Agent Skills Specification**: `https://agentskills.io/specification`
-4. **OpenAI Codex Skills Guidelines**: `https://developers.openai.com/codex/skills`
-5. **Matt Pocock Agent Skills Collection**: `https://github.com/mattpocock`
+2. **OpenWiki Knowledge Engine**: `https://github.com/langchain-ai/openwiki`
+3. **Paperthin Agent Reflexes Repository**: `https://github.com/LilMGenius/paperthin`
+4. **Open Agent Skills Specification**: `https://agentskills.io/specification`
+5. **OpenAI Codex Skills Guidelines**: `https://developers.openai.com/codex/skills`
+6. **Matt Pocock Agent Skills Collection**: `https://github.com/mattpocock`

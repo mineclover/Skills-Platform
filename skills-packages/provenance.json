@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-30T00:00:00.000Z",
+  "updated_at": "2026-09-06T01:26:01.929Z",
   "packages": [
     {
       "package_id": "platform-core",
@@ -72,6 +72,16 @@
       "maintainer": "Skills Platform Architecture Team",
       "description": "Diagnose and recover projects from spec proliferation, establish canonical product spines, golden paths, asset disposition matrices, and evidence-based delivery gates",
       "license": "Apache-2.0",
+      "skills_count": 5
+    },
+    {
+      "package_id": "openwiki",
+      "display_name": "OpenWiki Knowledge & Documentation Engine",
+      "origin_type": "first_party",
+      "maintainer": "OpenWiki Team",
+      "upstream_url": "https://github.com/langchain-ai/openwiki",
+      "description": "OpenWiki CLI operation, grounded knowledge graph documentation (OKF v0.2), diagram embedding, and connector development skills",
+      "license": "MIT",
       "skills_count": 5
     }
   ]

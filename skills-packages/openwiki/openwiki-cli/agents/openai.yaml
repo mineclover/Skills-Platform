@@ -1,0 +1,8 @@
+interface:
+  display_name: OpenWiki CLI
+  short_description: Operate OpenWiki CLI to generate, update, and visualize wikis
+  default_prompt: Use $openwiki-cli to run, configure, or troubleshoot OpenWiki documentation workflows.
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools: []

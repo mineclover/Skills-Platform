@@ -1,0 +1,8 @@
+interface:
+  display_name: OpenWiki Grounding
+  short_description: Guide for 2-axis documentation and OKF frontmatter grounding
+  default_prompt: Use $openwiki-grounding to structure and ground OpenWiki documentation.
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools: []

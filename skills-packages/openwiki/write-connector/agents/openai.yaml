@@ -1,0 +1,8 @@
+interface:
+  display_name: Write OpenWiki Connector
+  short_description: Guide for developing built-in source connectors for OpenWiki
+  default_prompt: Use $write-connector to design and implement built-in OpenWiki connectors.
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools: []
