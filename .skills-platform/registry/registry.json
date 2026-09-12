@@ -63,6 +63,20 @@
       "locator": "/Users/junwoobang/workflow/Skills-Platform/skills-packages/platform-core/svg-authoring",
       "requested_ref": null,
       "created_at": "2026-09-05T14:38:35.314Z"
+    },
+    {
+      "id": "source_local_286f992105ff8e54",
+      "kind": "local",
+      "locator": "./skills-packages/platform-core/skills-platform-guide",
+      "requested_ref": null,
+      "created_at": "2026-09-07T22:54:22.545Z"
+    },
+    {
+      "id": "source_local_4a65ffa53f80d846",
+      "kind": "local",
+      "locator": "./skills-packages/community-codex/diagnosing-bugs",
+      "requested_ref": null,
+      "created_at": "2026-09-07T22:54:22.670Z"
     }
   ],
   "revisions": [
@@ -152,6 +166,46 @@
       "resolved_revision": "ff5d35fab67c5d1f6279f44140f5a20c1567d0c1587d55ac0c0d0787b2cc62eb",
       "content_digest": "ff5d35fab67c5d1f6279f44140f5a20c1567d0c1587d55ac0c0d0787b2cc62eb",
       "fetched_at": "2026-09-05T15:18:09.227Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_b1dfe7c66633f77e12e33026",
+      "source_id": "source_local_05a23d0ba2577995",
+      "resolved_revision": "8156c4f25c4fe37c15056414f251d147c0468abcb3555a6abe765923c89f69e4",
+      "content_digest": "8156c4f25c4fe37c15056414f251d147c0468abcb3555a6abe765923c89f69e4",
+      "fetched_at": "2026-09-07T22:54:22.486Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_f7160bda00f7639d81619bcb",
+      "source_id": "source_local_286f992105ff8e54",
+      "resolved_revision": "f9abf02071c72d000ba12c571af936b374db4aa5d3380000dfb97dd4c82576ab",
+      "content_digest": "f9abf02071c72d000ba12c571af936b374db4aa5d3380000dfb97dd4c82576ab",
+      "fetched_at": "2026-09-07T22:54:22.545Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_b331dc9b9fa0df13b7ba8135",
+      "source_id": "source_local_4a65ffa53f80d846",
+      "resolved_revision": "3098440499d65036a30ae5ebec6fac90f3d53833472e582e32be50f90b459755",
+      "content_digest": "3098440499d65036a30ae5ebec6fac90f3d53833472e582e32be50f90b459755",
+      "fetched_at": "2026-09-07T22:54:22.670Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_373918045a7b3386e94dc6a0",
+      "source_id": "source_local_286f992105ff8e54",
+      "resolved_revision": "a738adffc8be4a7f8907e2261aa333ec479642e65f7080f49a24dc96ba9af7a4",
+      "content_digest": "a738adffc8be4a7f8907e2261aa333ec479642e65f7080f49a24dc96ba9af7a4",
+      "fetched_at": "2026-09-07T23:29:24.439Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_00e1070ca2c0448daf5eb2b5",
+      "source_id": "source_local_286f992105ff8e54",
+      "resolved_revision": "be1d1bea85f3dda8833095b2eba0805d93ed4670fbd91078ae6e78b96db982d5",
+      "content_digest": "be1d1bea85f3dda8833095b2eba0805d93ed4670fbd91078ae6e78b96db982d5",
+      "fetched_at": "2026-09-08T01:01:59.441Z",
       "review_state": "imported"
     }
   ],
@@ -942,6 +996,26 @@
       "source_relative_path": ".",
       "skill_name": "svg-authoring",
       "created_at": "2026-09-05T14:38:35.314Z"
+    },
+    {
+      "id": "lineage_71bc04923e334df357d2",
+      "source_id": "source_local_286f992105ff8e54",
+      "artifact_key": "source_local_286f992105ff8e54:.",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "skill_name": "skills-platform-guide",
+      "created_at": "2026-09-07T22:54:22.545Z"
+    },
+    {
+      "id": "lineage_10b15af9f8327bfc52fc",
+      "source_id": "source_local_4a65ffa53f80d846",
+      "artifact_key": "source_local_4a65ffa53f80d846:.",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "skill_name": "diagnosing-bugs",
+      "created_at": "2026-09-07T22:54:22.670Z"
     }
   ],
   "skills": [
@@ -2385,6 +2459,146 @@
       "canonical_path": "revisions/revision_062076352c48120b83a7ac5f/artifacts/svg-authoring-ff5d35fab6",
       "canonical_relative_path": "revisions/revision_062076352c48120b83a7ac5f/artifacts/svg-authoring-ff5d35fab6",
       "imported_at": "2026-09-05T15:18:09.227Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_c84eaa1963cc87e7aa2a",
+      "source_id": "source_local_05a23d0ba2577995",
+      "source_revision_id": "revision_b1dfe7c66633f77e12e33026",
+      "skill_name": "skill-authoring-standard",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_05a23d0ba2577995:.",
+      "lineage_id": "lineage_66da5b284b5655167d17",
+      "description": "Route skill authoring, review, and static validation through the official conventions for Codex or Google Antigravity. Use when creating or revising a skill, checking SKILL.md metadata and progressive disclosure, or explaining provider-specific discovery and package structure.",
+      "manifest": {
+        "declared_name": "skill-authoring-standard",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "8156c4f25c4fe37c15056414f251d147c0468abcb3555a6abe765923c89f69e4",
+      "canonical_path": "revisions/revision_b1dfe7c66633f77e12e33026/artifacts/skill-authoring-standard-8156c4f25c",
+      "canonical_relative_path": "revisions/revision_b1dfe7c66633f77e12e33026/artifacts/skill-authoring-standard-8156c4f25c",
+      "imported_at": "2026-09-07T22:54:22.486Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_b08001bcda4c76f7e1f2",
+      "source_id": "source_local_286f992105ff8e54",
+      "source_revision_id": "revision_f7160bda00f7639d81619bcb",
+      "skill_name": "skills-platform-guide",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_286f992105ff8e54:.",
+      "lineage_id": "lineage_71bc04923e334df357d2",
+      "description": "Skills Platform의 목적과 사용 흐름을 안내하고 스킬 탐색, 설치, 사용 확인, 업데이트, 제거를 지원한다. 플랫폼 온보딩, Vercel Skills CLI 설치와 Catalog 관리 방식 선택, 설치된 스킬의 경로·중복·인식 문제를 다룰 때 사용한다.",
+      "manifest": {
+        "declared_name": "skills-platform-guide",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "f9abf02071c72d000ba12c571af936b374db4aa5d3380000dfb97dd4c82576ab",
+      "canonical_path": "revisions/revision_f7160bda00f7639d81619bcb/artifacts/skills-platform-guide-f9abf02071",
+      "canonical_relative_path": "revisions/revision_f7160bda00f7639d81619bcb/artifacts/skills-platform-guide-f9abf02071",
+      "imported_at": "2026-09-07T22:54:22.545Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_4da6ec3e85c82591aafb",
+      "source_id": "source_local_4a65ffa53f80d846",
+      "source_revision_id": "revision_b331dc9b9fa0df13b7ba8135",
+      "skill_name": "diagnosing-bugs",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_4a65ffa53f80d846:.",
+      "lineage_id": "lineage_10b15af9f8327bfc52fc",
+      "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow.",
+      "manifest": {
+        "declared_name": "diagnosing-bugs",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "3098440499d65036a30ae5ebec6fac90f3d53833472e582e32be50f90b459755",
+      "canonical_path": "revisions/revision_b331dc9b9fa0df13b7ba8135/artifacts/diagnosing-bugs-3098440499",
+      "canonical_relative_path": "revisions/revision_b331dc9b9fa0df13b7ba8135/artifacts/diagnosing-bugs-3098440499",
+      "imported_at": "2026-09-07T22:54:22.670Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_1f29efbf572e35dec489",
+      "source_id": "source_local_286f992105ff8e54",
+      "source_revision_id": "revision_373918045a7b3386e94dc6a0",
+      "skill_name": "skills-platform-guide",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_286f992105ff8e54:.",
+      "lineage_id": "lineage_71bc04923e334df357d2",
+      "description": "Skills Platform의 목적과 사용 흐름을 안내하고 스킬 탐색, 설치, 사용 확인, 업데이트, 제거를 지원한다. 플랫폼 온보딩, 추천 스킬셋과 검토 정책, Vercel Skills CLI 설치와 Catalog 관리 방식 선택, 설치된 스킬의 경로·중복·인식 문제를 다룰 때 사용한다.",
+      "manifest": {
+        "declared_name": "skills-platform-guide",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "a738adffc8be4a7f8907e2261aa333ec479642e65f7080f49a24dc96ba9af7a4",
+      "canonical_path": "revisions/revision_373918045a7b3386e94dc6a0/artifacts/skills-platform-guide-a738adffc8",
+      "canonical_relative_path": "revisions/revision_373918045a7b3386e94dc6a0/artifacts/skills-platform-guide-a738adffc8",
+      "imported_at": "2026-09-07T23:29:24.439Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_2b94ece3beaabb476130",
+      "source_id": "source_local_286f992105ff8e54",
+      "source_revision_id": "revision_00e1070ca2c0448daf5eb2b5",
+      "skill_name": "skills-platform-guide",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_286f992105ff8e54:.",
+      "lineage_id": "lineage_71bc04923e334df357d2",
+      "description": "Skills Platform의 목적과 사용 흐름을 안내하고 스킬 탐색, 설치, 사용 확인, 업데이트, 제거를 지원한다. 플랫폼 온보딩, 추천 스킬셋과 검토 정책, Vercel Skills CLI 설치와 Catalog 관리 방식 선택, 설치된 스킬의 경로·중복·인식 문제를 다룰 때 사용한다.",
+      "manifest": {
+        "declared_name": "skills-platform-guide",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "be1d1bea85f3dda8833095b2eba0805d93ed4670fbd91078ae6e78b96db982d5",
+      "canonical_path": "revisions/revision_00e1070ca2c0448daf5eb2b5/artifacts/skills-platform-guide-be1d1bea85",
+      "canonical_relative_path": "revisions/revision_00e1070ca2c0448daf5eb2b5/artifacts/skills-platform-guide-be1d1bea85",
+      "imported_at": "2026-09-08T01:01:59.441Z",
       "review_state": "imported"
     }
   ]
