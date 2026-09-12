@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "recipe_id": "skills-platform-authoring",
-  "name": "Skills Platform Authoring Packages",
-  "description": "Project-managed Codex and Antigravity skill-authoring packages with provider-specific presets.",
+  "name": "Skills Platform Usage and Authoring Packages",
+  "description": "Project-managed onboarding, installation guidance, and provider-specific skill-authoring packages.",
   "created_at": "2026-09-04T00:00:00.000Z",
   "created_by": "Skills Platform Catalog",
   "sources": [
@@ -20,6 +20,11 @@
       "source_id": "skills-platform-skill-creator-source",
       "type": "local",
       "locator": "./skills-packages/community-codex/skill-creator"
+    },
+    {
+      "source_id": "skills-platform-guide-source",
+      "type": "local",
+      "locator": "./skills-packages/platform-core/skills-platform-guide"
     }
   ],
   "skills": [
@@ -29,7 +34,7 @@
       "invocation_mode": "hybrid",
       "source_id": "skills-platform-authoring-standard-source",
       "source_relative_path": ".",
-      "content_digest": "457160c2b7fa569be80b9a36ffcf97a8c29934fef50e9ebcc61d2e25235eab85",
+      "content_digest": "8156c4f25c4fe37c15056414f251d147c0468abcb3555a6abe765923c89f69e4",
       "description": "Route skill authoring and review through separate Codex and Antigravity provider rulesets."
     },
     {
@@ -49,22 +54,36 @@
       "source_relative_path": ".",
       "content_digest": "37ddb8d30bfd5d06e701d1b565f7b167e4ade8d5c2eb9d23c037417ebc722bba",
       "description": "Repository-pinned Skill Creator source retained for validation and update review; the bundled system skill remains the active Codex copy."
+    },
+    {
+      "name": "skills-platform-guide",
+      "artifact_type": "skill",
+      "invocation_mode": "hybrid",
+      "source_id": "skills-platform-guide-source",
+      "source_relative_path": ".",
+      "content_digest": "be1d1bea85f3dda8833095b2eba0805d93ed4670fbd91078ae6e78b96db982d5",
+      "description": "Guide platform onboarding, direct or Catalog-managed installation, verification, and maintenance."
     }
   ],
   "presets": [
     {
       "id": "skills-platform-authoring-codex",
       "name": "Skills Platform Authoring · Codex",
-      "version": 1,
+      "version": 2,
       "owner": "Skills Platform",
       "lifecycle": "reviewed",
-      "description": "Project-local Codex authoring router and explicit review reference.",
-      "purpose": "Author and review repository skills against Codex conventions without shadowing the bundled system skill-creator.",
+      "description": "Project-local Codex platform usage guide, authoring router, and explicit review reference.",
+      "purpose": "Use and maintain project skills consistently, and author against Codex conventions without shadowing the bundled system skill-creator.",
       "work_scope_tags": [
         "curation",
         "governance"
       ],
       "skills": [
+        {
+          "skill_name": "skills-platform-guide",
+          "artifact_type": "skill",
+          "required": true
+        },
         {
           "skill_name": "skill-authoring-standard",
           "artifact_type": "skill",
@@ -80,16 +99,21 @@
     {
       "id": "skills-platform-authoring-antigravity",
       "name": "Skills Platform Authoring · Antigravity",
-      "version": 1,
+      "version": 2,
       "owner": "Skills Platform",
       "lifecycle": "reviewed",
-      "description": "Antigravity authoring router using the provider-specific package and discovery contract.",
-      "purpose": "Author and review Antigravity skills without applying Codex-only invocation policy or interface metadata.",
+      "description": "Platform usage guide and Antigravity authoring router with provider-specific discovery guidance.",
+      "purpose": "Use and author Antigravity skills while keeping Codex-only metadata out of Antigravity requirements.",
       "work_scope_tags": [
         "curation",
         "governance"
       ],
       "skills": [
+        {
+          "skill_name": "skills-platform-guide",
+          "artifact_type": "skill",
+          "required": true
+        },
         {
           "skill_name": "skill-authoring-standard",
           "artifact_type": "skill",
@@ -106,7 +130,8 @@
       "scope": "project",
       "delivery_root_relative": ".agents/skills",
       "default_preset_id": "skills-platform-authoring-codex",
-      "default_preset_version": 1
+      "default_preset_version": 2,
+      "review_policy": "require_approved"
     }
   ],
   "hooks": []

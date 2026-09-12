@@ -1,60 +1,73 @@
-# Skill Governance & Maintenance Golden Path Standard
+# Platform package maintenance
 
-Every canonical skill package hosted in `skills-packages/` must document its governance lifecycle in the final section of `SKILL.md` (conventionally Section 10, or the concluding section before appendixes).
+This is a Skills Platform repository convention, not a Codex, Antigravity, or Vercel Skills
+requirement. Apply it to packages maintained under `skills-packages/`. A directly installed
+third-party skill does not acquire Catalog ownership or review status by containing this text.
 
----
+## Canonical source and portable packages
 
-## 1. Canonical Governance Section Specification
+Give maintainers the repository-relative canonical source path and a short update route. Avoid
+personal paths such as `~/workflow/Skills-Platform` and links outside the package that will break
+when a single skill is copied or installed. Detailed operational manuals belong in the repository
+guides; bundle only references needed for the skill's actual work.
 
-Each skill's `SKILL.md` must declare:
-1. **Canonical Source Path**: Explicit repository path under `skills-packages/<group>/<skill-name>/`.
-2. **Delivery Mechanism**: Reference to the 2-tier delivery model (Skills Platform Registry snapshot / direct source symlink via Skills Manager adapter).
-3. **The 5-Step Golden Path Lifecycle**:
-   - Step 1: Canonical source modification.
-   - Step 2: Static governance validation via CLI (`skill validate`).
-   - Step 3: Optional immutable revision ingestion (`import-local` or `skill freeze`).
-   - Step 4: Project link synchronization (`project link`).
-   - Step 5: In-place direct edit reconciliation.
+Do not require every skill to carry a numbered governance section, optional scripts, all provider
+metadata, or a copy of this document. Preserve applicable ownership information already present.
 
----
+## Choose the update route
 
-## 2. Standard Markdown Template
+| Delivery | Update behavior |
+| --- | --- |
+| Catalog revision and project plan | Import a new immutable revision; review, select and preview it before adapter apply |
+| Explicit development `project link --latest` | Points to the editable source; changes are immediately visible through the link |
+| `project link --version VERSION` | Points to a frozen instance under `skills-instances/`; choose a new instance to update |
+| Vercel Skills CLI direct install | Use that CLI's recorded source and scope; it has no Catalog review or plan history |
 
-Include the following template in the skill's `SKILL.md` (localized into Korean or English to match the document's primary language):
+An installation symlink is not automatically a live link to `skills-packages/`. Resolve the actual
+target and determine the owner before choosing how to update. Never edit files under immutable
+Registry revisions or frozen instances as a substitute for creating a new version.
 
-```markdown
-## 스킬 거버넌스 및 유지보수 워크플로 (Skills Platform Maintenance & Golden Path)
+## Catalog lifecycle
 
-본 스킬은 Skills Platform의 불변 레지스트리 및 참조 링크(`symlink`) 아키텍처에 의해 관리됩니다:
+Run these examples from the actual Skills Platform checkout; replace `SKILL_DIRECTORY` and other
+uppercase placeholders with inspected values.
 
-- **원본 패키지 (Canonical Source)**: `~/workflow/Skills-Platform/skills-packages/<group>/<skill-name>/`
-- **배포 및 관리 방식**: Skills Platform Registry 불변 스냅샷 $\to$ Skills Manager 어댑터 참조 링크(`symlink`) 배포
-- **업데이트 사이클 (Golden Path)**:
-  1. **원본 수정**: 기능 추가 및 수식/규격 보완 시 원본 패키지(`skills-packages/<group>/<skill-name>/`)를 편집합니다.
-  2. **정적 거버넌스 검증**:
-     ```bash
-     node apps/skills-catalog/src/cli.js skill validate skills-packages/<group>/<skill-name> --provider antigravity
-     node apps/skills-catalog/src/cli.js skill validate skills-packages/<group>/<skill-name> --provider codex
-     ```
-  3. **새 불변 리비전 임포트 (필요 시)**:
-     ```bash
-     node apps/skills-catalog/src/cli.js import-local skills-packages/<group>/<skill-name>
-     # 또는 특정 버전 동결 인스턴스 생성
-     node apps/skills-catalog/src/cli.js skill freeze <skill-name> --version <semver>
-     ```
-  4. **프로젝트 참조 링크 최신화**:
-     ```bash
-     # 실시간 최신 개발 트랙 (Tier 1: floating_latest)
-     node apps/skills-catalog/src/cli.js project link <project-id> <skill-name> --latest
-     # 또는 특정 버전 고정 (Tier 2: version_pinned)
-     node apps/skills-catalog/src/cli.js project link <project-id> <skill-name> --version <semver>
-     ```
-  5. **참조 링크 직접 수정 시의 동기화**: 프로젝트 작업 공간(`.agents/skills/<skill-name>`)에서 심볼릭 링크를 통해 직접 수정한 경우라도, 작업 완료 후 원본 패키지에 변경 사항이 안전하게 반영되었는지 확인하고 위 절차를 통해 레지스트리 무결성을 검증합니다.
-```
+1. Edit the canonical package and inspect its supporting scripts or resources as appropriate.
+2. Validate each claimed provider independently:
 
----
+   ```bash
+   node apps/skills-catalog/src/cli.js skill validate SKILL_DIRECTORY --provider codex
+   node apps/skills-catalog/src/cli.js skill validate SKILL_DIRECTORY --provider antigravity
+   ```
 
-## 3. Review Rules for Governance Compliance
+   These checks are static. Add a realistic behavior check when routing or operational choices
+   changed, and execute only the support scripts relevant to that check.
+3. If a recipe pins the package, update its digest using the platform's `digestDirectory` helper
+   after reviewing the source diff. `recipe inspect` checks structure, not content equivalence.
+   `recipe apply` without `--confirm` imports and changes Registry/Catalog state while previewing
+   provider delivery. For a package outside a recipe, use an explicit `import-local`/`import-git`.
+4. Review the new source revision and desired project selection. Preview `project apply` with
+   actual `--catalog`/`--registry` paths; add `--enabled-only` for additive bootstrap. Use
+   `--confirm` to execute the requested, inspected delivery. A full apply can disable stale managed
+   bindings, so select the mode based on the user's requested scope.
+5. Check the adapter report and repeat preview, then verify host discovery and a relevant use.
 
-- **Validation Rule**: If a canonical package is intended for multi-project distribution, verify that its `SKILL.md` links back to its canonical platform path.
-- **Sidecar Requirement**: Ensure the delivery target has a companion `*.skills-platform-link-ownership.json` recording `method: "direct_source_symlink"` and `binding_policy: "floating_latest" | "version_pinned"`.
+Existing authorization for the scoped operation remains valid. CLI `--confirm` is an execution
+flag; it does not itself require another conversational approval.
+
+## Development link limits
+
+`project link` changes bindings immediately without a preview or confirmation flag. Its current
+implementation can replace an existing symlink without the activation adapter's ownership
+validation. Use it only for an intentionally selected development binding after inspecting the
+destination. Do not use it as a generic repair for an ownership conflict.
+
+The companion `*.skills-platform-link-ownership.json` describes a binding; it does not prevent
+another installer from overwriting it. Direct links use `method: direct_source_symlink`, while
+plan-based adapter delivery has its own metadata. Do not manufacture or rewrite sidecars to claim
+an unmanaged path. `project status` observes links and sidecars; it does not validate content
+digests or prove a skill was invoked.
+
+For the full procedure in a platform checkout, read `docs/guides/project-skill-package-management.md`
+and `docs/guides/skills-installation-guide.md`. Keep the maintenance note understandable when those
+repository documents are not bundled with an installed skill.

@@ -41,8 +41,13 @@ For a side-by-side schema or directory audit, use the
 - Preserve provider-specific metadata already present unless the requested change requires it.
 - Validate observable structure and broken links without executing support scripts or changing the
   skill's activation behavior.
-- For canonical platform skills, include the standard governance section and lifecycle links as
-  defined in [references/golden-path-governance.md](references/golden-path-governance.md).
+- For repository-owned platform skills, read
+  [references/golden-path-governance.md](references/golden-path-governance.md) when changing
+  source ownership, recipe pins, or delivery guidance. Keep operational detail there instead of
+  copying a full platform maintenance manual into every skill.
+- For installation and onboarding requests, use `skills-platform-guide` when available. Authoring
+  validates a package; it does not install it or prove host discovery. Do not require Catalog
+  registration for a user who selected direct installation with Vercel Skills CLI.
 
 ## Review output
 
@@ -54,3 +59,10 @@ When reviewing a package, separate findings by provider and distinguish:
 
 Static analysis is advisory. It must not edit canonical skill content, change enablement, inject
 findings into prompts, or alter activation plans.
+
+## Platform maintenance
+
+Canonical source: `skills-packages/platform-core/skill-authoring-standard/` in Skills Platform.
+Validate edits for each supported provider, refresh the recipe digest, and review a new immutable
+revision before delivering it through a project plan and adapter. A development source link is a
+separately selected delivery mode; never edit an immutable registry artifact to update this skill.
