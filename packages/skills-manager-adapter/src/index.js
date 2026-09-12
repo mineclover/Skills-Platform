@@ -948,6 +948,7 @@ function compositeJournal(result, filesystemJournal, configJournal) {
 }
 
 async function materializeOperation(previewOperation, method, target, options = {}) {
+  await options.beforeOperation?.(previewOperation.operation);
   const filesystem = await materializeWithJournal(previewOperation, method);
   let config = { result: null, journal: null };
   try {

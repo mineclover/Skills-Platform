@@ -14,6 +14,7 @@ import {
   PLAN_MODES,
   PROCEDURE_TYPES,
   PROCEDURE_WORKSPACE_STATUSES,
+  RECIPE_PROFILE_FIELDS,
   SKILL_AUTHORING_BASIS_KINDS,
   SKILL_AUTHORING_CATEGORIES,
   SKILL_AUTHORING_CONFIDENCES,
@@ -776,6 +777,10 @@ export function validateSkillRecipe(recipe: unknown): ValidationResult {
   } else {
     r.skills.forEach((skill: any, index: number) => {
       const prefix = `skills[${index}]`;
+      if (!skill || typeof skill !== "object" || Array.isArray(skill)) {
+        issues.push({ field: prefix, message: "must be an object" });
+        return;
+      }
       requiredString(skill.name, `${prefix}.name`, issues);
       requiredString(skill.source_id, `${prefix}.source_id`, issues);
       requiredString(skill.source_relative_path, `${prefix}.source_relative_path`, issues);
@@ -786,19 +791,62 @@ export function validateSkillRecipe(recipe: unknown): ValidationResult {
       if (skill.invocation_mode && !INVOCATION_MODES.has(skill.invocation_mode)) {
         issues.push({ field: `${prefix}.invocation_mode`, message: `must be one of ${[...INVOCATION_MODES].join(", ")}` });
       }
+      if (skill.profile !== undefined) {
+        const profilePrefix = `${prefix}.profile`;
+        if (!skill.profile || typeof skill.profile !== "object" || Array.isArray(skill.profile)) {
+          issues.push({ field: profilePrefix, message: "must be an object" });
+        } else {
+          const profile = skill.profile;
+          for (const field of Object.keys(profile)) {
+            if (!(RECIPE_PROFILE_FIELDS as readonly string[]).includes(field)) {
+              issues.push({ field: `${profilePrefix}.${field}`, message: "is not portable profile metadata; approval, evidence and audit fields are excluded" });
+            }
+          }
+          for (const field of ["title", "summary", "purpose", "owner"]) {
+            if (profile[field] !== undefined && profile[field] !== null && typeof profile[field] !== "string") {
+              issues.push({ field: `${profilePrefix}.${field}`, message: "must be a string or null" });
+            }
+          }
+          for (const field of ["use_when", "avoid_when", "tags", "domains", "work_scope_tags", "maintainers", "provider_constraints", "runtime_requirements"]) {
+            if (profile[field] !== undefined && (!Array.isArray(profile[field])
+              || profile[field].some((value: any) => typeof value !== "string" || !value.trim()))) {
+              issues.push({ field: `${profilePrefix}.${field}`, message: "must be an array of non-empty strings" });
+            }
+          }
+          for (const [field, accepted] of Object.entries({
+            artifact_type: [...ARTIFACT_TYPES], invocation_mode: [...INVOCATION_MODES],
+            visibility: ["private", "team"], risk_level: ["unknown", "low", "medium", "high", "critical"],
+            review_state: ["unreviewed", "reviewed", "deprecated"],
+          })) {
+            if (profile[field] !== undefined && !(accepted as readonly string[]).includes(profile[field])) {
+              issues.push({ field: `${profilePrefix}.${field}`, message: `must be one of ${accepted.join(", ")}` });
+            }
+          }
+        }
+      }
     });
   }
 
   if (!Array.isArray(r.presets)) {
     issues.push({ field: "presets", message: "must be an array" });
   } else {
+    const seenPresetVersions = new Set<string>();
     r.presets.forEach((preset: any, index: number) => {
       const prefix = `presets[${index}]`;
+      if (!preset || typeof preset !== "object" || Array.isArray(preset)) {
+        issues.push({ field: prefix, message: "must be an object" });
+        return;
+      }
       requiredString(preset.id, `${prefix}.id`, issues);
       requiredString(preset.name, `${prefix}.name`, issues);
-      if (typeof preset.version !== "number" || preset.version < 1) {
+      if (!Number.isSafeInteger(preset.version) || preset.version < 1) {
         issues.push({ field: `${prefix}.version`, message: "must be a positive integer" });
       }
+      const versionKey = JSON.stringify([preset.id, preset.version]);
+      if (seenPresetVersions.has(versionKey)) {
+        issues.push({ field: `${prefix}.version`, message: "preset id and version must be unique within the recipe" });
+      }
+      seenPresetVersions.add(versionKey);
       if (preset.owner !== undefined && preset.owner !== null
         && (typeof preset.owner !== "string" || preset.owner.trim() === "")) {
         issues.push({ field: `${prefix}.owner`, message: "must be a non-empty string or null" });
@@ -808,6 +856,18 @@ export function validateSkillRecipe(recipe: unknown): ValidationResult {
       }
       if (!Array.isArray(preset.skills)) {
         issues.push({ field: `${prefix}.skills`, message: "must be an array" });
+      } else {
+        preset.skills.forEach((entry: any, entryIndex: number) => {
+          const entryPrefix = `${prefix}.skills[${entryIndex}]`;
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+            issues.push({ field: entryPrefix, message: "must be an object" });
+            return;
+          }
+          requiredString(entry.skill_name, `${entryPrefix}.skill_name`, issues);
+          for (const field of ["source_id", "content_digest"]) {
+            if (entry[field] !== undefined) requiredString(entry[field], `${entryPrefix}.${field}`, issues);
+          }
+        });
       }
     });
   }
@@ -819,6 +879,12 @@ export function validateSkillRecipe(recipe: unknown): ValidationResult {
       const declaredPresetIds = new Set(
         Array.isArray(r.presets)
           ? r.presets.filter((preset: any) => typeof preset?.id === "string").map((preset: any) => preset.id)
+          : [],
+      );
+      const declaredPresetVersions = new Set(
+        Array.isArray(r.presets)
+          ? r.presets.filter((preset: any) => preset && typeof preset === "object")
+            .map((preset: any) => JSON.stringify([preset.id, preset.version]))
           : [],
       );
       const seenProjectIds = new Set<string>();
@@ -841,6 +907,9 @@ export function validateSkillRecipe(recipe: unknown): ValidationResult {
         if (!["project", "global"].includes(project.scope)) {
           issues.push({ field: `${prefix}.scope`, message: "must be project or global" });
         }
+        if (project.review_policy !== undefined && !["advisory", "require_approved"].includes(project.review_policy)) {
+          issues.push({ field: `${prefix}.review_policy`, message: "must be advisory or require_approved" });
+        }
         if (project.default_preset_version !== undefined
           && (!Number.isSafeInteger(project.default_preset_version) || project.default_preset_version < 1)) {
           issues.push({ field: `${prefix}.default_preset_version`, message: "must be a positive integer" });
@@ -850,11 +919,54 @@ export function validateSkillRecipe(recipe: unknown): ValidationResult {
           && !declaredPresetIds.has(project.default_preset_id)) {
           issues.push({ field: `${prefix}.default_preset_id`, message: "must reference a declared preset" });
         }
+        if (project.preset_assignments !== undefined) {
+          if (!Array.isArray(project.preset_assignments)) {
+            issues.push({ field: `${prefix}.preset_assignments`, message: "must be an array" });
+          } else {
+            const seenAssignments = new Set<string>();
+            project.preset_assignments.forEach((assignment: any, assignmentIndex: number) => {
+              const assignmentPrefix = `${prefix}.preset_assignments[${assignmentIndex}]`;
+              if (!assignment || typeof assignment !== "object" || Array.isArray(assignment)) {
+                issues.push({ field: assignmentPrefix, message: "must be an object" });
+                return;
+              }
+              requiredString(assignment.preset_id, `${assignmentPrefix}.preset_id`, issues);
+              if (!Number.isSafeInteger(assignment.template_version) || assignment.template_version < 1) {
+                issues.push({ field: `${assignmentPrefix}.template_version`, message: "must be a positive integer" });
+              } else if (!declaredPresetVersions.has(JSON.stringify([assignment.preset_id, assignment.template_version]))) {
+                issues.push({ field: `${assignmentPrefix}.template_version`, message: "must reference a declared preset id and version" });
+              }
+              if (!["default", "recommended", "work_scope_overlay"].includes(assignment.role)) {
+                issues.push({ field: `${assignmentPrefix}.role`, message: "must be default, recommended, or work_scope_overlay" });
+              }
+              if (assignment.priority !== undefined && (typeof assignment.priority !== "number" || !Number.isFinite(assignment.priority))) {
+                issues.push({ field: `${assignmentPrefix}.priority`, message: "must be a finite number" });
+              }
+              if (assignment.enabled !== undefined && typeof assignment.enabled !== "boolean") {
+                issues.push({ field: `${assignmentPrefix}.enabled`, message: "must be a boolean" });
+              }
+              if (assignment.work_scope_tags !== undefined && (!Array.isArray(assignment.work_scope_tags)
+                || assignment.work_scope_tags.some((value: any) => typeof value !== "string" || !value.trim()))) {
+                issues.push({ field: `${assignmentPrefix}.work_scope_tags`, message: "must be an array of non-empty strings" });
+              }
+              const key = JSON.stringify([assignment.role, assignment.preset_id, assignment.template_version]);
+              if (seenAssignments.has(key)) issues.push({ field: assignmentPrefix, message: "must not duplicate an assignment" });
+              seenAssignments.add(key);
+            });
+            const defaults = project.preset_assignments.filter((assignment: any) => assignment?.role === "default");
+            if (defaults.length !== 1) {
+              issues.push({ field: `${prefix}.preset_assignments`, message: "must declare exactly one default assignment" });
+            } else if (defaults[0].preset_id !== project.default_preset_id
+              || (project.default_preset_version !== undefined && defaults[0].template_version !== project.default_preset_version)) {
+              issues.push({ field: `${prefix}.preset_assignments`, message: "default assignment must match the project default preset and version" });
+            }
+          }
+        }
         if (project.delivery_root_relative !== undefined) {
           requiredString(project.delivery_root_relative, `${prefix}.delivery_root_relative`, issues);
           if (typeof project.delivery_root_relative === "string" && project.delivery_root_relative.trim()) {
             const deliveryRoot = project.delivery_root_relative.trim();
-            const normalized = deliveryRoot.replaceAll("\\", "/");
+            const normalized = path.posix.normalize(deliveryRoot.replaceAll("\\", "/"));
             if (path.isAbsolute(deliveryRoot) || path.win32.isAbsolute(deliveryRoot)
               || normalized === ".." || normalized.startsWith("../")) {
               issues.push({ field: `${prefix}.delivery_root_relative`, message: "must remain relative to the project path" });

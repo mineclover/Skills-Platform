@@ -75,6 +75,8 @@ export interface CodexAdapterOptions {
 
 export interface ApplyActivationPlanOptions extends CodexAdapterOptions {
   confirm?: boolean;
+  /** Revalidate caller policy immediately before mutation; rejection fails and rolls back the plan. */
+  beforeOperation?: (operation: ActivationOperation) => void | Promise<void>;
   onProgress?: (progress: {
     processed_count: number;
     total_count: number;

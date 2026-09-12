@@ -566,6 +566,7 @@ export interface ProjectProfile {
   provider_id: string;
   delivery_root: string;
   scope: DeliveryScope;
+  review_policy?: "advisory" | "require_approved";
   default_preset_id: string;
   default_preset_version: number;
   preset_assignments: ProjectPresetAssignment[];
@@ -636,7 +637,19 @@ export interface UpstreamStatus {
 }
 
 // Skill Recipe & Export / Import Lockfile Types
+// Additive, optional metadata stays compatible with v1. A required field or a
+// change to an existing field's meaning requires a new schema version.
 export const RECIPE_SCHEMA_VERSION = 1;
+
+// Portable Catalog classification only. Source-review decisions, evaluation
+// evidence, identity and local audit timestamps must never be replayed here.
+export const RECIPE_PROFILE_FIELDS = [
+  "artifact_type", "invocation_mode", "title", "summary", "purpose", "use_when", "avoid_when",
+  "tags", "domains", "work_scope_tags", "owner", "maintainers", "visibility",
+  "provider_constraints", "runtime_requirements", "risk_level", "review_state",
+] as const;
+
+export type RecipeSkillProfile = Partial<Pick<SkillProfile, typeof RECIPE_PROFILE_FIELDS[number]>>;
 
 export interface RecipeSource {
   source_id: string;
@@ -654,12 +667,16 @@ export interface RecipeSkill {
   source_relative_path: string;
   content_digest: string;
   description?: string | null;
+  // review_state is a classification label, never revision approval.
+  profile?: RecipeSkillProfile;
 }
 
 export interface RecipePresetEntry {
   skill_name: string;
   source_relative_path?: string;
   artifact_type?: ArtifactType;
+  source_id?: string;
+  content_digest?: string;
   required?: boolean;
 }
 
@@ -668,11 +685,21 @@ export interface RecipePreset {
   name: string;
   version: number;
   owner?: string | null;
+  // Template lifecycle classification; does not import a source-review decision.
   lifecycle?: "draft" | "reviewed" | "deprecated";
   description?: string | null;
   purpose?: string | null;
   work_scope_tags?: string[];
   skills: RecipePresetEntry[];
+}
+
+export interface RecipePresetAssignment {
+  preset_id: string;
+  template_version: number;
+  role: Exclude<ProjectPresetAssignment["role"], "explicit">;
+  priority?: number;
+  work_scope_tags?: string[];
+  enabled?: boolean;
 }
 
 export interface RecipeProjectBinding {
@@ -683,6 +710,11 @@ export interface RecipeProjectBinding {
   default_preset_id: string;
   default_preset_version?: number;
   delivery_root_relative?: string;
+  // Import may strengthen an existing project, never downgrade its policy.
+  review_policy?: "advisory" | "require_approved";
+  // Omission keeps legacy default-preset reconciliation. An explicit list
+  // declares all assignments, including recommendations and disabled entries.
+  preset_assignments?: RecipePresetAssignment[];
 }
 
 export interface SkillRecipe {

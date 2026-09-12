@@ -15,6 +15,10 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.js"
     },
+    "./skill-search": {
+      "types": "./dist/skill-search.d.mts",
+      "default": "./dist/skill-search.mjs"
+    },
     "./types": {
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js",

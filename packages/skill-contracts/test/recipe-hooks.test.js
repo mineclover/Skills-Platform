@@ -134,6 +134,48 @@ test("rejects a skill recipe with invalid hook definition", () => {
   assert.ok(validation.issues.some((i) => i.field.startsWith("hooks[0]")));
 });
 
+test("validates optional v1 profile metadata and complete pinned project assignments without accepting approval evidence", () => {
+  const recipe = createSkillRecipe({
+    name: "Portable metadata", sources: [{ source_id: "source", type: "local", locator: "./source" }],
+    skills: [{ name: "guide", source_id: "source", source_relative_path: "guide", content_digest: "a".repeat(64),
+      artifact_type: "skill", invocation_mode: "user_invoked",
+      profile: { purpose: "Onboarding", use_when: ["New project"], provider_constraints: ["codex"], review_state: "reviewed" } }],
+    presets: [
+      { id: "guide-set", name: "Guide", version: 1, skills: [{ skill_name: "guide", source_id: "source", content_digest: "a".repeat(64) }] },
+      { id: "guide-set", name: "Guide", version: 2, skills: [] },
+    ],
+    projects: [{ project_id: "project", project_name: "Project", provider_id: "codex", scope: "project", default_preset_id: "guide-set", default_preset_version: 1,
+      review_policy: "require_approved", delivery_root_relative: ".agents/skills",
+      preset_assignments: [
+        { preset_id: "guide-set", template_version: 1, role: "default", priority: 0, enabled: true, work_scope_tags: [] },
+        { preset_id: "guide-set", template_version: 2, role: "recommended", priority: 10, enabled: false, work_scope_tags: ["debugging"] },
+      ] }],
+  });
+  assert.equal(recipe.schema_version, 1);
+  assert.equal(validateSkillRecipe(recipe).valid, true);
+  const invalidCases = [
+    [(r) => { r.skills[0].profile.tags = [""]; }, "skills[0].profile.tags"],
+    [(r) => { r.skills[0].profile.review_state = "approved"; }, "skills[0].profile.review_state"],
+    [(r) => { r.skills[0].profile.source_review = { decision: "approved" }; }, "skills[0].profile.source_review"],
+    [(r) => { r.skills[0].profile.reviewed_at = "2020-01-01"; }, "skills[0].profile.reviewed_at"],
+    [(r) => { r.projects[0].preset_assignments[1].template_version = 3; }, "projects[0].preset_assignments[1].template_version"],
+    [(r) => { r.projects[0].preset_assignments[1].role = "default"; }, "projects[0].preset_assignments"],
+    [(r) => { r.projects[0].preset_assignments[1].enabled = "false"; }, "projects[0].preset_assignments[1].enabled"],
+    [(r) => { r.projects[0].preset_assignments[1].priority = Infinity; }, "projects[0].preset_assignments[1].priority"],
+    [(r) => { r.projects[0].preset_assignments[1].work_scope_tags = "debugging"; }, "projects[0].preset_assignments[1].work_scope_tags"],
+    [(r) => { r.projects[0].review_policy = "approved"; }, "projects[0].review_policy"],
+    [(r) => { r.projects[0].delivery_root_relative = "inside/../../outside"; }, "projects[0].delivery_root_relative"],
+    [(r) => { r.presets.push({ ...r.presets[0] }); }, "presets[2].version"],
+  ];
+  for (const [mutate, expectedField] of invalidCases) {
+    const invalid = structuredClone(recipe);
+    mutate(invalid);
+    const result = validateSkillRecipe(invalid);
+    assert.equal(result.valid, false, expectedField);
+    assert.ok(result.issues.some((issue) => issue.field === expectedField), expectedField);
+  }
+});
+
 test("rejects non-array hooks field in skill recipe", () => {
   const invalidRecipe = {
     schema_version: 1,
