@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { withCatalogMutationLock } = require("./catalog-state");
 const {
   createPlanFromRegistry,
+  applyCatalogActivationPlan,
+  applyRecordedCatalogPlan,
+  bindProjectUpstream,
+  setProjectReviewPolicy,
   adoptApprovedRevisionIntoPreset,
   createEvaluationCase,
   addSkillFeedback,
@@ -129,7 +134,7 @@ function parseArguments(argv) {
 function usage() {
   return [
     "Usage:",
-    "  skills-catalog sync <skill-path-or-name> [--project <id>] [--provider <id>] [--confirm] [--copy]",
+    "  skills-catalog sync <skill-path-or-name> [--project <id>] [--provider <id>] [--confirm] [--copy] [--confirm-shared-root]",
     "  skills-catalog import-local <source-path> [--registry <path>] [--skill <name>]...",
     "  skills-catalog import-git <repository> [--ref <commit-or-ref>] [--registry <path>] [--skill <name>]...",
     "  skills-catalog source inspect <source-path> | source updates [--registry <path>]",
@@ -142,9 +147,11 @@ function usage() {
     "  skills-catalog workspace verify --task <id>",
     "  skills-catalog workspace merge --task <id> [--force]",
     "  skills-catalog workspace prune --task <id>",
-    "  skills-catalog project add <id> --name <name> --path <path> --provider <id> [--delivery-root <path>] [--upstream-project-id <id>]",
+    "  skills-catalog project add <id> --name <name> --path <path> --provider <id> [--delivery-root <path>] [--upstream-project-id <id>] [--review-policy advisory|require_approved]",
+    "  skills-catalog project set-policy <id> --review-policy advisory|require_approved",
+    "  skills-catalog project bind-manager <id> --upstream-project-id <id>",
     "  skills-catalog project list | project resolve <id> [--preset <id>] [--work-scope <tag>]...",
-    "  skills-catalog project apply <id> [--confirm] [--preset <id>] [--work-scope <tag>]... [--enabled-only] [--copy]",
+    "  skills-catalog project apply <id> [--confirm] [--preset <id>] [--work-scope <tag>]... [--enabled-only] [--copy] [--confirm-shared-root]",
     "  skills-catalog project link <project-id> <skill-name> [--version <semver>] [--latest]",
     "  skills-catalog project status <project-id>",
     "  skills-catalog project skill <project-id> enable|disable <lineage-id> --skill <registry-skill-id>",
@@ -155,8 +162,9 @@ function usage() {
     "  skills-catalog preset note add <id> --body <text> | preset assign <project-id> <preset-id> [--version <n>]",
     "  skills-catalog preset adopt <preset-id> --skill <approved-registry-skill-id>",
     "      [--role default|recommended|work_scope_overlay] [--priority <n>] [--work-scope <tag>]...",
-    "  skills-catalog project-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--enabled-only] [--copy] [--out <file>]",
-    "  skills-catalog history record-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--copy]",
+    "  skills-catalog project-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--enabled-only] [--copy] [--confirm-shared-root] [--out <file>]",
+    "  skills-catalog history record-plan <project-id> [--preset <id>] [--work-scope <tag>]... [--enabled-only] [--copy] [--confirm-shared-root] [--out <file>]",
+    "  skills-catalog history apply <plan-id> [--confirm]",
     "  skills-catalog history record-report <plan-id> --file <adapter-report.json> | history list [--project-id <id>]",
     "  skills-catalog system-prompt --preset <id>",
     "  skills-catalog skill list | skill search [query] [--tag <tag>] [--provider <id>]",
@@ -267,7 +275,7 @@ async function run(argv) {
       projectId,
       presetId: flags.preset,
       workScopeTags: flags["work-scope"] ?? [],
-      distribution: { method: flags.copy === true ? "copy" : "symlink" },
+      distribution: { method: flags.copy === true ? "copy" : "symlink", shared_root_confirmation: flags["confirm-shared-root"] === true },
       enabledOnly: true,
     });
 
@@ -285,7 +293,6 @@ async function run(argv) {
       };
     }
 
-    const report = await adapter.applyActivationPlan(plan, { confirm: true });
     const selection = await resolveProjectSelection({
       catalogRoot,
       registryRoot,
@@ -293,11 +300,12 @@ async function run(argv) {
       presetId: flags.preset,
       workScopeTags: flags["work-scope"] ?? [],
     });
-    await recordActivationPlan({ catalogRoot, plan, projectId, assignments: selection.assignments });
+    await recordActivationPlan({ catalogRoot, registryRoot, plan, projectId, assignments: selection.assignments });
+    const report = await applyCatalogActivationPlan({ catalogRoot, registryRoot, projectId, plan, adapter });
     await recordActivationReport({ catalogRoot, planId: plan.plan_id, report });
 
     return {
-      status: "applied",
+      status: report.status === "completed" ? "applied" : "failed",
       skill: importedSkill,
       source_revision_id: importResult.source_revision_id,
       plan,
@@ -831,8 +839,11 @@ async function run(argv) {
         deliveryRoot: flags["delivery-root"],
         scope: flags.global === true ? "global" : "project",
         upstreamProjectId: flags["upstream-project-id"],
+        reviewPolicy: flags["review-policy"],
       });
     }
+    if (action === "set-policy") return setProjectReviewPolicy({ catalogRoot, projectId, reviewPolicy: flags["review-policy"] });
+    if (action === "bind-manager") return bindProjectUpstream({ catalogRoot, projectId, upstreamProjectId: flags["upstream-project-id"] });
     if (action === "list") return listProjects(catalogRoot);
     if (action === "skill") {
       const desiredState = positional[3];
@@ -862,7 +873,7 @@ async function run(argv) {
         projectId,
         presetId: flags.preset,
         workScopeTags: flags["work-scope"] ?? [],
-        distribution: { method: flags.copy === true ? "copy" : "symlink" },
+        distribution: { method: flags.copy === true ? "copy" : "symlink", shared_root_confirmation: flags["confirm-shared-root"] === true },
         enabledOnly: flags["enabled-only"] === true,
       });
       const adapter = require("@skills-platform/skills-manager-adapter");
@@ -871,11 +882,11 @@ async function run(argv) {
         const preview = await adapter.previewActivationPlan(plan);
         return { plan, preview, message: "Preview only. Pass --confirm to apply." };
       }
-      const report = await adapter.applyActivationPlan(plan, { confirm: true });
       const selection = await resolveProjectSelection({
         catalogRoot, registryRoot, projectId, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [],
       });
-      await recordActivationPlan({ catalogRoot, plan, projectId, assignments: selection.assignments });
+      await recordActivationPlan({ catalogRoot, registryRoot, plan, projectId, assignments: selection.assignments });
+      const report = await applyCatalogActivationPlan({ catalogRoot, registryRoot, projectId, plan, adapter });
       await recordActivationReport({ catalogRoot, planId: plan.plan_id, report });
       return { plan, report };
     }
@@ -976,7 +987,7 @@ async function run(argv) {
       projectId,
       presetId: flags.preset,
       workScopeTags: flags["work-scope"] ?? [],
-      distribution: { method: flags.copy === true ? "copy" : "symlink" },
+      distribution: { method: flags.copy === true ? "copy" : "symlink", shared_root_confirmation: flags["confirm-shared-root"] === true },
       enabledOnly: flags["enabled-only"] === true,
     });
     if (flags.out) await exportActivationPlan({ outputPath: flags.out, plan });
@@ -985,20 +996,31 @@ async function run(argv) {
 
   if (command === "history") {
     const [action, subject] = positional.slice(1);
+    if (action === "apply") {
+      if (flags["confirm-shared-root"] !== undefined) {
+        throw new Error("Shared-root acknowledgement belongs to a new plan: use history record-plan --confirm-shared-root, review that plan, then apply its ID. Recorded plans are immutable.");
+      }
+      return applyRecordedCatalogPlan({ catalogRoot, registryRoot, planId: subject, confirmed: flags.confirm === true });
+    }
     if (action === "list") return listActivationHistory({ catalogRoot, projectId: flags["project-id"], planId: flags["plan-id"] });
     if (action === "record-plan") {
-      const selection = await resolveProjectSelection({
-        catalogRoot, registryRoot, projectId: subject, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [],
+      const record = await withCatalogMutationLock(catalogRoot, async () => {
+        const selection = await resolveProjectSelection({
+          catalogRoot, registryRoot, projectId: subject, presetId: flags.preset, workScopeTags: flags["work-scope"] ?? [],
+        });
+        const plan = await createProjectPlan({
+          catalogRoot,
+          registryRoot,
+          projectId: subject,
+          presetId: flags.preset,
+          workScopeTags: flags["work-scope"] ?? [],
+          distribution: { method: flags.copy === true ? "copy" : "symlink", shared_root_confirmation: flags["confirm-shared-root"] === true },
+          enabledOnly: flags["enabled-only"] === true,
+        });
+        return recordActivationPlan({ catalogRoot, registryRoot, plan, projectId: subject, assignments: selection.assignments });
       });
-      const plan = await createProjectPlan({
-        catalogRoot,
-        registryRoot,
-        projectId: subject,
-        presetId: flags.preset,
-        workScopeTags: flags["work-scope"] ?? [],
-        distribution: { method: flags.copy === true ? "copy" : "symlink" },
-      });
-      return recordActivationPlan({ catalogRoot, plan, projectId: subject, assignments: selection.assignments });
+      if (flags.out) await exportActivationPlan({ outputPath: flags.out, plan: record.plan });
+      return record;
     }
     if (action === "record-report") {
       if (!flags.file) throw new Error("history record-report requires --file <adapter-report.json>");
@@ -1020,6 +1042,8 @@ async function run(argv) {
   if (command === "plan") {
     const isGlobal = flags.global === true;
     return createPlanFromRegistry({
+      catalogRoot,
+      projectId: flags["project-id"],
       registryRoot,
       skillIds: flags.skill ?? [],
       deliveryRoot: flags["delivery-root"],
@@ -1029,7 +1053,7 @@ async function run(argv) {
         provider_id: flags.provider?.[0],
         scope: isGlobal ? "global" : "project",
       },
-      distribution: { method: flags.copy === true ? "copy" : "symlink" },
+      distribution: { method: flags.copy === true ? "copy" : "symlink", shared_root_confirmation: flags["confirm-shared-root"] === true },
     });
   }
 
@@ -1422,20 +1446,24 @@ async function run(argv) {
   throw new Error(usage());
 }
 
-if (require.main === module) {
-  const cliArguments = process.argv.slice(2);
-  run(cliArguments)
-    .then((result) => {
-      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-      if (cliArguments[0] === "skill" && cliArguments[1] === "validate" && result?.valid === false) {
-        process.exitCode = 1;
-      }
-    })
-    .catch((error) => {
-      process.stderr.write(`${error.message}\n`);
-      if (error.issues) process.stderr.write(`${JSON.stringify(error.issues, null, 2)}\n`);
-      process.exitCode = 1;
-    });
+async function main(cliArguments = process.argv.slice(2), { execute = run, stdout = process.stdout, stderr = process.stderr } = {}) {
+  try {
+    const result = await execute(cliArguments);
+    stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    const failedReport = result?.status === "failed"
+      || result?.report?.status === "failed"
+      || result?.delivery?.report?.status === "failed";
+    const invalidSkill = cliArguments[0] === "skill" && cliArguments[1] === "validate" && result?.valid === false;
+    return failedReport || invalidSkill ? 1 : 0;
+  } catch (error) {
+    stderr.write(`${error.message}\n`);
+    if (error.issues) stderr.write(`${JSON.stringify(error.issues, null, 2)}\n`);
+    return 1;
+  }
 }
 
-module.exports = { parseArguments, run, usage };
+if (require.main === module) {
+  main().then((exitCode) => { process.exitCode = exitCode; });
+}
+
+module.exports = { main, parseArguments, run, usage };

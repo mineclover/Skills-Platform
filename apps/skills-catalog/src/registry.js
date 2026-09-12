@@ -6,9 +6,11 @@ const path = require("node:path");
 const { promisify } = require("node:util");
 const { digestDirectory, listFiles, ARTIFACT_TYPES = new Set(["skill", "rule", "hook", "plugin", "mcp_server"]), INVOCATION_MODES = new Set(["model_invoked", "user_invoked", "hybrid", "unspecified"]) } = require("@skills-platform/contracts");
 const { inspectSkillPackage, parseSkillManifest } = require("./skill-authoring");
+const { physicalPath, withFileLock } = require("./file-locks");
 
 const REGISTRY_SCHEMA_VERSION = 2;
 const execFileAsync = promisify(execFile);
+const registrySnapshots = new WeakMap();
 
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -371,28 +373,62 @@ function normalizeRegistry(registry) {
 }
 
 async function loadRegistry(registryRoot) {
-  const file = registryFile(registryRoot);
-  if (!await pathExists(file)) return blankRegistry();
-  const registry = normalizeRegistry(JSON.parse(await fs.readFile(file, "utf8")));
-  return hydrateCanonicalPaths(registryRoot, registry);
+  const key = await physicalPath(registryFile(registryRoot));
+  let raw = null;
+  try {
+    raw = await fs.readFile(registryFile(registryRoot), "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  const registry = raw === null ? blankRegistry() : normalizeRegistry(JSON.parse(raw));
+  await hydrateCanonicalPaths(registryRoot, registry);
+  registrySnapshots.set(registry, { key, digest: raw === null ? null : sha256(raw) });
+  return registry;
 }
 
-async function saveRegistry(registryRoot, registry) {
+async function writeRegistrySnapshot(registryRoot, registry, key) {
   await fs.mkdir(registryRoot, { recursive: true });
   const temporaryFile = `${registryFile(registryRoot)}.${process.pid}.${crypto.randomUUID()}.tmp`;
   const stored = registryForStorage(registryRoot, registry);
+  const raw = `${JSON.stringify(stored, null, 2)}\n`;
   try {
     const handle = await fs.open(temporaryFile, "wx", 0o600);
     try {
-      await handle.writeFile(`${JSON.stringify(stored, null, 2)}\n`, "utf8");
+      await handle.writeFile(raw, "utf8");
       await handle.sync();
     } finally {
       await handle.close();
     }
     await fs.rename(temporaryFile, registryFile(registryRoot));
+    registrySnapshots.set(registry, { key, digest: sha256(raw) });
   } finally {
     await fs.rm(temporaryFile, { force: true }).catch(() => {});
   }
+}
+
+async function withRegistryMutationLock(registryRoot, operation) {
+  return withFileLock(registryFile(registryRoot), operation);
+}
+
+async function saveRegistry(registryRoot, registry) {
+  return withRegistryMutationLock(registryRoot, async () => {
+    const key = await physicalPath(registryFile(registryRoot));
+    const expected = registrySnapshots.get(registry);
+    if (expected) {
+      let raw = null;
+      try {
+        raw = await fs.readFile(registryFile(registryRoot), "utf8");
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
+      if (expected.key !== key || expected.digest !== (raw === null ? null : sha256(raw))) {
+        const error = new Error("Registry changed after this snapshot was loaded; reload it within withRegistryMutationLock before saving");
+        error.code = "REGISTRY_WRITE_CONFLICT";
+        throw error;
+      }
+    }
+    await writeRegistrySnapshot(registryRoot, registry, key);
+  });
 }
 
 function defaultRegistryRoot(workspacePath = process.cwd()) {
@@ -413,98 +449,103 @@ async function importLocalSource({ registryRoot, sourcePath, selectedSkillNames 
   if (missingNames.length > 0) throw new Error(`Selected skills were not found: ${missingNames.join(", ")}`);
   if (selected.length === 0) throw new Error("No SKILL.md artifacts were found in source");
 
-  const registry = await loadRegistry(registryRoot);
-  const locator = source?.locator ?? resolvedSourcePath;
-  const kind = source?.kind ?? "local";
-  const id = sourceId(locator);
-  const revisionDigest = inspection.source_digest;
-  const revisionId = `revision_${sha256(`${id}:${revisionDigest}`).slice(0, 24)}`;
-  const importedAt = new Date().toISOString();
+  // Source inspection (and Git fetch in importGitSource) stays outside the
+  // lock. Index reads, immutable materialization and publication share one
+  // process-shared lock so concurrent imports cannot lose or duplicate data.
+  return withRegistryMutationLock(registryRoot, async () => {
+    const registry = await loadRegistry(registryRoot);
+    const locator = source?.locator ?? resolvedSourcePath;
+    const kind = source?.kind ?? "local";
+    const id = sourceId(locator);
+    const revisionDigest = inspection.source_digest;
+    const revisionId = `revision_${sha256(`${id}:${revisionDigest}`).slice(0, 24)}`;
+    const importedAt = new Date().toISOString();
 
-  if (!registry.sources.some((source) => source.id === id)) {
-    registry.sources.push({
-      id,
-      kind,
-      locator,
-      requested_ref: source?.requested_ref ?? null,
-      created_at: importedAt,
-    });
-  }
-  if (!registry.revisions.some((revision) => revision.id === revisionId)) {
-    registry.revisions.push({
-      id: revisionId,
-      source_id: id,
-      resolved_revision: source?.resolved_revision ?? revisionDigest,
-      content_digest: revisionDigest,
-      fetched_at: importedAt,
-      review_state: "imported",
-    });
-  }
-
-  const artifactsRoot = path.join(registryRoot, "revisions", revisionId, "artifacts");
-  const imported = [];
-  for (const skill of selected) {
-    const artifactDigest = await digestDirectory(skill.root_path);
-    // The ID includes the source revision so every delivery plan can pin the
-    // exact immutable instructions it was reviewed against.
-    const artifactId = `skill_${sha256(`${id}:${revisionId}:${skill.relative_path}`).slice(0, 20)}`;
-    const artifactPath = path.join(artifactsRoot, `${slug(skill.name)}-${artifactDigest.slice(0, 10)}`);
-    const canonicalRelativePath = path.relative(path.resolve(registryRoot), artifactPath).replaceAll("\\", "/");
-    if (!await pathExists(artifactPath)) {
-      await fs.mkdir(path.dirname(artifactPath), { recursive: true });
-      await fs.cp(skill.root_path, artifactPath, { recursive: true, force: false, errorOnExist: true });
-    }
-    const existing = registry.skills.find((record) => record.id === artifactId && record.source_revision_id === revisionId);
-    const record = existing ? Object.assign(existing, {
-      invocation_mode: skill.invocation_mode ?? existing.invocation_mode ?? "unspecified",
-      artifact_type: skill.artifact_type ?? existing.artifact_type ?? "skill",
-      manifest: skill.manifest ?? existing.manifest ?? null,
-      provider_compatibility: skill.provider_compatibility ?? existing.provider_compatibility ?? null,
-      authoring_ruleset_fingerprint: skill.authoring?.ruleset_fingerprint ?? existing.authoring_ruleset_fingerprint ?? null,
-    }) : {
-      id: artifactId,
-      source_id: id,
-      source_revision_id: revisionId,
-      skill_name: skill.name,
-      artifact_type: skill.artifact_type ?? "skill",
-      invocation_mode: skill.invocation_mode ?? "unspecified",
-      source_relative_path: skill.relative_path,
-      artifact_key: `${id}:${skill.relative_path}`,
-      lineage_id: lineageId(`${id}:${skill.relative_path}`),
-      description: skill.description,
-      manifest: skill.manifest ?? null,
-      provider_compatibility: skill.provider_compatibility ?? null,
-      authoring_ruleset_fingerprint: skill.authoring?.ruleset_fingerprint ?? null,
-      content_digest: artifactDigest,
-      canonical_path: artifactPath,
-      canonical_relative_path: canonicalRelativePath,
-      imported_at: importedAt,
-      review_state: "imported",
-    };
-    if (!registry.lineages.some((lineage) => lineage.id === record.lineage_id)) {
-      registry.lineages.push({
-        id: record.lineage_id,
-        source_id: id,
-        artifact_key: record.artifact_key,
-        artifact_type: record.artifact_type ?? "skill",
-        invocation_mode: record.invocation_mode ?? "unspecified",
-        source_relative_path: skill.relative_path,
-        skill_name: skill.name,
+    if (!registry.sources.some((source) => source.id === id)) {
+      registry.sources.push({
+        id,
+        kind,
+        locator,
+        requested_ref: source?.requested_ref ?? null,
         created_at: importedAt,
       });
-    } else {
-      const lineage = registry.lineages.find((item) => item.id === record.lineage_id);
-      if (lineage) {
-        lineage.artifact_type = record.artifact_type ?? lineage.artifact_type;
-        lineage.invocation_mode = record.invocation_mode ?? lineage.invocation_mode;
-      }
     }
-    if (!existing) registry.skills.push(record);
-    imported.push(record);
-  }
+    if (!registry.revisions.some((revision) => revision.id === revisionId)) {
+      registry.revisions.push({
+        id: revisionId,
+        source_id: id,
+        resolved_revision: source?.resolved_revision ?? revisionDigest,
+        content_digest: revisionDigest,
+        fetched_at: importedAt,
+        review_state: "imported",
+      });
+    }
 
-  await saveRegistry(registryRoot, registry);
-  return { source_id: id, source_revision_id: revisionId, skills: imported };
+    const artifactsRoot = path.join(registryRoot, "revisions", revisionId, "artifacts");
+    const imported = [];
+    for (const skill of selected) {
+      const artifactDigest = await digestDirectory(skill.root_path);
+      // The ID includes the source revision so every delivery plan can pin the
+      // exact immutable instructions it was reviewed against.
+      const artifactId = `skill_${sha256(`${id}:${revisionId}:${skill.relative_path}`).slice(0, 20)}`;
+      const artifactPath = path.join(artifactsRoot, `${slug(skill.name)}-${artifactDigest.slice(0, 10)}`);
+      const canonicalRelativePath = path.relative(path.resolve(registryRoot), artifactPath).replaceAll("\\", "/");
+      if (!await pathExists(artifactPath)) {
+        await fs.mkdir(path.dirname(artifactPath), { recursive: true });
+        await fs.cp(skill.root_path, artifactPath, { recursive: true, force: false, errorOnExist: true });
+      }
+      const existing = registry.skills.find((record) => record.id === artifactId && record.source_revision_id === revisionId);
+      const record = existing ? Object.assign(existing, {
+        invocation_mode: skill.invocation_mode ?? existing.invocation_mode ?? "unspecified",
+        artifact_type: skill.artifact_type ?? existing.artifact_type ?? "skill",
+        manifest: skill.manifest ?? existing.manifest ?? null,
+        provider_compatibility: skill.provider_compatibility ?? existing.provider_compatibility ?? null,
+        authoring_ruleset_fingerprint: skill.authoring?.ruleset_fingerprint ?? existing.authoring_ruleset_fingerprint ?? null,
+      }) : {
+        id: artifactId,
+        source_id: id,
+        source_revision_id: revisionId,
+        skill_name: skill.name,
+        artifact_type: skill.artifact_type ?? "skill",
+        invocation_mode: skill.invocation_mode ?? "unspecified",
+        source_relative_path: skill.relative_path,
+        artifact_key: `${id}:${skill.relative_path}`,
+        lineage_id: lineageId(`${id}:${skill.relative_path}`),
+        description: skill.description,
+        manifest: skill.manifest ?? null,
+        provider_compatibility: skill.provider_compatibility ?? null,
+        authoring_ruleset_fingerprint: skill.authoring?.ruleset_fingerprint ?? null,
+        content_digest: artifactDigest,
+        canonical_path: artifactPath,
+        canonical_relative_path: canonicalRelativePath,
+        imported_at: importedAt,
+        review_state: "imported",
+      };
+      if (!registry.lineages.some((lineage) => lineage.id === record.lineage_id)) {
+        registry.lineages.push({
+          id: record.lineage_id,
+          source_id: id,
+          artifact_key: record.artifact_key,
+          artifact_type: record.artifact_type ?? "skill",
+          invocation_mode: record.invocation_mode ?? "unspecified",
+          source_relative_path: skill.relative_path,
+          skill_name: skill.name,
+          created_at: importedAt,
+        });
+      } else {
+        const lineage = registry.lineages.find((item) => item.id === record.lineage_id);
+        if (lineage) {
+          lineage.artifact_type = record.artifact_type ?? lineage.artifact_type;
+          lineage.invocation_mode = record.invocation_mode ?? lineage.invocation_mode;
+        }
+      }
+      if (!existing) registry.skills.push(record);
+      imported.push(record);
+    }
+
+    await saveRegistry(registryRoot, registry);
+    return { source_id: id, source_revision_id: revisionId, skills: imported };
+  });
 }
 
 function requireGitLocator(value) {
@@ -734,4 +775,5 @@ module.exports = {
   loadRegistry,
   parseSkillMarkdown,
   saveRegistry,
+  withRegistryMutationLock,
 };

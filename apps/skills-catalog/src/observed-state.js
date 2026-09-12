@@ -1,7 +1,7 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
-const { loadCatalog, saveCatalog } = require("./catalog-state");
+const { loadCatalog, saveCatalog, mutateCatalog } = require("./catalog-state");
 
 function timestamp() {
   return new Date().toISOString();
@@ -42,25 +42,27 @@ function validateBindings(bindings) {
 }
 
 async function recordObservedState({ catalogRoot, projectId, providerId, inventory, bindings, capturedAt = timestamp(), source = "skills-manager-inspect" }) {
-  projectId = requiredText(projectId, "Project id");
-  providerId = requiredText(providerId, "Provider id");
-  capturedAt = requiredText(capturedAt, "Observed state capture time");
-  source = requiredText(source, "Observed state source");
-  const catalog = await loadCatalog(catalogRoot);
-  if (!catalog.projects.some((project) => project.id === projectId)) throw new Error(`Project not found for observed state: ${projectId}`);
-  const record = {
-    id: `observed_state_${crypto.randomUUID()}`,
-    project_id: projectId,
-    provider_id: providerId,
-    captured_at: capturedAt,
-    source,
-    inventory: validateInventory(inventory),
-    bindings: validateBindings(bindings),
-    recorded_at: timestamp(),
-  };
-  catalog.observed_states.push(record);
-  await saveCatalog(catalogRoot, catalog);
-  return record;
+  return mutateCatalog(catalogRoot, async () => {
+    projectId = requiredText(projectId, "Project id");
+    providerId = requiredText(providerId, "Provider id");
+    capturedAt = requiredText(capturedAt, "Observed state capture time");
+    source = requiredText(source, "Observed state source");
+    const catalog = await loadCatalog(catalogRoot);
+    if (!catalog.projects.some((project) => project.id === projectId)) throw new Error(`Project not found for observed state: ${projectId}`);
+    const record = {
+      id: `observed_state_${crypto.randomUUID()}`,
+      project_id: projectId,
+      provider_id: providerId,
+      captured_at: capturedAt,
+      source,
+      inventory: validateInventory(inventory),
+      bindings: validateBindings(bindings),
+      recorded_at: timestamp(),
+    };
+    catalog.observed_states.push(record);
+    await saveCatalog(catalogRoot, catalog);
+    return record;
+  });
 }
 
 async function listObservedStates({ catalogRoot, projectId, providerId }) {

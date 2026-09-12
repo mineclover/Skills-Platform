@@ -1,5 +1,6 @@
 module.exports = {
   ...require("./activation-plans"),
+  ...require("./activation-policy"),
   ...require("./catalog-state"),
   ...require("./catalog-workflows"),
   ...require("./evaluation"),

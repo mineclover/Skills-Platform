@@ -3,7 +3,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { URL } = require("node:url");
 const { validateSkillAuthoringVirtualValidationRequest } = require("@skills-platform/contracts");
-const { assignPreset, clearProjectSkillOverride, createPreset, getProject, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, loadCatalog, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay, setProjectSkillOverride, updatePresetTemplate } = require("./catalog-state");
+const { withCatalogMutationLock } = require("./catalog-state");
+const { withFileLock } = require("./file-locks");
+const { bindProjectUpstream, setProjectReviewPolicy, assignPreset, clearProjectSkillOverride, createPreset, getProject, listActivationHistory, listPresets, listProjectPresetAssignments, listProjects, loadCatalog, recordActivationPlan, recordActivationReport, replaceWorkScopeOverlay, setProjectSkillOverride, updatePresetTemplate } = require("./catalog-state");
 const { buildProjectSystemPrompt, createProjectPlan, resolveProjectEffectiveSet, resolveProjectSelection } = require("./catalog-workflows");
 const { addSkillFeedback, addSkillNote, getSkillFeedbackSummary, getSkillProfile, listSkillFeedback, listSkillNotes, searchSkills, updateSkillProfile } = require("./skill-management");
 const {
@@ -234,6 +236,16 @@ function createCatalogServer({
           files: body.files,
         });
         return json(response, 200, { authoring: inspection.authoring });
+      }
+      const projectPolicy = url.pathname.match(/^\/api\/projects\/([^/]+)\/review-policy$/);
+      if (request.method === "POST" && projectPolicy) {
+        const body = await parseJsonBody(request);
+        return json(response, 200, { project: await setProjectReviewPolicy({ catalogRoot, projectId: decodeURIComponent(projectPolicy[1]), reviewPolicy: body.review_policy }) });
+      }
+      const projectManager = url.pathname.match(/^\/api\/projects\/([^/]+)\/upstream-binding$/);
+      if (request.method === "POST" && projectManager) {
+        const body = await parseJsonBody(request);
+        return json(response, 200, { project: await bindProjectUpstream({ catalogRoot, projectId: decodeURIComponent(projectManager[1]), upstreamProjectId: body.upstream_project_id }) });
       }
       if (request.method === "GET" && url.pathname === "/api/projects") {
         return json(response, 200, { projects: await listProjects(catalogRoot) });
@@ -561,13 +573,13 @@ function createCatalogServer({
       }
       const effective = url.pathname.match(/^\/api\/projects\/([^/]+)\/effective-set$/);
       if (request.method === "GET" && effective) {
-        return json(response, 200, await resolveProjectEffectiveSet({
+        return json(response, 200, await withFileLock(path.join(catalogRoot, "catalog.json"), () => resolveProjectEffectiveSet({
           catalogRoot,
           registryRoot,
           projectId: decodeURIComponent(effective[1]),
           presetId: url.searchParams.get("preset") ?? undefined,
           workScopeTags: workScopeTags(url),
-        }));
+        })));
       }
       const skillOverride = url.pathname.match(/^\/api\/projects\/([^/]+)\/skill-overrides\/([^/]+)$/);
       if (request.method === "POST" && skillOverride) {
@@ -639,19 +651,23 @@ function createCatalogServer({
         const body = await parseJsonBody(request);
         const projectId = decodeURIComponent(preview[1]);
         const tags = workScopeTags(url, body);
-        const [effectiveSet, selection, plan] = await Promise.all([
-          resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
-          resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
-          createProjectPlan({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags, distribution: body.distribution }),
-        ]);
-        const record = await recordActivationPlan({
-          catalogRoot,
-          plan,
-          projectId,
-          assignments: selection.assignments,
+        const { effectiveSet, plan, record } = await withCatalogMutationLock(catalogRoot, async () => {
+          const [effectiveSet, selection, plan] = await Promise.all([
+            resolveProjectEffectiveSet({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
+            resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
+            createProjectPlan({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags, distribution: body.distribution }),
+          ]);
+          const record = await recordActivationPlan({
+            catalogRoot,
+            registryRoot,
+            plan,
+            projectId,
+            assignments: selection.assignments,
+          });
+          return { effectiveSet, plan, record };
         });
         const preflight = body.preflight === true
-          ? await applyRecordedActivationPlan({ catalogRoot, planId: plan.plan_id, confirmed: false, upstreamCli })
+          ? await applyRecordedActivationPlan({ catalogRoot, registryRoot, planId: plan.plan_id, confirmed: false, upstreamCli })
           : null;
         return json(response, 200, { effective_set: effectiveSet, plan, record, preflight });
       }
@@ -660,16 +676,20 @@ function createCatalogServer({
         const body = await parseJsonBody(request);
         const projectId = decodeURIComponent(recordPlan[1]);
         const tags = workScopeTags(url, body);
-        const [selection, plan] = await Promise.all([
-          resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
-          createProjectPlan({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags, distribution: body.distribution }),
-        ]);
-        return json(response, 201, { record: await recordActivationPlan({
-          catalogRoot,
-          plan,
-          projectId,
-          assignments: selection.assignments,
-        }), plan });
+        const result = await withCatalogMutationLock(catalogRoot, async () => {
+          const [selection, plan] = await Promise.all([
+            resolveProjectSelection({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags }),
+            createProjectPlan({ catalogRoot, registryRoot, projectId, presetId: body.preset_id, workScopeTags: tags, distribution: body.distribution }),
+          ]);
+          return { record: await recordActivationPlan({
+            catalogRoot,
+            registryRoot,
+            plan,
+            projectId,
+            assignments: selection.assignments,
+          }), plan };
+        });
+        return json(response, 201, result);
       }
       const report = url.pathname.match(/^\/api\/activation-plans\/([^/]+)\/report$/);
       if (request.method === "POST" && report) {
@@ -685,6 +705,7 @@ function createCatalogServer({
         const body = await parseJsonBody(request);
         const result = await applyRecordedActivationPlan({
           catalogRoot,
+          registryRoot,
           planId: decodeURIComponent(apply[1]),
           confirmed: body.confirmed === true,
           upstreamCli,
@@ -704,6 +725,7 @@ function createCatalogServer({
         try {
           const result = await applyRecordedActivationPlan({
             catalogRoot,
+            registryRoot,
             planId: decodeURIComponent(applyStream[1]),
             confirmed: body.confirmed === true,
             upstreamCli,

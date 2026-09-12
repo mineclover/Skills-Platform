@@ -1,7 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
-const { createSkillRecipe, validateSkillRecipe } = require("@skills-platform/contracts");
-const { getPreset, getProject, listPresets, loadCatalog, recordActivationPlan, recordActivationReport, saveCatalog } = require("./catalog-state");
+const { createSkillRecipe, validateSkillRecipe, RECIPE_PROFILE_FIELDS } = require("@skills-platform/contracts");
+const { getPreset, getProject, loadCatalog, recordActivationPlan, recordActivationReport, mutateCatalog } = require("./catalog-state");
 const { createProjectPlan, resolveProjectSelection } = require("./catalog-workflows");
 const { getRegistrySkills, importGitSource, importLocalSource, listRegistrySkills, loadRegistry } = require("./registry");
 const { updateSkillProfile } = require("./skill-management");
@@ -18,12 +18,24 @@ async function exportRecipe({ catalogRoot, registryRoot, projectId, presetId, na
   } else if (projectId) {
     const project = await getProject(catalogRoot, projectId);
     targetProjects = [project];
-    const assignedIds = new Set(project.preset_assignments.map((a) => a.preset_id));
-    targetPresets = catalog.presets.filter((p) => assignedIds.has(p.id));
   } else {
-    targetPresets = catalog.presets.filter((p) => p.id !== "builtin-pristine");
+    targetPresets = await Promise.all(catalog.presets
+      .filter((p) => p.id !== "builtin-pristine")
+      .map((preset) => getPreset(catalogRoot, preset.id)));
     targetProjects = catalog.projects;
   }
+
+  // Assignments pin template versions. Include those exact snapshots even when
+  // the Catalog's active version has moved on, or projects use several versions.
+  for (const project of targetProjects) {
+    for (const assignment of project.preset_assignments) {
+      targetPresets.push(await getPreset(catalogRoot, assignment.preset_id, assignment.template_version));
+    }
+  }
+  targetPresets = [...new Map(targetPresets.map((preset) => [
+    presetVersionKey(preset.id, preset.selected_version ?? preset.active_version ?? 1), preset,
+  ])).values()].sort((left, right) => left.id.localeCompare(right.id)
+    || (left.selected_version ?? left.active_version) - (right.selected_version ?? right.active_version));
 
   const skillIds = new Set();
   for (const preset of targetPresets) {
@@ -57,14 +69,18 @@ async function exportRecipe({ catalogRoot, registryRoot, projectId, presetId, na
     }
   }
 
+  const profilesByLineage = new Map(catalog.skill_profiles.map((profile) => [profile.lineage_id, profile]));
   const recipeSkills = relevantSkills.map((skill) => ({
     name: skill.skill_name,
     artifact_type: skill.artifact_type ?? "skill",
-    invocation_mode: skill.invocation_mode ?? "unspecified",
+    invocation_mode: profilesByLineage.get(skill.lineage_id)?.invocation_mode ?? skill.invocation_mode ?? "unspecified",
     source_id: recipeSourceIdByRevision.get(`${skill.source_id}:${skill.source_revision_id}`),
     source_relative_path: skill.source_relative_path,
     content_digest: skill.content_digest,
     description: skill.description ?? null,
+    ...(profilesByLineage.has(skill.lineage_id)
+      ? { profile: portableProfile(profilesByLineage.get(skill.lineage_id)) }
+      : {}),
   }));
 
   const allSkillsById = new Map(allSkills.map((s) => [s.id, s]));
@@ -78,15 +94,17 @@ async function exportRecipe({ catalogRoot, registryRoot, projectId, presetId, na
       version,
       owner: preset.owner ?? null,
       lifecycle: preset.lifecycle ?? "draft",
-      description: preset.description ?? null,
-      purpose: preset.purpose ?? null,
-      work_scope_tags: preset.work_scope_tags ?? [],
+      description: versionData.description ?? null,
+      purpose: versionData.purpose ?? null,
+      work_scope_tags: versionData.work_scope_tags ?? [],
       skills: skillIds.map((id) => {
         const skill = allSkillsById.get(id);
         return {
           skill_name: skill?.skill_name ?? "unknown",
           source_relative_path: skill?.source_relative_path,
           artifact_type: skill?.artifact_type ?? "skill",
+          source_id: skill && recipeSourceIdByRevision.get(`${skill.source_id}:${skill.source_revision_id}`),
+          content_digest: skill?.content_digest,
           required: true,
         };
       }),
@@ -100,6 +118,18 @@ async function exportRecipe({ catalogRoot, registryRoot, projectId, presetId, na
     scope: p.scope ?? "project",
     default_preset_id: p.default_preset_id,
     default_preset_version: p.default_preset_version,
+    ...(p.review_policy !== undefined ? { review_policy: p.review_policy } : {}),
+    ...(p.scope === "project" && p.project_path && p.delivery_root
+      ? { delivery_root_relative: relativeDeliveryRoot(p) }
+      : {}),
+    preset_assignments: p.preset_assignments.map((assignment) => ({
+      preset_id: assignment.preset_id,
+      template_version: assignment.template_version,
+      role: assignment.role,
+      priority: assignment.priority,
+      work_scope_tags: assignment.work_scope_tags,
+      enabled: assignment.enabled,
+    })),
   }));
 
   let exportHooks = hooks;
@@ -123,6 +153,25 @@ async function exportRecipe({ catalogRoot, registryRoot, projectId, presetId, na
     projects: recipeProjects,
     hooks: exportHooks,
   });
+}
+
+function presetVersionKey(presetId, version) {
+  return JSON.stringify([presetId, version]);
+}
+
+function portableProfile(profile) {
+  return Object.fromEntries(RECIPE_PROFILE_FIELDS
+    .filter((field) => profile[field] !== undefined)
+    .map((field) => [field, profile[field]]));
+}
+
+function relativeDeliveryRoot(project) {
+  const pathApi = /^[A-Za-z]:[\\/]/.test(project.project_path) ? path.win32 : path;
+  const relative = pathApi.relative(project.project_path, project.delivery_root).replaceAll("\\", "/") || ".";
+  if (relative === ".." || relative.startsWith("../") || pathApi.isAbsolute(relative)) {
+    throw new Error(`Project ${project.id} delivery root cannot be represented relative to its project path`);
+  }
+  return relative;
 }
 
 async function readRecipe(recipePath, recipeContent) {
@@ -184,7 +233,16 @@ function selectDeclaredProject(recipeProjects, providerId) {
 function recipeSkillMatchesPresetEntry(skill, entry) {
   return skill.name === entry.skill_name
     && (entry.source_relative_path === undefined || skill.source_relative_path === entry.source_relative_path)
-    && (entry.artifact_type === undefined || (skill.artifact_type ?? "skill") === entry.artifact_type);
+    && (entry.artifact_type === undefined || (skill.artifact_type ?? "skill") === entry.artifact_type)
+    && (entry.source_id === undefined || skill.source_id === entry.source_id)
+    && (entry.content_digest === undefined || skill.content_digest === entry.content_digest);
+}
+
+function presetShapeMatches(snapshot, shape) {
+  return JSON.stringify(snapshot.registry_skill_ids ?? []) === JSON.stringify(shape.registry_skill_ids)
+    && (snapshot.description ?? null) === shape.description
+    && (snapshot.purpose ?? null) === shape.purpose
+    && JSON.stringify(snapshot.work_scope_tags ?? []) === JSON.stringify(shape.work_scope_tags);
 }
 
 async function inspectRecipe({ recipePath, recipeContent }) {
@@ -197,7 +255,8 @@ async function inspectRecipe({ recipePath, recipeContent }) {
   const byInvocationMode = { user_invoked: 0, model_invoked: 0, hybrid: 0, unspecified: 0 };
   const byArtifactType = {};
   for (const skill of recipe.skills ?? []) {
-    byInvocationMode[skill.invocation_mode ?? "unspecified"] = (byInvocationMode[skill.invocation_mode ?? "unspecified"] ?? 0) + 1;
+    const invocationMode = skill.profile?.invocation_mode ?? skill.invocation_mode ?? "unspecified";
+    byInvocationMode[invocationMode] = (byInvocationMode[invocationMode] ?? 0) + 1;
     byArtifactType[skill.artifact_type ?? "skill"] = (byArtifactType[skill.artifact_type ?? "skill"] ?? 0) + 1;
   }
 
@@ -210,8 +269,10 @@ async function inspectRecipe({ recipePath, recipeContent }) {
     summary: {
       sources_count: recipe.sources?.length ?? 0,
       skills_count: recipe.skills?.length ?? 0,
+      profiles_count: recipe.skills?.filter((skill) => skill.profile !== undefined).length ?? 0,
       presets_count: recipe.presets?.length ?? 0,
       projects_count: recipe.projects?.length ?? 0,
+      project_assignments_count: (recipe.projects ?? []).reduce((sum, project) => sum + (project.preset_assignments?.length ?? 0), 0),
       hooks_count: recipe.hooks?.length ?? 0,
       by_invocation_mode: byInvocationMode,
       by_artifact_type: byArtifactType,
@@ -332,110 +393,115 @@ async function applyRecipe({
     resolvedRecipeSkills.set(specification, candidates[0]);
   }
 
-  const catalog = await loadCatalog(catalogRoot);
   const presetResults = [];
   const resolvedPresetVersions = new Map();
-  for (const recipePreset of recipe.presets ?? []) {
-    const matchedSkillIds = [];
-    for (const entry of recipePreset.skills ?? []) {
-      const specifications = (recipe.skills ?? []).filter((skill) => recipeSkillMatchesPresetEntry(skill, entry));
-      if (specifications.length !== 1) {
-        throw new Error(`Recipe preset ${recipePreset.id} must reference exactly one declared skill named ${entry.skill_name}`);
+  await mutateCatalog(catalogRoot, async (catalog) => {
+    for (const recipePreset of recipe.presets ?? []) {
+      const matchedSkillIds = [];
+      for (const entry of recipePreset.skills ?? []) {
+        const specifications = (recipe.skills ?? []).filter((skill) => recipeSkillMatchesPresetEntry(skill, entry));
+        if (specifications.length !== 1) {
+          throw new Error(`Recipe preset ${recipePreset.id} must reference exactly one declared skill named ${entry.skill_name}`);
+        }
+        const specification = specifications[0];
+        matchedSkillIds.push(resolvedRecipeSkills.get(specification).id);
       }
-      const specification = specifications[0];
-      matchedSkillIds.push(resolvedRecipeSkills.get(specification).id);
-    }
-    const matchedSkills = await getRegistrySkills(registryRoot, matchedSkillIds);
-    const entries = matchedSkills.map((skill) => ({
-      lineage_id: skill.lineage_id,
-      source_revision_id: skill.source_revision_id,
-      registry_skill_id: skill.id,
-      revision_policy: "pinned",
-      required: true,
-      enabled_by_default: true,
-    }));
-    const existing = catalog.presets.find((p) => p.id === recipePreset.id);
-    if (existing) {
-      const currentVersion = existing.versions.find((version) => version.version === existing.active_version)
-        ?? existing.versions.at(-1);
-      const nextShape = {
-        registry_skill_ids: matchedSkillIds,
-        description: recipePreset.description ?? null,
-        purpose: recipePreset.purpose ?? null,
-        work_scope_tags: recipePreset.work_scope_tags ?? [],
-      };
-      const changed = existing.name !== recipePreset.name
-        || JSON.stringify(currentVersion.registry_skill_ids ?? []) !== JSON.stringify(nextShape.registry_skill_ids)
-        || (currentVersion.description ?? null) !== nextShape.description
-        || (currentVersion.purpose ?? null) !== nextShape.purpose
-        || JSON.stringify(currentVersion.work_scope_tags ?? []) !== JSON.stringify(nextShape.work_scope_tags);
-      if (changed) {
-        const nextVersion = Math.max(...existing.versions.map((version) => version.version)) + 1;
-        existing.versions.push({
-          version: nextVersion,
-          ...nextShape,
-          entries,
-          template_notes: (currentVersion.template_notes ?? []).map((note) => ({ ...note })),
-          created_at: new Date().toISOString(),
-        });
+      const matchedSkills = await getRegistrySkills(registryRoot, matchedSkillIds);
+      const entries = matchedSkills.map((skill) => ({
+        lineage_id: skill.lineage_id,
+        source_revision_id: skill.source_revision_id,
+        registry_skill_id: skill.id,
+        revision_policy: "pinned",
+        required: true,
+        enabled_by_default: true,
+      }));
+      const existing = catalog.presets.find((p) => p.id === recipePreset.id);
+      if (existing) {
+        const currentVersion = existing.versions.find((version) => version.version === existing.active_version)
+          ?? existing.versions.at(-1);
+        const nextShape = {
+          registry_skill_ids: matchedSkillIds,
+          description: recipePreset.description !== undefined ? recipePreset.description : currentVersion.description ?? null,
+          purpose: recipePreset.purpose !== undefined ? recipePreset.purpose : currentVersion.purpose ?? null,
+          work_scope_tags: recipePreset.work_scope_tags ?? currentVersion.work_scope_tags ?? [],
+        };
+        const declaredVersion = existing.versions.find((version) => version.version === recipePreset.version);
+        const matchingVersion = declaredVersion && (presetShapeMatches(declaredVersion, nextShape)
+          ? declaredVersion
+          : existing.versions.find((version) => presetShapeMatches(version, nextShape)));
+        let localVersion = matchingVersion?.version;
+        if (localVersion === undefined) {
+          // Local template history is immutable. Preserve the portable version
+          // number when available; otherwise map it to a new local snapshot.
+          const nextVersion = Math.max(recipePreset.version ?? 1, ...existing.versions.map((version) => version.version + 1));
+          existing.versions.push({
+            version: nextVersion,
+            ...nextShape,
+            entries,
+            template_notes: (currentVersion.template_notes ?? []).map((note) => ({ ...note })),
+            created_at: new Date().toISOString(),
+          });
+          localVersion = nextVersion;
+        }
         existing.name = recipePreset.name;
         existing.description = nextShape.description;
         existing.purpose = nextShape.purpose;
         existing.work_scope_tags = nextShape.work_scope_tags;
         existing.registry_skill_ids = matchedSkillIds;
         existing.entries = entries;
-        existing.active_version = nextVersion;
-        existing.selected_version = nextVersion;
+        existing.active_version = localVersion;
+        existing.selected_version = localVersion;
         existing.updated_at = new Date().toISOString();
-      }
-      if (recipePreset.owner !== undefined) existing.owner = recipePreset.owner;
-      if (recipePreset.lifecycle !== undefined) existing.lifecycle = recipePreset.lifecycle;
-      resolvedPresetVersions.set(recipePreset.id, existing.active_version);
-    } else {
-      const initialVersion = recipePreset.version ?? 1;
-      catalog.presets.push({
-        id: recipePreset.id,
-        name: recipePreset.name,
-        owner: recipePreset.owner ?? null,
-        lifecycle: recipePreset.lifecycle ?? "draft",
-        description: recipePreset.description,
-        purpose: recipePreset.purpose,
-        work_scope_tags: recipePreset.work_scope_tags ?? [],
-        registry_skill_ids: matchedSkillIds,
-        entries,
-        active_version: initialVersion,
-        selected_version: initialVersion,
-        versions: [{
-          version: initialVersion,
-          registry_skill_ids: matchedSkillIds,
-          entries,
+        if (recipePreset.owner !== undefined) existing.owner = recipePreset.owner;
+        if (recipePreset.lifecycle !== undefined) existing.lifecycle = recipePreset.lifecycle;
+        resolvedPresetVersions.set(presetVersionKey(recipePreset.id, recipePreset.version), localVersion);
+      } else {
+        const initialVersion = recipePreset.version ?? 1;
+        catalog.presets.push({
+          id: recipePreset.id,
+          name: recipePreset.name,
+          owner: recipePreset.owner ?? null,
+          lifecycle: recipePreset.lifecycle ?? "draft",
           description: recipePreset.description,
           purpose: recipePreset.purpose,
           work_scope_tags: recipePreset.work_scope_tags ?? [],
-          template_notes: [],
-          created_at: new Date().toISOString(),
-        }],
+          registry_skill_ids: matchedSkillIds,
+          entries,
+          active_version: initialVersion,
+          selected_version: initialVersion,
+          versions: [{
+            version: initialVersion,
+            registry_skill_ids: matchedSkillIds,
+            entries,
+            description: recipePreset.description,
+            purpose: recipePreset.purpose,
+            work_scope_tags: recipePreset.work_scope_tags ?? [],
+            template_notes: [],
+            created_at: new Date().toISOString(),
+          }],
+        });
+        resolvedPresetVersions.set(presetVersionKey(recipePreset.id, recipePreset.version), initialVersion);
+      }
+      presetResults.push({
+        id: recipePreset.id,
+        recipe_version: recipePreset.version,
+        matched_skills: matchedSkillIds.length,
+        template_version: resolvedPresetVersions.get(presetVersionKey(recipePreset.id, recipePreset.version)),
       });
-      resolvedPresetVersions.set(recipePreset.id, initialVersion);
     }
-    presetResults.push({
-      id: recipePreset.id,
-      matched_skills: matchedSkillIds.length,
-      template_version: resolvedPresetVersions.get(recipePreset.id),
-    });
-  }
 
-  await saveCatalog(catalogRoot, catalog);
+  });
 
   for (const recipeSkill of recipe.skills ?? []) {
     const matched = resolvedRecipeSkills.get(recipeSkill);
     if (matched) {
       const patch = {
-        artifact_type: recipeSkill.artifact_type ?? "skill",
-        invocation_mode: recipeSkill.invocation_mode ?? "unspecified",
+        ...(recipeSkill.artifact_type !== undefined ? { artifact_type: recipeSkill.artifact_type } : {}),
+        ...(recipeSkill.invocation_mode !== undefined ? { invocation_mode: recipeSkill.invocation_mode } : {}),
       };
       if (recipeSkill.description !== undefined) patch.summary = recipeSkill.description;
-      await updateSkillProfile({
+      Object.assign(patch, portableProfile(recipeSkill.profile ?? {}));
+      if (Object.keys(patch).length > 0) await updateSkillProfile({
         catalogRoot,
         registryRoot,
         lineageId: matched.lineage_id,
@@ -444,7 +510,7 @@ async function applyRecipe({
     }
   }
 
-  const { createProject, assignPreset } = require("./catalog-state");
+  const { createProject, assignPreset, setProjectReviewPolicy } = require("./catalog-state");
 
   let deliveryResult = null;
   if (projectPath) {
@@ -471,25 +537,58 @@ async function applyRecipe({
         projectPath: resolvedPath,
         providerId: resolvedProvider,
         scope: declaredProject?.scope ?? "project",
+        reviewPolicy: declaredProject?.review_policy ?? "advisory",
         deliveryRoot: declaredProject?.delivery_root_relative
           ? path.resolve(resolvedPath, declaredProject.delivery_root_relative)
           : undefined,
       });
+    } else if (declaredProject?.review_policy === "require_approved" && project.review_policy !== "require_approved") {
+      project = await setProjectReviewPolicy({ catalogRoot, projectId: project.id, reviewPolicy: "require_approved" });
     }
 
     const defaultPreset = declaredProject
-      ? (recipe.presets ?? []).find((preset) => preset.id === declaredProject.default_preset_id)
+      ? ((recipe.presets ?? []).find((preset) => preset.id === declaredProject.default_preset_id
+        && (declaredProject.default_preset_version === undefined || preset.version === declaredProject.default_preset_version))
+        ?? (declaredProject.preset_assignments === undefined
+          ? (recipe.presets ?? []).find((preset) => preset.id === declaredProject.default_preset_id)
+          : undefined))
       : recipe.presets?.[0];
     if (declaredProject && !defaultPreset) {
       throw new Error(`Recipe project ${declaredProject.project_id} references an undeclared default preset ${declaredProject.default_preset_id}`);
     }
-    if (defaultPreset) {
+    if (declaredProject?.preset_assignments !== undefined) {
+      await mutateCatalog(catalogRoot, async (latestCatalog) => {
+        const storedProject = latestCatalog.projects.find((item) => item.id === project.id);
+        storedProject.preset_assignments = declaredProject.preset_assignments.map((assignment) => {
+          const localVersion = resolvedPresetVersions.get(presetVersionKey(assignment.preset_id, assignment.template_version));
+          const existing = storedProject.preset_assignments.find((item) => item.preset_id === assignment.preset_id
+            && item.role === assignment.role && item.template_version === localVersion);
+          return {
+            preset_id: assignment.preset_id,
+            template_version: localVersion,
+            role: assignment.role,
+            priority: assignment.priority ?? existing?.priority ?? 0,
+            work_scope_tags: assignment.work_scope_tags ?? existing?.work_scope_tags ?? [],
+            enabled: assignment.enabled ?? existing?.enabled ?? true,
+            created_at: existing?.created_at ?? new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        });
+        const defaultAssignment = storedProject.preset_assignments.find((assignment) => assignment.role === "default");
+        storedProject.default_preset_id = defaultAssignment.preset_id;
+        storedProject.default_preset_version = defaultAssignment.template_version;
+      });
+    } else if (defaultPreset) {
+      const existingDefault = project.preset_assignments.find((assignment) => assignment.role === "default");
       await assignPreset({
         catalogRoot,
         projectId: project.id,
         presetId: defaultPreset.id,
-        version: resolvedPresetVersions.get(defaultPreset.id) ?? defaultPreset.version ?? 1,
+        version: resolvedPresetVersions.get(presetVersionKey(defaultPreset.id, defaultPreset.version)) ?? defaultPreset.version ?? 1,
         role: "default",
+        priority: existingDefault?.priority ?? 0,
+        workScopeTags: existingDefault?.work_scope_tags ?? [],
+        enabled: existingDefault?.enabled ?? true,
       });
     }
 
@@ -511,21 +610,23 @@ async function applyRecipe({
         message: "Preview ready. Pass --confirm to apply delivery bindings.",
       };
     } else {
-      const report = await adapter.applyActivationPlan(plan, { confirm: true });
       const selection = await resolveProjectSelection({ catalogRoot, registryRoot, projectId: project.id });
-      await recordActivationPlan({ catalogRoot, plan, projectId: project.id, assignments: selection.assignments });
+      const { applyCatalogActivationPlan } = require("./activation-policy");
+      await recordActivationPlan({ catalogRoot, registryRoot, plan, projectId: project.id, assignments: selection.assignments });
+      const report = await applyCatalogActivationPlan({ catalogRoot, registryRoot, projectId: project.id, plan, assignments: selection.assignments, adapter });
       await recordActivationReport({ catalogRoot, planId: plan.plan_id, report });
       deliveryResult = {
         project_id: project.id,
         report,
-        applied: true,
+        applied: report.status === "completed",
       };
     }
   }
 
   const hookResults = [];
   let hooksSyncResult = null;
-  if (Array.isArray(recipe.hooks) && recipe.hooks.length > 0) {
+  if (Array.isArray(recipe.hooks) && recipe.hooks.length > 0
+    && !(confirm && deliveryResult && !deliveryResult.applied)) {
     const hooksTarget = projectPath
       ? path.resolve(projectPath)
       : catalogRoot

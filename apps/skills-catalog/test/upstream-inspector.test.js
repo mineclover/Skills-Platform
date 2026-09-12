@@ -53,3 +53,34 @@ test("binding state summary retains attention states", () => {
     { state: "enabled" }, { state: "missing" }, { state: "conflict" }, { state: "unavailable" }, { state: "unknown" },
   ]), { total: 5, enabled: 1, disabled: 0, missing: 1, conflict: 1, unavailable: 1 });
 });
+
+test("missing Manager configuration returns a setup diagnosis without trying to initialize it", async () => {
+  const calls = [];
+  const inspector = createSkillsManagerInspector({
+    fileExists: () => true,
+    execute: async (_command, args) => {
+      calls.push(args);
+      const error = new Error("process exited");
+      error.stderr = "Operation failed: Failed to read /fixture/.skills-manager/config.json: No such file or directory (os error 2)";
+      throw error;
+    },
+  });
+  await assert.rejects(inspector.execute(["providers"]), (error) => {
+    assert.equal(error.code, "SKILLS_MANAGER_NOT_INITIALIZED");
+    assert.match(error.message, /project bind-manager/);
+    return true;
+  });
+  assert.deepEqual(calls, [["providers", "--json"]]);
+});
+
+test("other Manager failures retain their original diagnosis", async () => {
+  const inspector = createSkillsManagerInspector({
+    fileExists: () => true,
+    execute: async () => {
+      const error = new Error("process exited");
+      error.stderr = "Failed to parse /fixture/config.json: invalid JSON";
+      throw error;
+    },
+  });
+  await assert.rejects(inspector.execute(["providers"]), /Failed to parse.*invalid JSON/);
+});

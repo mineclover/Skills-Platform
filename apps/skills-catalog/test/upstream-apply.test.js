@@ -155,3 +155,35 @@ test("CLI apply treats reported operation failures and post-apply drift as failu
   assert.equal(drifted.report.post_apply.verification.verified, false);
   assert.match(drifted.error, /verification/);
 });
+
+test("upstream preview cannot redirect a pinned plan to a different provider root", async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skills-upstream-target-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const source = path.join(root, "source");
+  await fs.mkdir(source);
+  await fs.writeFile(path.join(source, "SKILL.md"), "---\nname: planning\ndescription: Plan work.\n---\n# Planning\n");
+  const registryRoot = path.join(root, "registry");
+  const catalogRoot = path.join(root, "catalog");
+  const imported = await importLocalSource({ registryRoot, sourcePath: source });
+  await createProject({ catalogRoot, id: "demo", name: "Demo", projectPath: path.join(root, "project"), providerId: "codex", upstreamProjectId: "manager-demo" });
+  await createPreset({ catalogRoot, registryRoot, id: "base", name: "Base", registrySkillIds: [imported.skills[0].id] });
+  await assignPreset({ catalogRoot, projectId: "demo", presetId: "base" });
+  const plan = await createProjectPlan({ catalogRoot, registryRoot, projectId: "demo", enabledOnly: true });
+  await recordActivationPlan({ catalogRoot, registryRoot, plan, projectId: "demo" });
+  const calls = [];
+  const upstreamCli = { execute: async (args) => {
+    calls.push(args);
+    if (args[0] === "inspect") return { skills: [{ name: "planning", instance_id: "planning", project_id: "manager-demo", scope: "project", path: plan.operations[0].canonical_path }] };
+    if (args[0] === "skill" && args[1] === "preview") return { impacts: [{ provider_id: "codex", root_path: path.join(root, "project", ".codex", "skills") }] };
+    throw new Error("No write should occur after a target mismatch");
+  } };
+  for (const confirmed of [false, true]) {
+    await assert.rejects(applyRecordedActivationPlan({ catalogRoot, registryRoot, planId: plan.plan_id, confirmed, upstreamCli }), /preview target differs from the activation plan/);
+  }
+  assert.equal(calls.some((args) => args[0] === "skill" && args[1] === "enable"), false);
+  const { verifyBindings } = require("../src/upstream-apply");
+  const mapping = { operation: plan.operations[0], upstream_skill_instance_id: "planning" };
+  const binding = { skill_instance_id: "planning", provider_id: "codex", state: "enabled", target_path: path.join(root, "project", ".codex", "skills", "planning") };
+  assert.equal(verifyBindings([mapping], [binding], { provider_id: "codex" }).verified, false);
+  assert.equal(verifyBindings([mapping], [{ ...binding, target_path: plan.operations[0].delivery_path }], { provider_id: "codex" }).verified, true);
+});

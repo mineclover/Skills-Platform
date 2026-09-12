@@ -4,6 +4,7 @@ const { createPlanFromRegistry } = require("./activation-plans");
 const { getPreset, getProject, PRISTINE_PRESET_ID } = require("./catalog-state");
 const { getRegistrySkills, latestSkillsByArtifact, listRegistrySkills } = require("./registry");
 const { listSkillNotes } = require("./skill-management");
+const { assertActivationPolicy, assertProjectDeliveryBoundary } = require("./activation-policy");
 
 const PROJECT_OVERRIDE_TARGETS = Symbol("projectOverrideTargets");
 
@@ -188,6 +189,8 @@ async function createProjectPlan({
     : effectiveSkills;
 
   const plan = await createPlanFromRegistry({
+    catalogRoot,
+    projectId,
     registryRoot,
     skillIds: plannedSkills.map((skill) => skill.id),
     target: {
@@ -202,6 +205,8 @@ async function createProjectPlan({
     desiredStateBySkillId,
     mode: isPristine ? "pristine" : "apply",
   });
+  plan.catalog_selection = { project_id: project.id, assignments: selection.assignments.map((assignment) => ({ ...assignment })) };
+  await assertActivationPolicy({ catalogRoot, registryRoot, projectId, plan });
   if (overrides.length === 0) return plan;
 
   const lineageByRegistrySkillId = new Map(plannedSkills.map((skill) => [skill.id, skill.lineage_id]));
@@ -426,6 +431,10 @@ async function linkProjectSkill({
   if (!project.delivery_root) {
     throw new Error(`Project ${projectId} does not have a delivery_root defined`);
   }
+  if (project.review_policy === "require_approved") {
+    throw new Error("Strict projects cannot use direct project link; import the source, approve its source revision, and use project-plan/history apply");
+  }
+  await assertProjectDeliveryBoundary({ catalogRoot, project, deliveryPaths: [path.join(project.delivery_root, skillName)] });
 
   const targetSourcePath = await resolveSkillPackageSource({ skillName, version, packagesRoot, instancesRoot });
   if (!targetSourcePath) {

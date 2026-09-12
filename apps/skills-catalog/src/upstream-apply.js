@@ -2,6 +2,8 @@ const crypto = require("node:crypto");
 const path = require("node:path");
 const { digestDirectory } = require("../../../packages/skill-contracts/src");
 const { getProject, loadCatalog, recordActivationReport } = require("./catalog-state");
+const { assertActivationPolicy } = require("./activation-policy");
+const { withActivationDeliveryLock } = require("./activation-locks");
 
 const activePlanApplies = new Set();
 
@@ -87,11 +89,23 @@ function comparablePath(value) {
   return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
+function assertPreviewTarget(mapping, preview, project) {
+  const expectedRoot = comparablePath(path.dirname(mapping.operation.delivery_path));
+  // A dependency impact can have the same provider in another project. Only
+  // the directly mutated root is the plan target; later impacts are consumers.
+  const targetRoot = preview.target_root
+    ?? (preview.impacts ?? []).find(impact => !impact.provider_id || impact.provider_id === project.provider_id)?.root_path;
+  if (targetRoot && comparablePath(targetRoot) !== expectedRoot) {
+    throw new Error(`Skills Manager preview target differs from the activation plan for ${mapping.operation.skill_name}: ${targetRoot}; expected ${path.dirname(mapping.operation.delivery_path)}`);
+  }
+}
+
 function bindingFor(mapping, bindings, project) {
   if (!mapping.upstream_skill_instance_id) return null;
   const expectedTarget = comparablePath(mapping.operation.delivery_path);
   return bindings.find((binding) => {
     if (binding.provider_id && binding.provider_id !== project.provider_id) return false;
+    if (binding.target_path && comparablePath(binding.target_path) !== expectedTarget) return false;
     const bindingId = binding.skill_instance_id ?? binding.instance_id ?? binding.id;
     if (bindingId && bindingId === mapping.upstream_skill_instance_id) return true;
     return expectedTarget && comparablePath(binding.target_path) === expectedTarget;
@@ -146,7 +160,7 @@ function verifyBindings(mappings, bindings, project) {
   };
 }
 
-async function applyRecordedActivationPlan({ catalogRoot, planId, confirmed = false, upstreamCli, onProgress }) {
+async function applyRecordedActivationPlan({ catalogRoot, registryRoot, planId, confirmed = false, upstreamCli, onProgress }) {
   if (!upstreamCli?.execute) throw new Error("A Skills Manager CLI adapter is required");
   if (confirmed && activePlanApplies.has(planId)) throw new Error(`Activation plan is already being applied: ${planId}`);
   if (confirmed) activePlanApplies.add(planId);
@@ -158,101 +172,108 @@ async function applyRecordedActivationPlan({ catalogRoot, planId, confirmed = fa
   if (record.digest !== planDigest(record.plan)) {
     throw new Error(`Activation plan integrity check failed: ${planId}`);
   }
-  const project = await getProject(catalogRoot, record.project_id);
-  const total = record.plan.operations.length;
-  progress("inspect", 0, total, "Inspecting the target Skills Manager project");
-  const inspect = await upstreamCli.execute(["inspect", ...scopeArgs(project)]);
-  const mappings = [];
-  for (const operation of record.plan.operations) {
-    mappings.push(await resolveOperation(operation, inspect.skills ?? [], project));
-    progress("resolve", mappings.length, total, `Matched immutable revision for ${operation.skill_name}`);
-  }
-  const previews = [];
-  for (const mapping of mappings) {
-    const args = previewArgs(mapping, project);
-    previews.push({
-      ...mapping,
-      preview: args
+  return await withActivationDeliveryLock(record.plan, async () => {
+    const project = await getProject(catalogRoot, record.project_id);
+    const policy = { catalogRoot, registryRoot, projectId: record.project_id, plan: record.plan, assignments: record.assignments };
+    await assertActivationPolicy(policy);
+    const total = record.plan.operations.length;
+    progress("inspect", 0, total, "Inspecting the target Skills Manager project");
+    const inspect = await upstreamCli.execute(["inspect", ...scopeArgs(project)]);
+    const mappings = [];
+    for (const operation of record.plan.operations) {
+      mappings.push(await resolveOperation(operation, inspect.skills ?? [], project));
+      progress("resolve", mappings.length, total, `Matched immutable revision for ${operation.skill_name}`);
+    }
+    const previews = [];
+    for (const mapping of mappings) {
+      const args = previewArgs(mapping, project);
+      const preview = args
         ? await upstreamCli.execute(args)
-        : { status: "noop", requires_confirmation: false, reason: "No upstream instance exists to disable." },
-    });
-    progress("preview", previews.length, total, `Previewed ${mapping.operation.skill_name}`);
-  }
-  const requiresSharedConfirmation = previews.some((item) => item.preview.requires_confirmation === true);
-  if (!confirmed) {
-    progress("confirmation_required", total, total, "Preview is complete and requires explicit confirmation");
-    return { plan_id: planId, status: "confirmation_required", mappings: previews, requires_shared_confirmation: requiresSharedConfirmation };
-  }
-  if (requiresSharedConfirmation && record.plan.distribution.shared_root_confirmation !== true) {
-    throw new Error("The plan requires shared-root confirmation; create a plan with shared_root_confirmation before applying.");
-  }
-  const operations = [];
-  let failure = null;
-  for (const previewed of previews) {
-    progress("apply", operations.length, total, `Applying ${previewed.operation.skill_name}`);
-    try {
-      const args = applyArgs(previewed, project, requiresSharedConfirmation);
-      await assertMappingStillMatches(previewed);
-      const result = args
-        ? await upstreamCli.execute(args)
-        : { applied_count: 0, skipped_count: 1, failed_count: 0, status: "already_absent" };
-      operations.push({ ...previewed, result });
-      if ((result.failed_count ?? 0) > 0) {
-        failure = new Error(result.error || `Skills Manager reported a failed operation for ${previewed.operation.skill_name}`);
+        : { status: "noop", requires_confirmation: false, reason: "No upstream instance exists to disable." };
+      assertPreviewTarget(mapping, preview, project);
+      previews.push({
+        ...mapping,
+        preview,
+      });
+      progress("preview", previews.length, total, `Previewed ${mapping.operation.skill_name}`);
+    }
+    const requiresSharedConfirmation = previews.some((item) => item.preview.requires_confirmation === true);
+    if (!confirmed) {
+      progress("confirmation_required", total, total, "Preview is complete and requires explicit confirmation");
+      return { plan_id: planId, status: "confirmation_required", mappings: previews, requires_shared_confirmation: requiresSharedConfirmation };
+    }
+    if (requiresSharedConfirmation && record.plan.distribution.shared_root_confirmation !== true) {
+      throw new Error("The plan requires shared-root confirmation; create a plan with shared_root_confirmation before applying.");
+    }
+    const operations = [];
+    let failure = null;
+    for (const previewed of previews) {
+      progress("apply", operations.length, total, `Applying ${previewed.operation.skill_name}`);
+      try {
+        const args = applyArgs(previewed, project, requiresSharedConfirmation);
+        await assertMappingStillMatches(previewed);
+        await assertActivationPolicy(policy);
+        const result = args
+          ? await upstreamCli.execute(args)
+          : { applied_count: 0, skipped_count: 1, failed_count: 0, status: "already_absent" };
+        operations.push({ ...previewed, result });
+        if ((result.failed_count ?? 0) > 0) {
+          failure = new Error(result.error || `Skills Manager reported a failed operation for ${previewed.operation.skill_name}`);
+          progress("apply", operations.length, total, `Failed to apply ${previewed.operation.skill_name}`);
+          break;
+        }
+        progress("apply", operations.length, total, result.applied_count > 0 ? `Applied ${previewed.operation.skill_name}` : `No change needed for ${previewed.operation.skill_name}`);
+      } catch (error) {
+        failure = error;
+        operations.push({
+          ...previewed,
+          result: { applied_count: 0, skipped_count: 0, failed_count: 1, error: error.message },
+        });
         progress("apply", operations.length, total, `Failed to apply ${previewed.operation.skill_name}`);
         break;
       }
-      progress("apply", operations.length, total, result.applied_count > 0 ? `Applied ${previewed.operation.skill_name}` : `No change needed for ${previewed.operation.skill_name}`);
-    } catch (error) {
-      failure = error;
-      operations.push({
-        ...previewed,
-        result: { applied_count: 0, skipped_count: 0, failed_count: 1, error: error.message },
-      });
-      progress("apply", operations.length, total, `Failed to apply ${previewed.operation.skill_name}`);
-      break;
     }
-  }
-  progress("verify", operations.length, total, "Re-inspecting provider bindings");
-  let inventory = null;
-  let bindings = [];
-  let verificationError = null;
-  try {
-    [inventory, bindings] = await Promise.all([
-      upstreamCli.execute(["providers", ...scopeArgs(project)]),
-      upstreamCli.execute(["bindings", ...scopeArgs(project)]),
-    ]);
-  } catch (error) {
-    verificationError = error;
-  }
-  const verification = verificationError
-    ? { verified: false, results: [], error: verificationError.message }
-    : verifyBindings(mappings, Array.isArray(bindings) ? bindings : bindings.bindings ?? [], project);
-  if (!failure && !verification.verified) {
-    failure = new Error(verification.error || "Post-apply verification did not match the activation plan");
-  }
-  const summary = summarize(operations);
-  if (failure && summary.failed === 0) summary.failed = 1;
-  const report = {
-    plan_id: planId,
-    completed_at: new Date().toISOString(),
-    status: failure ? "failed" : "completed",
-    transport: "skills-manager-cli",
-    project_id: project.id,
-    upstream_project_id: upstreamProjectId(project),
-    provider_id: project.provider_id,
-    operations,
-    summary,
-    post_apply: { inventory, bindings, verification },
-  };
-  const stored = await recordActivationReport({ catalogRoot, planId, report });
-  progress(failure ? "failed" : "completed", operations.length, total, failure ? "Apply completed with failures" : "Apply and verification completed");
-  return {
-    status: failure ? "failed" : "completed",
-    report: stored.report,
-    stored_report_id: stored.report_id,
-    error: failure?.message,
-  };
+    progress("verify", operations.length, total, "Re-inspecting provider bindings");
+    let inventory = null;
+    let bindings = [];
+    let verificationError = null;
+    try {
+      [inventory, bindings] = await Promise.all([
+        upstreamCli.execute(["providers", ...scopeArgs(project)]),
+        upstreamCli.execute(["bindings", ...scopeArgs(project)]),
+      ]);
+    } catch (error) {
+      verificationError = error;
+    }
+    const verification = verificationError
+      ? { verified: false, results: [], error: verificationError.message }
+      : verifyBindings(mappings, Array.isArray(bindings) ? bindings : bindings.bindings ?? [], project);
+    if (!failure && !verification.verified) {
+      failure = new Error(verification.error || "Post-apply verification did not match the activation plan");
+    }
+    const summary = summarize(operations);
+    if (failure && summary.failed === 0) summary.failed = 1;
+    const report = {
+      plan_id: planId,
+      completed_at: new Date().toISOString(),
+      status: failure ? "failed" : "completed",
+      transport: "skills-manager-cli",
+      project_id: project.id,
+      upstream_project_id: upstreamProjectId(project),
+      provider_id: project.provider_id,
+      operations,
+      summary,
+      post_apply: { inventory, bindings, verification },
+    };
+    const stored = await recordActivationReport({ catalogRoot, planId, report });
+    progress(failure ? "failed" : "completed", operations.length, total, failure ? "Apply completed with failures" : "Apply and verification completed");
+    return {
+      status: failure ? "failed" : "completed",
+      report: stored.report,
+      stored_report_id: stored.report_id,
+      error: failure?.message,
+    };
+  });
   } finally {
     if (confirmed) activePlanApplies.delete(planId);
   }

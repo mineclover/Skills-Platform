@@ -431,96 +431,98 @@ function parsePrdDocument(rawContent, prdPath = "PRD.md") {
  * Ensures canonical lifecycle skills exist in the registry revisions directory.
  */
 async function ensureCanonicalSkillsInRegistry(registryRoot, skills = []) {
-  const { loadRegistry, saveRegistry } = require("./registry");
+  const { loadRegistry, saveRegistry, withRegistryMutationLock } = require("./registry");
   const { digestDirectory } = require("@skills-platform/contracts");
 
-  const registry = await loadRegistry(registryRoot);
-  let changed = false;
+  return withRegistryMutationLock(registryRoot, async () => {
+    const registry = await loadRegistry(registryRoot);
+    let changed = false;
 
-  for (const skill of skills) {
-    const existing = registry.skills?.find((s) => s.skill_name === skill.name);
-    if (!existing) {
-      const sourceId = "source_local_canonical_lifecycle";
-      if (!registry.sources?.some((src) => src.id === sourceId)) {
-        registry.sources ??= [];
-        registry.sources.push({
-          id: sourceId,
-          kind: "local",
-          locator: "./.skills-platform/registry",
-          created_at: new Date().toISOString(),
-        });
-      }
+    for (const skill of skills) {
+      const existing = registry.skills?.find((s) => s.skill_name === skill.name);
+      if (!existing) {
+        const sourceId = "source_local_canonical_lifecycle";
+        if (!registry.sources?.some((src) => src.id === sourceId)) {
+          registry.sources ??= [];
+          registry.sources.push({
+            id: sourceId,
+            kind: "local",
+            locator: "./.skills-platform/registry",
+            created_at: new Date().toISOString(),
+          });
+        }
 
-      const revisionId = `revision_${skill.name.replace(/[^a-z0-9]/g, "_")}`;
-      const revDir = path.resolve(registryRoot, "revisions", revisionId, skill.name);
-      await fs.mkdir(revDir, { recursive: true });
+        const revisionId = `revision_${skill.name.replace(/[^a-z0-9]/g, "_")}`;
+        const revDir = path.resolve(registryRoot, "revisions", revisionId, skill.name);
+        await fs.mkdir(revDir, { recursive: true });
 
-      const skillFile = path.join(revDir, "SKILL.md");
-      const skillContent = [
-        "---",
-        `name: ${skill.name}`,
-        `description: ${skill.description || "Lifecycle management skill"}`,
-        `invocation_mode: ${skill.invocation_mode || "model_invoked"}`,
-        "---",
-        `# ${skill.name}`,
-        "",
-        skill.description || "Lifecycle recipe skill.",
-      ].join("\n");
+        const skillFile = path.join(revDir, "SKILL.md");
+        const skillContent = [
+          "---",
+          `name: ${skill.name}`,
+          `description: ${skill.description || "Lifecycle management skill"}`,
+          `invocation_mode: ${skill.invocation_mode || "model_invoked"}`,
+          "---",
+          `# ${skill.name}`,
+          "",
+          skill.description || "Lifecycle recipe skill.",
+        ].join("\n");
 
-      await fs.writeFile(skillFile, skillContent, "utf8");
-      const digest = await digestDirectory(revDir);
+        await fs.writeFile(skillFile, skillContent, "utf8");
+        const digest = await digestDirectory(revDir);
 
-      if (!registry.revisions?.some((r) => r.id === revisionId)) {
-        registry.revisions ??= [];
-        registry.revisions.push({
-          id: revisionId,
+        if (!registry.revisions?.some((r) => r.id === revisionId)) {
+          registry.revisions ??= [];
+          registry.revisions.push({
+            id: revisionId,
+            source_id: sourceId,
+            resolved_revision: digest,
+            content_digest: digest,
+            fetched_at: new Date().toISOString(),
+            review_state: "imported",
+          });
+        }
+
+        const artifactKey = `${sourceId}:${skill.name}`;
+        const lineageId = `lineage_${crypto.createHash("sha256").update(artifactKey).digest("hex").slice(0, 20)}`;
+
+        if (!registry.lineages?.some((l) => l.id === lineageId)) {
+          registry.lineages ??= [];
+          registry.lineages.push({
+            id: lineageId,
+            source_id: sourceId,
+            artifact_key: artifactKey,
+            artifact_type: skill.artifact_type || "skill",
+            source_relative_path: skill.name,
+            skill_name: skill.name,
+            created_at: new Date().toISOString(),
+          });
+        }
+
+        registry.skills ??= [];
+        registry.skills.push({
+          id: `reg_${skill.name.replace(/[^a-z0-9]/g, "_")}`,
           source_id: sourceId,
-          resolved_revision: digest,
-          content_digest: digest,
-          fetched_at: new Date().toISOString(),
-          review_state: "imported",
-        });
-      }
-
-      const artifactKey = `${sourceId}:${skill.name}`;
-      const lineageId = `lineage_${crypto.createHash("sha256").update(artifactKey).digest("hex").slice(0, 20)}`;
-
-      if (!registry.lineages?.some((l) => l.id === lineageId)) {
-        registry.lineages ??= [];
-        registry.lineages.push({
-          id: lineageId,
-          source_id: sourceId,
-          artifact_key: artifactKey,
-          artifact_type: skill.artifact_type || "skill",
-          source_relative_path: skill.name,
+          source_revision_id: revisionId,
+          lineage_id: lineageId,
           skill_name: skill.name,
-          created_at: new Date().toISOString(),
+          artifact_type: skill.artifact_type || "skill",
+          invocation_mode: skill.invocation_mode || "model_invoked",
+          source_relative_path: skill.name,
+          canonical_path: revDir,
+          canonical_relative_path: path.relative(path.resolve(registryRoot), revDir).replaceAll("\\", "/"),
+          content_digest: digest,
+          description: skill.description || null,
+          imported_at: new Date().toISOString(),
         });
+        changed = true;
       }
-
-      registry.skills ??= [];
-      registry.skills.push({
-        id: `reg_${skill.name.replace(/[^a-z0-9]/g, "_")}`,
-        source_id: sourceId,
-        source_revision_id: revisionId,
-        lineage_id: lineageId,
-        skill_name: skill.name,
-        artifact_type: skill.artifact_type || "skill",
-        invocation_mode: skill.invocation_mode || "model_invoked",
-        source_relative_path: skill.name,
-        canonical_path: revDir,
-        canonical_relative_path: path.relative(path.resolve(registryRoot), revDir).replaceAll("\\", "/"),
-        content_digest: digest,
-        description: skill.description || null,
-        imported_at: new Date().toISOString(),
-      });
-      changed = true;
     }
-  }
 
-  if (changed) {
-    await saveRegistry(registryRoot, registry);
-  }
+    if (changed) {
+      await saveRegistry(registryRoot, registry);
+    }
+  });
 }
 
 /**
@@ -613,6 +615,15 @@ async function mountLifecycleRecipe(phaseOrRecipe, {
     confirm,
     reuseRegistryLocalSource: true,
   });
+
+  // Failed adapters return a persisted report. A confirmed mount must stop
+  // the lifecycle before parsing work or executing the next phase's runners.
+  if (confirm && result.delivery?.applied !== true) {
+    throw new LifecycleLoopError(
+      `Lifecycle recipe delivery failed: ${recipe.recipe_id} (${result.delivery?.report?.status ?? "not applied"})`,
+      { phase: "mount", recipe_id: recipe.recipe_id, delivery: result.delivery },
+    );
+  }
 
   return {
     recipe_id: recipe.recipe_id,

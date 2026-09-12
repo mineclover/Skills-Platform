@@ -99,6 +99,8 @@ async function validateAntigravitySkill({ skill, target, deliveryRoot, desiredSt
 }
 
 async function createPlanFromRegistry({
+  catalogRoot,
+  projectId,
   registryRoot,
   skillIds,
   target,
@@ -125,7 +127,7 @@ async function createPlanFromRegistry({
       desiredState: desiredStateBySkillId[skill.id] ?? desiredState,
     });
   }
-  return createActivationPlan({
+  const plan = createActivationPlan({
     target,
     distribution,
     mode,
@@ -145,6 +147,8 @@ async function createPlanFromRegistry({
       };
     }),
   });
+  await require("./activation-policy").assertActivationPolicy({ catalogRoot, registryRoot, projectId, plan });
+  return plan;
 }
 
 module.exports = {

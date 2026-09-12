@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
 const { getSkillLineage, listSkillLineages, listSkillRevisions } = require("./registry");
-const { loadCatalog, saveCatalog } = require("./catalog-state");
+const { loadCatalog, saveCatalog, mutateCatalog } = require("./catalog-state");
 const { getSkillFeedbackSummary, getSkillProfile } = require("./skill-management");
 
 const EVALUATION_LIFECYCLES = new Set(["draft", "active", "retired"]);
@@ -47,30 +47,32 @@ function presentCase(evaluationCase, version = evaluationCase.active_version) {
 }
 
 async function createEvaluationCase({ catalogRoot, registryRoot, id, lineageId, name, objective, criteria, owner = "local", lifecycle = "draft" }) {
-  id = requiredText(id, "Evaluation case id");
-  name = requiredText(name, "Evaluation case name");
-  objective = requiredText(objective, "Evaluation objective");
-  if (!EVALUATION_LIFECYCLES.has(lifecycle)) throw new Error("Evaluation lifecycle is not valid");
-  await getSkillLineage(registryRoot, lineageId);
-  const catalog = await loadCatalog(catalogRoot);
-  if (catalog.evaluation_cases.some((item) => item.id === id)) throw new Error(`Evaluation case already exists: ${id}`);
-  const evaluationCase = {
-    id,
-    lineage_id: lineageId,
-    name,
-    owner: optionalText(owner, "Evaluation owner") ?? "local",
-    lifecycle,
-    objective,
-    criteria: criteriaList(criteria),
-    active_version: 1,
-    versions: [],
-    created_at: timestamp(),
-    updated_at: timestamp(),
-  };
-  evaluationCase.versions.push(caseSnapshot(evaluationCase, 1));
-  catalog.evaluation_cases.push(evaluationCase);
-  await saveCatalog(catalogRoot, catalog);
-  return presentCase(evaluationCase);
+  return mutateCatalog(catalogRoot, async () => {
+    id = requiredText(id, "Evaluation case id");
+    name = requiredText(name, "Evaluation case name");
+    objective = requiredText(objective, "Evaluation objective");
+    if (!EVALUATION_LIFECYCLES.has(lifecycle)) throw new Error("Evaluation lifecycle is not valid");
+    await getSkillLineage(registryRoot, lineageId);
+    const catalog = await loadCatalog(catalogRoot);
+    if (catalog.evaluation_cases.some((item) => item.id === id)) throw new Error(`Evaluation case already exists: ${id}`);
+    const evaluationCase = {
+      id,
+      lineage_id: lineageId,
+      name,
+      owner: optionalText(owner, "Evaluation owner") ?? "local",
+      lifecycle,
+      objective,
+      criteria: criteriaList(criteria),
+      active_version: 1,
+      versions: [],
+      created_at: timestamp(),
+      updated_at: timestamp(),
+    };
+    evaluationCase.versions.push(caseSnapshot(evaluationCase, 1));
+    catalog.evaluation_cases.push(evaluationCase);
+    await saveCatalog(catalogRoot, catalog);
+    return presentCase(evaluationCase);
+  });
 }
 
 async function getEvaluationCase({ catalogRoot, caseId, version }) {
@@ -89,26 +91,28 @@ async function listEvaluationCases({ catalogRoot, lineageId, lifecycle, includeR
 }
 
 async function updateEvaluationCase({ catalogRoot, caseId, name, owner, lifecycle, objective, criteria }) {
-  const catalog = await loadCatalog(catalogRoot);
-  const evaluationCase = catalog.evaluation_cases.find((item) => item.id === caseId);
-  if (!evaluationCase) throw new Error(`Evaluation case not found: ${caseId}`);
-  if ([name, owner, lifecycle, objective, criteria].every((item) => item === undefined)) throw new Error("At least one evaluation case field is required");
-  if (lifecycle !== undefined && !EVALUATION_LIFECYCLES.has(lifecycle)) throw new Error("Evaluation lifecycle is not valid");
-  const nextObjective = objective === undefined ? evaluationCase.objective : requiredText(objective, "Evaluation objective");
-  const nextCriteria = criteria === undefined ? evaluationCase.criteria : criteriaList(criteria);
-  const definitionChanged = nextObjective !== evaluationCase.objective || JSON.stringify(nextCriteria) !== JSON.stringify(evaluationCase.criteria);
-  if (name !== undefined) evaluationCase.name = requiredText(name, "Evaluation case name");
-  if (owner !== undefined) evaluationCase.owner = optionalText(owner, "Evaluation owner");
-  if (lifecycle !== undefined) evaluationCase.lifecycle = lifecycle;
-  if (definitionChanged) {
-    evaluationCase.objective = nextObjective;
-    evaluationCase.criteria = nextCriteria;
-    evaluationCase.active_version = Math.max(...evaluationCase.versions.map((item) => item.version)) + 1;
-    evaluationCase.versions.push(caseSnapshot(evaluationCase, evaluationCase.active_version));
-  }
-  evaluationCase.updated_at = timestamp();
-  await saveCatalog(catalogRoot, catalog);
-  return presentCase(evaluationCase);
+  return mutateCatalog(catalogRoot, async () => {
+    const catalog = await loadCatalog(catalogRoot);
+    const evaluationCase = catalog.evaluation_cases.find((item) => item.id === caseId);
+    if (!evaluationCase) throw new Error(`Evaluation case not found: ${caseId}`);
+    if ([name, owner, lifecycle, objective, criteria].every((item) => item === undefined)) throw new Error("At least one evaluation case field is required");
+    if (lifecycle !== undefined && !EVALUATION_LIFECYCLES.has(lifecycle)) throw new Error("Evaluation lifecycle is not valid");
+    const nextObjective = objective === undefined ? evaluationCase.objective : requiredText(objective, "Evaluation objective");
+    const nextCriteria = criteria === undefined ? evaluationCase.criteria : criteriaList(criteria);
+    const definitionChanged = nextObjective !== evaluationCase.objective || JSON.stringify(nextCriteria) !== JSON.stringify(evaluationCase.criteria);
+    if (name !== undefined) evaluationCase.name = requiredText(name, "Evaluation case name");
+    if (owner !== undefined) evaluationCase.owner = optionalText(owner, "Evaluation owner");
+    if (lifecycle !== undefined) evaluationCase.lifecycle = lifecycle;
+    if (definitionChanged) {
+      evaluationCase.objective = nextObjective;
+      evaluationCase.criteria = nextCriteria;
+      evaluationCase.active_version = Math.max(...evaluationCase.versions.map((item) => item.version)) + 1;
+      evaluationCase.versions.push(caseSnapshot(evaluationCase, evaluationCase.active_version));
+    }
+    evaluationCase.updated_at = timestamp();
+    await saveCatalog(catalogRoot, catalog);
+    return presentCase(evaluationCase);
+  });
 }
 
 function normalizeCriterionResults(criteria, results) {
@@ -128,29 +132,31 @@ function normalizeCriterionResults(criteria, results) {
 }
 
 async function recordEvaluationRun({ catalogRoot, registryRoot, caseId, version, sourceRevisionId, outcome, summary, details = null, author = "local", criterionResults }) {
-  const evaluationCase = await getEvaluationCase({ catalogRoot, caseId, version });
-  if (!EVALUATION_OUTCOMES.has(outcome)) throw new Error("Evaluation outcome is not valid");
-  const revisions = await listSkillRevisions({ registryRoot, lineageId: evaluationCase.lineage_id });
-  if (!revisions.some((revision) => revision.source_revision_id === sourceRevisionId)) {
-    throw new Error(`Source revision is not available for evaluation case lineage: ${sourceRevisionId}`);
-  }
-  const run = {
-    id: `evaluation_run_${crypto.randomUUID()}`,
-    case_id: evaluationCase.id,
-    case_version: evaluationCase.selected_version,
-    lineage_id: evaluationCase.lineage_id,
-    source_revision_id: sourceRevisionId,
-    outcome,
-    summary: requiredText(summary, "Evaluation summary"),
-    details: optionalText(details, "Evaluation details") ?? null,
-    author: optionalText(author, "Evaluation author") ?? "local",
-    criterion_results: normalizeCriterionResults(evaluationCase.criteria, criterionResults),
-    created_at: timestamp(),
-  };
-  const catalog = await loadCatalog(catalogRoot);
-  catalog.evaluation_runs.push(run);
-  await saveCatalog(catalogRoot, catalog);
-  return run;
+  return mutateCatalog(catalogRoot, async () => {
+    const evaluationCase = await getEvaluationCase({ catalogRoot, caseId, version });
+    if (!EVALUATION_OUTCOMES.has(outcome)) throw new Error("Evaluation outcome is not valid");
+    const revisions = await listSkillRevisions({ registryRoot, lineageId: evaluationCase.lineage_id });
+    if (!revisions.some((revision) => revision.source_revision_id === sourceRevisionId)) {
+      throw new Error(`Source revision is not available for evaluation case lineage: ${sourceRevisionId}`);
+    }
+    const run = {
+      id: `evaluation_run_${crypto.randomUUID()}`,
+      case_id: evaluationCase.id,
+      case_version: evaluationCase.selected_version,
+      lineage_id: evaluationCase.lineage_id,
+      source_revision_id: sourceRevisionId,
+      outcome,
+      summary: requiredText(summary, "Evaluation summary"),
+      details: optionalText(details, "Evaluation details") ?? null,
+      author: optionalText(author, "Evaluation author") ?? "local",
+      criterion_results: normalizeCriterionResults(evaluationCase.criteria, criterionResults),
+      created_at: timestamp(),
+    };
+    const catalog = await loadCatalog(catalogRoot);
+    catalog.evaluation_runs.push(run);
+    await saveCatalog(catalogRoot, catalog);
+    return run;
+  });
 }
 
 async function listEvaluationRuns({ catalogRoot, lineageId, caseId, sourceRevisionId, outcome }) {

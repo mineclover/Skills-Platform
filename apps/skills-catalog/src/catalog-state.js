@@ -5,13 +5,17 @@ const { getRegistrySkills, getSkillLineage } = require("./registry");
 const { validateActivationPlan } = require("../../../packages/skill-contracts/src");
 
 const crypto = require("node:crypto");
+const { AsyncLocalStorage } = require("node:async_hooks");
+const { physicalPath, withFileLock } = require("./file-locks");
 
 const CATALOG_SCHEMA_VERSION = 11;
 const PRISTINE_PRESET_ID = "builtin-pristine";
 const TEMPLATE_LIFECYCLES = new Set(["draft", "reviewed", "deprecated"]);
 const PROJECT_PRESET_ROLES = new Set(["default", "recommended", "work_scope_overlay"]);
 const SKILL_OVERRIDE_STATES = new Set(["enabled", "disabled"]);
-const catalogMutationLocks = new Map();
+const PROJECT_REVIEW_POLICIES = new Set(["advisory", "require_approved"]);
+const catalogTransactions = new AsyncLocalStorage();
+const catalogSnapshots = new WeakMap();
 
 function now() {
   return new Date().toISOString();
@@ -22,20 +26,7 @@ function catalogFile(catalogRoot) {
 }
 
 async function withCatalogMutationLock(catalogRoot, operation) {
-  const key = path.resolve(catalogRoot);
-  const previous = catalogMutationLocks.get(key) ?? Promise.resolve();
-  let release;
-  const current = new Promise((resolve) => {
-    release = resolve;
-  });
-  catalogMutationLocks.set(key, current);
-  try {
-    await previous;
-    return await operation();
-  } finally {
-    release();
-    if (catalogMutationLocks.get(key) === current) catalogMutationLocks.delete(key);
-  }
+  return mutateCatalog(catalogRoot, operation);
 }
 
 function blankCatalog() {
@@ -189,6 +180,8 @@ function normalizeProject(project, { sourceSchemaVersion = CATALOG_SCHEMA_VERSIO
   migrateLegacyCodexDeliveryRoot(project, sourceSchemaVersion);
   migrateLegacyAntigravityDeliveryRoot(project, sourceSchemaVersion);
   project.upstream_project_id ??= project.id;
+  project.review_policy ??= "advisory";
+  if (!PROJECT_REVIEW_POLICIES.has(project.review_policy)) throw new Error("Project review policy must be advisory or require_approved");
   project.default_preset_id ??= PRISTINE_PRESET_ID;
   project.default_preset_version ??= 1;
   project.preset_assignments = (project.preset_assignments ?? []).map(normalizeAssignment);
@@ -260,30 +253,117 @@ function pristinePreset() {
   };
 }
 
-async function loadCatalog(catalogRoot) {
+async function readCatalogSnapshot(catalogRoot, key) {
+  let raw = null;
   try {
-    return normalizeCatalog(JSON.parse(await fs.readFile(catalogFile(catalogRoot), "utf8")));
+    raw = await fs.readFile(catalogFile(catalogRoot), "utf8");
   } catch (error) {
-    if (error.code === "ENOENT") return blankCatalog();
-    throw error;
+    if (error.code !== "ENOENT") throw error;
   }
+  const catalog = raw === null ? blankCatalog() : normalizeCatalog(JSON.parse(raw));
+  catalogSnapshots.set(catalog, { key, digest: raw === null ? null : crypto.createHash("sha256").update(raw).digest("hex") });
+  return catalog;
 }
 
-async function saveCatalog(catalogRoot, catalog) {
+async function loadCatalog(catalogRoot) {
+  const key = await physicalPath(catalogFile(catalogRoot));
+  const transaction = catalogTransactions.getStore()?.get(key);
+  if (transaction?.active && transaction.phase === "mutating") return transaction.catalog;
+  return readCatalogSnapshot(catalogRoot, key);
+}
+
+async function writeCatalogSnapshot(catalogRoot, catalog, key) {
   await fs.mkdir(catalogRoot, { recursive: true });
   const temporary = `${catalogFile(catalogRoot)}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  const raw = `${JSON.stringify(catalog, null, 2)}\n`;
   try {
     const handle = await fs.open(temporary, "wx", 0o600);
     try {
-      await handle.writeFile(`${JSON.stringify(catalog, null, 2)}\n`, "utf8");
+      await handle.writeFile(raw, "utf8");
       await handle.sync();
     } finally {
       await handle.close();
     }
     await fs.rename(temporary, catalogFile(catalogRoot));
+    catalogSnapshots.set(catalog, { key, digest: crypto.createHash("sha256").update(raw).digest("hex") });
   } finally {
     await fs.rm(temporary, { force: true }).catch(() => {});
   }
+}
+
+function catalogWriteConflict() {
+  const error = new Error("Catalog changed after this snapshot was loaded; reload it or use mutateCatalog for a read-modify-write operation");
+  error.code = "CATALOG_WRITE_CONFLICT";
+  return error;
+}
+
+function closedCatalogTransaction() {
+  const error = new Error("Catalog transaction is already committing; await nested mutations before leaving its callback");
+  error.code = "CATALOG_TRANSACTION_CLOSED";
+  return error;
+}
+
+// Retain explicit snapshot replacement for fixtures/admin callers. A snapshot
+// returned by loadCatalog may never silently overwrite intervening changes.
+async function saveCatalog(catalogRoot, catalog) {
+  const key = await physicalPath(catalogFile(catalogRoot));
+  const transaction = catalogTransactions.getStore()?.get(key);
+  if (transaction?.active) {
+    if (transaction.phase !== "mutating") throw closedCatalogTransaction();
+    if (transaction.catalog !== catalog) throw catalogWriteConflict();
+    return; // The outer mutation commits once, after its callback succeeds.
+  }
+  return withFileLock(catalogFile(catalogRoot), async () => {
+    const expected = catalogSnapshots.get(catalog);
+    if (expected) {
+      const current = await readCatalogSnapshot(catalogRoot, key);
+      if (expected.key !== key || expected.digest !== catalogSnapshots.get(current).digest) throw catalogWriteConflict();
+    }
+    await writeCatalogSnapshot(catalogRoot, catalog, key);
+  });
+}
+
+async function mutateCatalog(catalogRoot, operation) {
+  const key = await physicalPath(catalogFile(catalogRoot));
+  const inherited = catalogTransactions.getStore();
+  const current = inherited?.get(key);
+  if (current?.active) {
+    if (current.phase !== "mutating") throw closedCatalogTransaction();
+    if (current.failure) throw current.failure;
+    const pending = Promise.resolve().then(() => operation(current.catalog));
+    current.pending.add(pending);
+    try {
+      return await pending;
+    } catch (error) {
+      // Nested writers participate in one transaction, not independent
+      // savepoints. Poison the outer transaction even if its caller catches
+      // this error; replacing objects would detach outer references and a
+      // sibling rollback could otherwise erase a successful nested write.
+      current.failure = error;
+      throw error;
+    } finally {
+      current.pending.delete(pending);
+    }
+  }
+  return withFileLock(catalogFile(catalogRoot), async () => {
+    const transaction = { catalog: await readCatalogSnapshot(catalogRoot, key), active: true, phase: "mutating", pending: new Set() };
+    const context = new Map(inherited ?? []);
+    context.set(key, transaction);
+    try {
+      return await catalogTransactions.run(context, async () => {
+        const result = await operation(transaction.catalog);
+        // Join nested work that started inside the callback before committing.
+        // Detached work that first enters during commit is explicitly rejected.
+        while (transaction.pending.size > 0) await Promise.allSettled([...transaction.pending]);
+        if (transaction.failure) throw transaction.failure;
+        transaction.phase = "committing";
+        await writeCatalogSnapshot(catalogRoot, transaction.catalog, key);
+        return result;
+      });
+    } finally {
+      transaction.active = false;
+    }
+  });
 }
 
 function requireIdentifier(value, label) {
@@ -311,63 +391,93 @@ function defaultDeliveryRoot(providerId, projectPath) {
   return path.join(base, "skills");
 }
 
-async function createProject({ catalogRoot, id, name, projectPath, providerId, deliveryRoot, scope = "project", upstreamProjectId = id }) {
-  id = requireIdentifier(id, "Project id");
-  name = requireIdentifier(name, "Project name");
-  providerId = requireIdentifier(providerId, "Provider id");
-  if (scope !== "project" && scope !== "global") throw new Error("Project scope must be project or global");
-  if (scope === "project") projectPath = requireIdentifier(projectPath, "Project path");
-  const scopedProjectPath = scope === "project" ? projectPath : null;
-  const resolvedDeliveryRoot = deliveryRoot ? requireIdentifier(deliveryRoot, "Delivery root") : defaultDeliveryRoot(providerId, scopedProjectPath);
-  if (providerId.toLowerCase() === "codex") {
-    const expectedRoot = defaultDeliveryRoot(providerId, scopedProjectPath);
-    if (!pathsEqualForHost(resolvedDeliveryRoot, expectedRoot)) {
-      throw new Error(`Codex delivery root must be ${expectedRoot}; received ${path.resolve(resolvedDeliveryRoot)}`);
+async function createProject({ catalogRoot, id, name, projectPath, providerId, deliveryRoot, scope = "project", upstreamProjectId = id, reviewPolicy = "advisory" }) {
+  return mutateCatalog(catalogRoot, async () => {
+    id = requireIdentifier(id, "Project id");
+    name = requireIdentifier(name, "Project name");
+    providerId = requireIdentifier(providerId, "Provider id");
+    if (!PROJECT_REVIEW_POLICIES.has(reviewPolicy)) throw new Error("Project review policy must be advisory or require_approved");
+    if (scope !== "project" && scope !== "global") throw new Error("Project scope must be project or global");
+    if (scope === "project") projectPath = requireIdentifier(projectPath, "Project path");
+    const scopedProjectPath = scope === "project" ? projectPath : null;
+    const resolvedDeliveryRoot = deliveryRoot ? requireIdentifier(deliveryRoot, "Delivery root") : defaultDeliveryRoot(providerId, scopedProjectPath);
+    if (providerId.toLowerCase() === "codex") {
+      const expectedRoot = defaultDeliveryRoot(providerId, scopedProjectPath);
+      if (!pathsEqualForHost(resolvedDeliveryRoot, expectedRoot)) {
+        throw new Error(`Codex delivery root must be ${expectedRoot}; received ${path.resolve(resolvedDeliveryRoot)}`);
+      }
     }
-  }
-  if (isAntigravityProvider(providerId)) {
-    const expectedRoot = defaultDeliveryRoot(providerId, scopedProjectPath);
-    const acceptedRoots = scope === "project"
-      ? [expectedRoot, path.join(path.resolve(scopedProjectPath), ".agent", "skills")]
-      : [expectedRoot];
-    if (!acceptedRoots.some((candidate) => pathsEqualForHost(resolvedDeliveryRoot, candidate))) {
-      throw new Error(
-        `Antigravity delivery root must be one of ${acceptedRoots.join(", ")}; received ${path.resolve(resolvedDeliveryRoot)}`,
-      );
+    if (isAntigravityProvider(providerId)) {
+      const expectedRoot = defaultDeliveryRoot(providerId, scopedProjectPath);
+      const acceptedRoots = scope === "project"
+        ? [expectedRoot, path.join(path.resolve(scopedProjectPath), ".agent", "skills")]
+        : [expectedRoot];
+      if (!acceptedRoots.some((candidate) => pathsEqualForHost(resolvedDeliveryRoot, candidate))) {
+        throw new Error(
+          `Antigravity delivery root must be one of ${acceptedRoots.join(", ")}; received ${path.resolve(resolvedDeliveryRoot)}`,
+        );
+      }
     }
-  }
 
-  const catalog = await loadCatalog(catalogRoot);
-  if (catalog.projects.some((project) => project.id === id)) throw new Error(`Project already exists: ${id}`);
-  const project = {
-    id,
-    name,
-    upstream_project_id: requireIdentifier(upstreamProjectId, "Upstream Skills Manager project id"),
-    project_path: scope === "project" ? path.resolve(scopedProjectPath) : null,
-    provider_id: providerId,
-    delivery_root: path.resolve(resolvedDeliveryRoot),
-    scope,
-    default_preset_id: PRISTINE_PRESET_ID,
-    default_preset_version: 1,
-    preset_assignments: [{
-      preset_id: PRISTINE_PRESET_ID,
-      template_version: 1,
-      role: "default",
-      priority: 0,
-      work_scope_tags: [],
-      enabled: true,
+    const catalog = await loadCatalog(catalogRoot);
+    if (catalog.projects.some((project) => project.id === id)) throw new Error(`Project already exists: ${id}`);
+    const project = {
+      id,
+      name,
+      upstream_project_id: requireIdentifier(upstreamProjectId, "Upstream Skills Manager project id"),
+      project_path: scope === "project" ? path.resolve(scopedProjectPath) : null,
+      provider_id: providerId,
+      delivery_root: path.resolve(resolvedDeliveryRoot),
+      scope,
+      review_policy: reviewPolicy,
+      default_preset_id: PRISTINE_PRESET_ID,
+      default_preset_version: 1,
+      preset_assignments: [{
+        preset_id: PRISTINE_PRESET_ID,
+        template_version: 1,
+        role: "default",
+        priority: 0,
+        work_scope_tags: [],
+        enabled: true,
+        created_at: now(),
+      }],
+      skill_overrides: [],
       created_at: now(),
-    }],
-    skill_overrides: [],
-    created_at: now(),
-  };
-  catalog.projects.push(project);
-  await saveCatalog(catalogRoot, catalog);
-  return project;
+    };
+    catalog.projects.push(project);
+    await saveCatalog(catalogRoot, catalog);
+    return project;
+  });
 }
 
 async function listProjects(catalogRoot) {
   return (await loadCatalog(catalogRoot)).projects.slice().sort((left, right) => left.name.localeCompare(right.name));
+}
+
+async function setProjectReviewPolicy({ catalogRoot, projectId, reviewPolicy }) {
+  if (!PROJECT_REVIEW_POLICIES.has(reviewPolicy)) throw new Error("Project review policy must be advisory or require_approved");
+  return withCatalogMutationLock(catalogRoot, async () => {
+    const catalog = await loadCatalog(catalogRoot);
+    const project = catalog.projects.find((item) => item.id === projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+    project.review_policy = reviewPolicy;
+    project.updated_at = now();
+    await saveCatalog(catalogRoot, catalog);
+    return project;
+  });
+}
+
+async function bindProjectUpstream({ catalogRoot, projectId, upstreamProjectId }) {
+  const managerId = requireIdentifier(upstreamProjectId, "Upstream Skills Manager project id");
+  return withCatalogMutationLock(catalogRoot, async () => {
+    const catalog = await loadCatalog(catalogRoot);
+    const project = catalog.projects.find((item) => item.id === projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+    project.upstream_project_id = managerId;
+    project.updated_at = now();
+    await saveCatalog(catalogRoot, catalog);
+    return project;
+  });
 }
 
 function templateEntries(skills) {
@@ -382,41 +492,43 @@ function templateEntries(skills) {
 }
 
 async function createPreset({ catalogRoot, registryRoot, id, name, description = null, purpose = null, workScopeTags = [], owner = null, lifecycle = "draft", registrySkillIds }) {
-  id = requireIdentifier(id, "Preset id");
-  name = requireIdentifier(name, "Preset name");
-  if (id === PRISTINE_PRESET_ID) throw new Error(`${PRISTINE_PRESET_ID} is reserved`);
-  if (!Array.isArray(registrySkillIds) || registrySkillIds.length === 0) {
-    throw new Error("A custom preset must contain at least one registry skill");
-  }
-  const selectedSkills = await getRegistrySkills(registryRoot, registrySkillIds);
-  const artifactKeys = selectedSkills.map((skill) => skill.artifact_key ?? `${skill.source_id}:${skill.source_relative_path}`);
-  if (new Set(artifactKeys).size !== artifactKeys.length) {
-    throw new Error("A preset cannot contain multiple revisions of the same artifact");
-  }
-  if (!TEMPLATE_LIFECYCLES.has(lifecycle)) throw new Error("Preset lifecycle is not valid");
+  return mutateCatalog(catalogRoot, async () => {
+    id = requireIdentifier(id, "Preset id");
+    name = requireIdentifier(name, "Preset name");
+    if (id === PRISTINE_PRESET_ID) throw new Error(`${PRISTINE_PRESET_ID} is reserved`);
+    if (!Array.isArray(registrySkillIds) || registrySkillIds.length === 0) {
+      throw new Error("A custom preset must contain at least one registry skill");
+    }
+    const selectedSkills = await getRegistrySkills(registryRoot, registrySkillIds);
+    const artifactKeys = selectedSkills.map((skill) => skill.artifact_key ?? `${skill.source_id}:${skill.source_relative_path}`);
+    if (new Set(artifactKeys).size !== artifactKeys.length) {
+      throw new Error("A preset cannot contain multiple revisions of the same artifact");
+    }
+    if (!TEMPLATE_LIFECYCLES.has(lifecycle)) throw new Error("Preset lifecycle is not valid");
 
-  const catalog = await loadCatalog(catalogRoot);
-  if (catalog.presets.some((preset) => preset.id === id)) throw new Error(`Preset already exists: ${id}`);
-  const preset = {
-    id,
-    name,
-    description,
-    kind: "custom",
-    registry_skill_ids: [...new Set(registrySkillIds)],
-    entries: templateEntries(selectedSkills),
-    purpose,
-    work_scope_tags: uniqueStrings(workScopeTags),
-    owner,
-    lifecycle,
-    active_version: 1,
-    template_notes: [],
-    created_at: now(),
-    updated_at: now(),
-  };
-  preset.versions = [templateSnapshot(preset, 1)];
-  catalog.presets.push(preset);
-  await saveCatalog(catalogRoot, catalog);
-  return preset;
+    const catalog = await loadCatalog(catalogRoot);
+    if (catalog.presets.some((preset) => preset.id === id)) throw new Error(`Preset already exists: ${id}`);
+    const preset = {
+      id,
+      name,
+      description,
+      kind: "custom",
+      registry_skill_ids: [...new Set(registrySkillIds)],
+      entries: templateEntries(selectedSkills),
+      purpose,
+      work_scope_tags: uniqueStrings(workScopeTags),
+      owner,
+      lifecycle,
+      active_version: 1,
+      template_notes: [],
+      created_at: now(),
+      updated_at: now(),
+    };
+    preset.versions = [templateSnapshot(preset, 1)];
+    catalog.presets.push(preset);
+    await saveCatalog(catalogRoot, catalog);
+    return preset;
+  });
 }
 
 async function listPresets(catalogRoot) {
@@ -433,37 +545,39 @@ async function getPreset(catalogRoot, presetId, version) {
 }
 
 async function assignPreset({ catalogRoot, projectId, presetId, version, role = "default", priority = 0, workScopeTags = [], enabled = true }) {
-  if (!PROJECT_PRESET_ROLES.has(role)) throw new Error("Project preset role is not valid");
-  const preset = await getPreset(catalogRoot, presetId, version);
-  const catalog = await loadCatalog(catalogRoot);
-  const project = catalog.projects.find((item) => item.id === projectId);
-  if (!project) throw new Error(`Project not found: ${projectId}`);
-  const assignment = {
-    preset_id: presetId,
-    template_version: preset.selected_version,
-    role,
-    priority: Number(priority),
-    work_scope_tags: uniqueStrings(workScopeTags),
-    enabled: enabled !== false,
-    updated_at: now(),
-  };
-  if (!Number.isFinite(assignment.priority)) throw new Error("Project preset priority must be a number");
-  const existingIndex = role === "default"
-    ? project.preset_assignments.findIndex((item) => item.role === "default")
-    : project.preset_assignments.findIndex((item) => item.role === role && item.preset_id === presetId && item.template_version === preset.selected_version);
-  if (existingIndex >= 0) {
-    project.preset_assignments[existingIndex] = { ...project.preset_assignments[existingIndex], ...assignment };
-  } else {
-    assignment.created_at = now();
-    project.preset_assignments.push(assignment);
-  }
-  if (role === "default") {
-    project.default_preset_id = presetId;
-    project.default_preset_version = preset.selected_version;
-  }
-  project.updated_at = now();
-  await saveCatalog(catalogRoot, catalog);
-  return project;
+  return mutateCatalog(catalogRoot, async () => {
+    if (!PROJECT_PRESET_ROLES.has(role)) throw new Error("Project preset role is not valid");
+    const preset = await getPreset(catalogRoot, presetId, version);
+    const catalog = await loadCatalog(catalogRoot);
+    const project = catalog.projects.find((item) => item.id === projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+    const assignment = {
+      preset_id: presetId,
+      template_version: preset.selected_version,
+      role,
+      priority: Number(priority),
+      work_scope_tags: uniqueStrings(workScopeTags),
+      enabled: enabled !== false,
+      updated_at: now(),
+    };
+    if (!Number.isFinite(assignment.priority)) throw new Error("Project preset priority must be a number");
+    const existingIndex = role === "default"
+      ? project.preset_assignments.findIndex((item) => item.role === "default")
+      : project.preset_assignments.findIndex((item) => item.role === role && item.preset_id === presetId && item.template_version === preset.selected_version);
+    if (existingIndex >= 0) {
+      project.preset_assignments[existingIndex] = { ...project.preset_assignments[existingIndex], ...assignment };
+    } else {
+      assignment.created_at = now();
+      project.preset_assignments.push(assignment);
+    }
+    if (role === "default") {
+      project.default_preset_id = presetId;
+      project.default_preset_version = preset.selected_version;
+    }
+    project.updated_at = now();
+    await saveCatalog(catalogRoot, catalog);
+    return project;
+  });
 }
 
 function sameTags(left, right) {
@@ -472,70 +586,74 @@ function sameTags(left, right) {
 }
 
 async function replaceWorkScopeOverlay({ catalogRoot, projectId, presetId, version, workScopeTags, priority = 0 }) {
-  const tags = uniqueStrings(workScopeTags);
-  if (tags.length === 0) throw new Error("A work-scope overlay requires at least one work-scope tag");
-  const catalog = await loadCatalog(catalogRoot);
-  const project = catalog.projects.find((item) => item.id === projectId);
-  if (!project) throw new Error(`Project not found: ${projectId}`);
-  project.preset_assignments = project.preset_assignments.filter((assignment) => !(assignment.role === "work_scope_overlay" && sameTags(assignment.work_scope_tags, tags)));
-  if (presetId) {
-    const preset = await getPreset(catalogRoot, presetId, version);
-    const assignment = {
-      preset_id: preset.id,
-      template_version: preset.selected_version,
-      role: "work_scope_overlay",
-      priority: Number(priority),
-      work_scope_tags: tags,
-      enabled: true,
-      created_at: now(),
-      updated_at: now(),
-    };
-    if (!Number.isFinite(assignment.priority)) throw new Error("Project preset priority must be a number");
-    project.preset_assignments.push(assignment);
-  }
-  project.updated_at = now();
-  await saveCatalog(catalogRoot, catalog);
-  return project;
+  return mutateCatalog(catalogRoot, async () => {
+    const tags = uniqueStrings(workScopeTags);
+    if (tags.length === 0) throw new Error("A work-scope overlay requires at least one work-scope tag");
+    const catalog = await loadCatalog(catalogRoot);
+    const project = catalog.projects.find((item) => item.id === projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+    project.preset_assignments = project.preset_assignments.filter((assignment) => !(assignment.role === "work_scope_overlay" && sameTags(assignment.work_scope_tags, tags)));
+    if (presetId) {
+      const preset = await getPreset(catalogRoot, presetId, version);
+      const assignment = {
+        preset_id: preset.id,
+        template_version: preset.selected_version,
+        role: "work_scope_overlay",
+        priority: Number(priority),
+        work_scope_tags: tags,
+        enabled: true,
+        created_at: now(),
+        updated_at: now(),
+      };
+      if (!Number.isFinite(assignment.priority)) throw new Error("Project preset priority must be a number");
+      project.preset_assignments.push(assignment);
+    }
+    project.updated_at = now();
+    await saveCatalog(catalogRoot, catalog);
+    return project;
+  });
 }
 
 async function updatePresetTemplate({ catalogRoot, registryRoot, presetId, patch }) {
-  if (presetId === PRISTINE_PRESET_ID) throw new Error("Pristine template cannot be changed");
-  const catalog = await loadCatalog(catalogRoot);
-  const preset = catalog.presets.find((item) => item.id === presetId);
-  if (!preset) throw new Error(`Preset not found: ${presetId}`);
-  if (patch.lifecycle !== undefined && !TEMPLATE_LIFECYCLES.has(patch.lifecycle)) throw new Error("Preset lifecycle is not valid");
-  const current = presentPreset(preset);
-  let selectedSkills = null;
-  if (patch.registrySkillIds !== undefined) {
-    if (!Array.isArray(patch.registrySkillIds) || patch.registrySkillIds.length === 0) throw new Error("A template must contain at least one registry skill");
-    selectedSkills = await getRegistrySkills(registryRoot, patch.registrySkillIds);
-    const keys = selectedSkills.map((skill) => skill.lineage_id);
-    if (new Set(keys).size !== keys.length) throw new Error("A template cannot contain multiple revisions of the same skill lineage");
-  }
-  const nextVersion = Math.max(...preset.versions.map((item) => item.version)) + 1;
-  const snapshot = {
-    version: nextVersion,
-    registry_skill_ids: selectedSkills ? selectedSkills.map((skill) => skill.id) : current.registry_skill_ids,
-    entries: selectedSkills ? templateEntries(selectedSkills) : current.entries,
-    description: patch.description ?? current.description,
-    purpose: patch.purpose ?? current.purpose,
-    work_scope_tags: patch.workScopeTags === undefined ? current.work_scope_tags : uniqueStrings(patch.workScopeTags),
-    template_notes: current.template_notes.map((note) => ({ ...note })),
-    created_at: now(),
-  };
-  preset.name = patch.name ?? preset.name;
-  preset.owner = patch.owner ?? preset.owner;
-  preset.lifecycle = patch.lifecycle ?? preset.lifecycle;
-  preset.versions.push(snapshot);
-  preset.active_version = nextVersion;
-  preset.registry_skill_ids = snapshot.registry_skill_ids;
-  preset.entries = snapshot.entries;
-  preset.description = snapshot.description;
-  preset.purpose = snapshot.purpose;
-  preset.work_scope_tags = snapshot.work_scope_tags;
-  preset.updated_at = now();
-  await saveCatalog(catalogRoot, catalog);
-  return presentPreset(preset);
+  return mutateCatalog(catalogRoot, async () => {
+    if (presetId === PRISTINE_PRESET_ID) throw new Error("Pristine template cannot be changed");
+    const catalog = await loadCatalog(catalogRoot);
+    const preset = catalog.presets.find((item) => item.id === presetId);
+    if (!preset) throw new Error(`Preset not found: ${presetId}`);
+    if (patch.lifecycle !== undefined && !TEMPLATE_LIFECYCLES.has(patch.lifecycle)) throw new Error("Preset lifecycle is not valid");
+    const current = presentPreset(preset);
+    let selectedSkills = null;
+    if (patch.registrySkillIds !== undefined) {
+      if (!Array.isArray(patch.registrySkillIds) || patch.registrySkillIds.length === 0) throw new Error("A template must contain at least one registry skill");
+      selectedSkills = await getRegistrySkills(registryRoot, patch.registrySkillIds);
+      const keys = selectedSkills.map((skill) => skill.lineage_id);
+      if (new Set(keys).size !== keys.length) throw new Error("A template cannot contain multiple revisions of the same skill lineage");
+    }
+    const nextVersion = Math.max(...preset.versions.map((item) => item.version)) + 1;
+    const snapshot = {
+      version: nextVersion,
+      registry_skill_ids: selectedSkills ? selectedSkills.map((skill) => skill.id) : current.registry_skill_ids,
+      entries: selectedSkills ? templateEntries(selectedSkills) : current.entries,
+      description: patch.description ?? current.description,
+      purpose: patch.purpose ?? current.purpose,
+      work_scope_tags: patch.workScopeTags === undefined ? current.work_scope_tags : uniqueStrings(patch.workScopeTags),
+      template_notes: current.template_notes.map((note) => ({ ...note })),
+      created_at: now(),
+    };
+    preset.name = patch.name ?? preset.name;
+    preset.owner = patch.owner ?? preset.owner;
+    preset.lifecycle = patch.lifecycle ?? preset.lifecycle;
+    preset.versions.push(snapshot);
+    preset.active_version = nextVersion;
+    preset.registry_skill_ids = snapshot.registry_skill_ids;
+    preset.entries = snapshot.entries;
+    preset.description = snapshot.description;
+    preset.purpose = snapshot.purpose;
+    preset.work_scope_tags = snapshot.work_scope_tags;
+    preset.updated_at = now();
+    await saveCatalog(catalogRoot, catalog);
+    return presentPreset(preset);
+  });
 }
 
 async function clonePresetTemplate({ catalogRoot, registryRoot, sourcePresetId, id, name, owner = null }) {
@@ -571,32 +689,34 @@ async function comparePresetVersions({ catalogRoot, presetId, leftVersion, right
 }
 
 async function addPresetTemplateNote({ catalogRoot, presetId, body, author = "local" }) {
-  if (typeof body !== "string" || body.trim() === "") throw new Error("Template note body is required");
-  if (presetId === PRISTINE_PRESET_ID) throw new Error("Pristine template cannot be changed");
-  const catalog = await loadCatalog(catalogRoot);
-  const preset = catalog.presets.find((item) => item.id === presetId);
-  if (!preset) throw new Error(`Preset not found: ${presetId}`);
-  const note = { id: `template_note_${crypto.randomUUID()}`, body: body.trim(), author, created_at: now() };
-  const current = presentPreset(preset);
-  const nextVersion = Math.max(...preset.versions.map((item) => item.version)) + 1;
-  const snapshot = {
-    version: nextVersion,
-    registry_skill_ids: [...current.registry_skill_ids],
-    entries: current.entries.map((entry) => ({ ...entry })),
-    description: current.description,
-    purpose: current.purpose,
-    work_scope_tags: [...current.work_scope_tags],
-    template_notes: [...current.template_notes.map((item) => ({ ...item })), note],
-    created_at: now(),
-  };
-  preset.versions.push(snapshot);
-  preset.active_version = nextVersion;
-  preset.registry_skill_ids = snapshot.registry_skill_ids;
-  preset.entries = snapshot.entries;
-  preset.template_notes = snapshot.template_notes;
-  preset.updated_at = now();
-  await saveCatalog(catalogRoot, catalog);
-  return { ...note, template_version: nextVersion };
+  return mutateCatalog(catalogRoot, async () => {
+    if (typeof body !== "string" || body.trim() === "") throw new Error("Template note body is required");
+    if (presetId === PRISTINE_PRESET_ID) throw new Error("Pristine template cannot be changed");
+    const catalog = await loadCatalog(catalogRoot);
+    const preset = catalog.presets.find((item) => item.id === presetId);
+    if (!preset) throw new Error(`Preset not found: ${presetId}`);
+    const note = { id: `template_note_${crypto.randomUUID()}`, body: body.trim(), author, created_at: now() };
+    const current = presentPreset(preset);
+    const nextVersion = Math.max(...preset.versions.map((item) => item.version)) + 1;
+    const snapshot = {
+      version: nextVersion,
+      registry_skill_ids: [...current.registry_skill_ids],
+      entries: current.entries.map((entry) => ({ ...entry })),
+      description: current.description,
+      purpose: current.purpose,
+      work_scope_tags: [...current.work_scope_tags],
+      template_notes: [...current.template_notes.map((item) => ({ ...item })), note],
+      created_at: now(),
+    };
+    preset.versions.push(snapshot);
+    preset.active_version = nextVersion;
+    preset.registry_skill_ids = snapshot.registry_skill_ids;
+    preset.entries = snapshot.entries;
+    preset.template_notes = snapshot.template_notes;
+    preset.updated_at = now();
+    await saveCatalog(catalogRoot, catalog);
+    return { ...note, template_version: nextVersion };
+  });
 }
 
 async function getProject(catalogRoot, projectId) {
@@ -680,7 +800,7 @@ function activationPlanDigest(plan) {
   return crypto.createHash("sha256").update(JSON.stringify(plan)).digest("hex");
 }
 
-async function recordActivationPlan({ catalogRoot, plan, projectId, assignments = [] }) {
+async function recordActivationPlan({ catalogRoot, registryRoot, plan, projectId, assignments = [] }) {
   if (!plan?.plan_id) throw new Error("Activation plan id is required");
   const validation = validateActivationPlan(plan);
   if (!validation.valid) {
@@ -694,6 +814,7 @@ async function recordActivationPlan({ catalogRoot, plan, projectId, assignments 
     if (!effectiveProjectId || !catalog.projects.some((project) => project.id === effectiveProjectId)) {
       throw new Error("Activation plan must reference a registered project");
     }
+    await require("./activation-policy").assertActivationPolicy({ catalogRoot, registryRoot, plan, projectId: effectiveProjectId, assignments });
     if (catalog.activation_plans.some((item) => item.plan_id === plan.plan_id)) {
       throw new Error(`Activation plan already recorded: ${plan.plan_id}`);
     }
@@ -761,8 +882,10 @@ module.exports = {
   CATALOG_SCHEMA_VERSION,
   PRISTINE_PRESET_ID,
   PROJECT_PRESET_ROLES,
+  PROJECT_REVIEW_POLICIES,
   SKILL_OVERRIDE_STATES,
   assignPreset,
+  bindProjectUpstream,
   addPresetTemplateNote,
   clearProjectSkillOverride,
   clonePresetTemplate,
@@ -777,8 +900,11 @@ module.exports = {
   listActivationHistory,
   listProjects,
   loadCatalog,
+  mutateCatalog,
+  withCatalogMutationLock,
   saveCatalog,
   setProjectSkillOverride,
+  setProjectReviewPolicy,
   recordActivationPlan,
   recordActivationReport,
   replaceWorkScopeOverlay,

@@ -66,6 +66,16 @@ function createSkillsManagerCli({
       return parseInspectorJson(stdout, args[0]);
     } catch (error) {
       const detail = error.stderr?.trim() || error.message;
+      if (/config\.json/i.test(detail) && /No such file|os error 2|cannot find the file/i.test(detail)) {
+        const setupError = new Error(
+          "Skills Manager is not initialized. Register the target project with " +
+          "skills-manager-inspect project add --path <project-directory>, then connect its returned " +
+          "project ID using skills-catalog project bind-manager <catalog-project-id> " +
+          "--upstream-project-id <manager-project-id>. Inspection does not initialize or install skills.",
+        );
+        setupError.code = "SKILLS_MANAGER_NOT_INITIALIZED";
+        throw setupError;
+      }
       throw new Error(`Skills Manager ${args[0]} command failed: ${detail}`);
     }
   }
