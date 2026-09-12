@@ -391,10 +391,8 @@ export async function applyRecipeApi(params: RecipeApplyOptions): Promise<Recipe
       ? {
           project_id: params.project_path.split(/[\\/]/).pop() || "project",
           preview: { operations: (recipeObj.skills || []).length },
-          applied: params.confirm === true,
-          message: params.confirm
-            ? `Successfully materialized ${(recipeObj.skills || []).length} skill bindings for ${params.provider_id || "codex"} into ${params.project_path}`
-            : "Preview ready. Confirm execution to materialize bindings into target project.",
+          applied: false,
+          message: "Demo preview only. No provider bindings were changed. Connect the Catalog bridge to apply this recipe.",
         }
       : null,
   };

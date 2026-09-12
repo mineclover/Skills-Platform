@@ -33,6 +33,7 @@ import {
   Zap,
 } from "lucide-react";
 import { FilterToolbar, type InvocationFilterMode, type ViewMode } from "./FilterToolbar";
+import { filterWorkspaceSkills } from "../skill-search";
 import {
   DeliveryPathIndicator,
   InvocationBadge,
@@ -670,50 +671,10 @@ export function SkillWorkspace({
     };
   }, []);
 
-  // Filter skills
-  const visible = useMemo(() => {
-    return skills.filter((skill) => {
-      // 1. Invocation mode filter
-      if (invocationFilter !== "all") {
-        const mode =
-          skill.profile.invocation_mode ??
-          skill.latest_skill?.invocation_mode ??
-          skill.lineage.invocation_mode ??
-          "unspecified";
-        if (mode !== invocationFilter) return false;
-      }
-
-      // 2. Provider filter
-      if (providerFilter !== "all") {
-        const tags = (skill.profile.tags || []).map((t) => t.toLowerCase());
-        const desc = (skill.latest_skill?.description || "").toLowerCase();
-        const prov = providerFilter.toLowerCase();
-        const matchesProvider =
-          tags.some((t) => t.includes(prov)) || desc.includes(prov) || skill.lineage.id.includes(prov);
-        if (!matchesProvider) return false;
-      }
-
-      // 3. Keyword / tag search
-      const needle = searchQuery.trim().toLowerCase();
-      if (!needle) return true;
-
-      const searchable = [
-        skill.lineage.skill_name,
-        skill.profile.title,
-        skill.profile.summary,
-        skill.profile.purpose,
-        skill.latest_skill?.description,
-        resolveDeliveryPath(providerId, skill.lineage.skill_name),
-        ...(skill.profile.tags || []),
-        ...(skill.profile.use_when || []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return searchable.includes(needle);
-    });
-  }, [skills, invocationFilter, providerFilter, searchQuery, providerId]);
+  const visible = useMemo(
+    () => filterWorkspaceSkills(skills, { invocationFilter, providerFilter, searchQuery }),
+    [skills, invocationFilter, providerFilter, searchQuery],
+  );
 
   const selected =
     visible.find((skill) => skill.lineage.id === selectedLineageId) ??
@@ -808,6 +769,13 @@ export function SkillWorkspace({
 
   const telemetrySummary =
     propTelemetrySummary ?? internalTelemetry ?? createMockTelemetrySummary();
+  const hasTelemetrySamples = telemetrySummary.total_invocations > 0;
+  const telemetryLatency = hasTelemetrySamples
+    ? formatDuration(telemetrySummary.average_duration_ms)
+    : "—";
+  const telemetrySuccessRate = hasTelemetrySamples
+    ? `${Math.round(telemetrySummary.success_rate * 100)}%`
+    : "—";
 
   const activeAnnotations = annotations.filter((annotation) => annotation.deleted_at === null);
   const deletedAnnotations = annotations.filter((annotation) => annotation.deleted_at !== null);
@@ -1084,11 +1052,12 @@ export function SkillWorkspace({
               </div>
               <strong>
                 {telemetrySummary.total_invocations} Invocations ·{" "}
-                {formatDuration(telemetrySummary.average_duration_ms)} avg latency
+                {telemetryLatency} avg latency
               </strong>
               <small>
-                {Math.round(telemetrySummary.success_rate * 100)}% success rate across active
-                multi-agent hooks
+                {hasTelemetrySamples
+                  ? `${telemetrySuccessRate} success rate across active multi-agent hooks`
+                  : "No data for success rate or average latency"}
               </small>
             </div>
             <div className="telemetry-health-pills">
@@ -1113,21 +1082,21 @@ export function SkillWorkspace({
             <div className="telemetry-metric-box">
               <span className="metric-box-label">Avg Latency</span>
               <strong className="metric-box-val mint">
-                {formatDuration(telemetrySummary.average_duration_ms)}
+                {telemetryLatency}
               </strong>
-              <small className="metric-box-sub">&lt; 50ms invariant</small>
+              <small className="metric-box-sub">{hasTelemetrySamples ? "< 50ms invariant" : "No data"}</small>
             </div>
             <div className="telemetry-metric-box">
               <span className="metric-box-label">Success Rate</span>
               <strong className="metric-box-val">
-                {Math.round(telemetrySummary.success_rate * 100)}%
+                {telemetrySuccessRate}
               </strong>
-              <small className="metric-box-sub">Pass ratio</small>
+              <small className="metric-box-sub">{hasTelemetrySamples ? "Pass ratio" : "No data"}</small>
             </div>
             <div className="telemetry-metric-box">
               <span className="metric-box-label">Active Providers</span>
               <strong className="metric-box-val">
-                {Object.keys(telemetrySummary.by_provider).length || 1}
+                {Object.keys(telemetrySummary.by_provider).length}
               </strong>
               <small className="metric-box-sub">Multi-agent</small>
             </div>
@@ -1971,7 +1940,7 @@ export function SkillWorkspace({
         showInvocationChips={true}
         showProviderFilter={true}
         showViewToggle={true}
-        searchPlaceholder="Search skills by name, tags, description, or delivery path..."
+        searchPlaceholder="Search skills by name, metadata, or notes..."
       />
 
       {skills.length === 0 ? (

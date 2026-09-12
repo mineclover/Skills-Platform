@@ -61,6 +61,72 @@ export interface RecipeWorkspaceProps {
   onSelectProject?: (projectId: string) => void;
 }
 
+export function recipeApplyNotice(
+  result: RecipeApplyResult,
+  providerId: string,
+): { type: "success" | "error" | "info"; message: string } {
+  const delivery = result.delivery;
+  if (delivery?.report?.status === "failed") {
+    return {
+      type: "error",
+      message: `Recipe delivery failed: ${delivery.report.error || delivery.message || "No error details were reported."}`,
+    };
+  }
+  if (delivery?.applied === true && delivery.report?.status === "completed") {
+    return {
+      type: "success",
+      message: `Successfully applied recipe "${result.name}" with ${providerId} delivery bindings.`,
+    };
+  }
+  return {
+    type: "info",
+    message: delivery?.message || `Recipe "${result.name}" processed without confirmed provider delivery.`,
+  };
+}
+
+export function recipeDeliveryRoot(providerId: string): string {
+  switch (providerId) {
+    case "antigravity":
+    case "codex":
+      return ".agents/skills";
+    case "claude":
+      return ".claude/skills";
+    default:
+      return "skills";
+  }
+}
+
+export function RecipeApplyResultCard({
+  result,
+  providerId,
+}: {
+  result: RecipeApplyResult;
+  providerId: string;
+}) {
+  const notice = recipeApplyNotice(result, providerId);
+  return (
+    <div className={`apply-result-card ${notice.type === "success" ? "confirmed" : notice.type === "info" ? "preview" : "apply-error-banner"}`}>
+      <div className="result-header">
+        {notice.type === "success" ? <CheckCircle2 size={20} className="mint" />
+          : notice.type === "error" ? <AlertCircle size={20} className="coral" />
+          : <Play size={20} className="amber" />}
+        <strong>{notice.type === "success" ? "Successfully Applied" : notice.type === "error" ? "Recipe Delivery Failed" : "Recipe Result"}: {result.name}</strong>
+      </div>
+      <p className={notice.type === "success" ? "confirmed-desc" : undefined}>{notice.message}</p>
+      <div className="result-stats">
+        <div><span>Sources:</span> <strong>{result.sources_imported.length}</strong></div>
+        <div><span>Presets:</span> <strong>{result.presets_reconciled.length}</strong></div>
+      </div>
+      {result.delivery?.report && (
+        <details>
+          <summary>Delivery report</summary>
+          <pre>{JSON.stringify(result.delivery.report, null, 2)}</pre>
+        </details>
+      )}
+    </div>
+  );
+}
+
 // Built-in Curated Quick Recipe Cards
 interface QuickRecipeCard {
   id: string;
@@ -577,6 +643,8 @@ export function RecipeWorkspace({
     }
     setApplying(true);
     setApplyError(null);
+    setApplyConfirmedResult(null);
+    setNotice(null);
     try {
       const result = await applyRecipeApi({
         recipe: rawJson,
@@ -585,10 +653,9 @@ export function RecipeWorkspace({
         confirm: true,
       });
       setApplyConfirmedResult(result);
-      setNotice({
-        type: "success",
-        message: `Successfully applied recipe "${result.name}" to target project with ${selectedProvider} delivery bindings!`,
-      });
+      const outcome = recipeApplyNotice(result, selectedProvider);
+      setApplyError(outcome.type === "error" ? outcome.message : null);
+      setNotice(outcome);
     } catch (err: any) {
       setApplyError(err.message);
       setNotice({ type: "error", message: `Apply failed: ${err.message}` });
@@ -600,15 +667,7 @@ export function RecipeWorkspace({
   // Active Provider Delivery Path preview
   const deliveryPathExample = useMemo(() => {
     const cleanPath = targetProjectPath.replace(/[\\/]+$/, "");
-    switch (selectedProvider) {
-      case "antigravity":
-        return `${cleanPath}/.agents/skills/<skill_name>/`;
-      case "claude":
-        return `${cleanPath}/.claude/skills/<skill_name>/`;
-      case "codex":
-      default:
-        return `${cleanPath}/skills/<skill_name>/`;
-    }
+    return `${cleanPath}/${recipeDeliveryRoot(selectedProvider)}/<skill_name>/`;
   }, [targetProjectPath, selectedProvider]);
 
   // Filtered skills in inspected recipe
@@ -1537,7 +1596,7 @@ export function RecipeWorkspace({
                         <Terminal size={16} className="amber" />
                         <strong>Codex CLI</strong>
                       </div>
-                      <span className="delivery-root-tag">skills/</span>
+                      <span className="delivery-root-tag">.agents/skills/</span>
                     </div>
                   </label>
 
@@ -1583,11 +1642,7 @@ export function RecipeWorkspace({
                   <span className="tree-indent">├──</span>
                   <Folder size={14} className="cyan" />
                   <strong>
-                    {selectedProvider === "antigravity"
-                      ? ".agents/skills/"
-                      : selectedProvider === "claude"
-                      ? ".claude/skills/"
-                      : "skills/"}
+                    {recipeDeliveryRoot(selectedProvider)}/
                   </strong>
                   <span className="tree-pill-status">NTFS Junction / Symlink</span>
                 </div>
@@ -1675,33 +1730,7 @@ export function RecipeWorkspace({
 
             {/* Confirmed Results Display */}
             {applyConfirmedResult && (
-              <div className="apply-result-card confirmed">
-                <div className="result-header">
-                  <CheckCircle2 size={20} className="mint" />
-                  <strong>Successfully Applied: {applyConfirmedResult.name}</strong>
-                </div>
-                <p className="confirmed-desc">
-                  All recipe sources were imported, preset templates updated, and symbolic delivery
-                  bindings materialized into <code>{targetProjectPath}</code> for provider{" "}
-                  <code>{selectedProvider}</code>.
-                </p>
-                <div className="result-stats">
-                  <div>
-                    <span>Sources:</span>{" "}
-                    <strong>{applyConfirmedResult.sources_imported.length} active</strong>
-                  </div>
-                  <div>
-                    <span>Presets Reconciled:</span>{" "}
-                    <strong>{applyConfirmedResult.presets_reconciled.length} templates</strong>
-                  </div>
-                  {applyConfirmedResult.delivery?.message && (
-                    <div>
-                      <span>Delivery:</span>{" "}
-                      <strong>{applyConfirmedResult.delivery.message}</strong>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <RecipeApplyResultCard result={applyConfirmedResult} providerId={selectedProvider} />
             )}
           </div>
         </div>

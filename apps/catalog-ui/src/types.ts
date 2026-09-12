@@ -108,10 +108,12 @@ export type Assignment = {
   template_version: number;
   role: string;
   name?: string;
+  priority?: number;
+  work_scope_tags?: string[];
 };
 
 export type RemoteSet = {
-  project: { id: string; name: string };
+  project: { id: string; name: string; preset_assignments?: RemoteAssignment[] };
   assignments: Assignment[];
   skill_overrides?: ProjectSkillOverride[];
   skills: Array<{
@@ -123,7 +125,12 @@ export type RemoteSet = {
     desired_state: "enabled" | "disabled";
     reason: string;
     override?: ProjectSkillOverride;
-    selected_by: { preset_id?: string } | null;
+    selected_by: {
+      preset_id?: string;
+      template_version?: number;
+      priority?: number;
+      reason?: string;
+    } | null;
   }>;
 };
 
@@ -188,6 +195,13 @@ export type SourceReview = {
   reviewed_at: string;
 };
 
+export type SourceRevisionCandidateSummary = {
+  registry_skill_id: string;
+  source_revision_id: string;
+  imported_at: string;
+  review: SourceReview | null;
+};
+
 export type SourceAdoptionCandidate = {
   lineage_id: string;
   skill_name: string;
@@ -195,6 +209,9 @@ export type SourceAdoptionCandidate = {
   source_revision_id: string;
   imported_at: string;
   review: SourceReview | null;
+  candidate_kind?: "latest_import" | "latest_approved";
+  latest_import?: SourceRevisionCandidateSummary;
+  latest_approved?: SourceRevisionCandidateSummary | null;
   compatible_presets: Array<{
     id: string;
     name: string;
@@ -214,7 +231,7 @@ export type CatalogSkill = {
     invocation_mode?: InvocationMode;
   } | null;
   profile: SkillProfile;
-  notes: Array<{ id: string }>;
+  notes: Array<{ id: string; body?: string; deleted_at?: string | null }>;
 };
 
 export type EvaluationSummary = {

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, RefreshCcw, X } from "lucide-react";
 import { catalogApi, copyText, readApplyStream, setProjectSkillOverrideApi } from "./api/catalog-api";
-import { ActivationProgressModal } from "./components/ActivationProgressModal";
+import { canApplyProjectPreview, displayEffectiveSkill, embeddedProjectSnapshot, projectPreviewRequest, resolveProjectSnapshot, sharedImpactSignature, sharedPreviewReview, type ProjectPlanPreview } from "./project-resolution";
+import { useContextValue, useLatestRequest } from "./context-state";
+import { ActivationProgressModal, type ActivationPreviewResult } from "./components/ActivationProgressModal";
 import { LiveActivationDrawer } from "./components/LiveActivationDrawer";
 import { LiveActivationStatus } from "./components/LiveActivationStatus";
 import {
@@ -106,54 +108,77 @@ function presetName(
 export function CatalogApp() {
   const [scope, setScope] = useState<Scope>("implementation");
   const [pristine, setPristine] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
-  const [copyingPrompt, setCopyingPrompt] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [remoteSet, setRemoteSet] = useState<RemoteSet | null>(null);
-  const [remoteError, setRemoteError] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<RemoteProject[]>([]);
+  const [policyVersion, setPolicyVersion] = useState(0);
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+  const activeProviderId = selectedProject?.provider_id || "codex";
+  const projectContext = JSON.stringify([selectedProjectId, scope, pristine, policyVersion,
+    activeProviderId, selectedProject?.project_path, selectedProject?.delivery_root]);
+  const [sharedConsent, setSharedConsent] = useContextValue(projectContext, false);
+  const planContext = JSON.stringify([projectContext, sharedConsent]);
+  const [sharedReview, setSharedReview] = useContextValue<ReturnType<typeof sharedPreviewReview> | null>(projectContext, null);
+  const [previewing, setPreviewing] = useContextValue(planContext, false);
+  const [copyingPrompt, setCopyingPrompt] = useContextValue(projectContext, false);
+  const [notice, setNotice] = useContextValue<string | null>(projectContext, null);
+  const [remoteSet, setRemoteSet] = useContextValue<RemoteSet | null>(projectContext, null);
+  const [remoteError, setRemoteError] = useContextValue<string | null>(projectContext, null);
   const [presets, setPresets] = useState<RemotePreset[]>([]);
   const [registrySkills, setRegistrySkills] = useState<RegistrySkill[]>([]);
   const [catalogSkills, setCatalogSkills] = useState<CatalogSkill[]>([]);
   const [selectedSkillLineageId, setSelectedSkillLineageId] = useState<string | null>(null);
+  const selectedSourceRevisionId = catalogSkills.find((skill) => skill.lineage.id === selectedSkillLineageId)?.latest_skill?.source_revision_id;
+  const evidenceContext = JSON.stringify([projectContext, selectedSkillLineageId, selectedSourceRevisionId]);
   const [savingSkillProfile, setSavingSkillProfile] = useState(false);
-  const [skillFeedback, setSkillFeedback] = useState<SkillFeedback[]>([]);
-  const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary | null>(null);
-  const [skillNotes, setSkillNotes] = useState<SkillNote[]>([]);
-  const [evaluationSummary, setEvaluationSummary] = useState<EvaluationSummary | null>(null);
-  const [loadingSkillEvidence, setLoadingSkillEvidence] = useState(false);
-  const [recordingFeedback, setRecordingFeedback] = useState(false);
-  const [recordingNote, setRecordingNote] = useState(false);
-  const [projectAssignments, setProjectAssignments] = useState<RemoteAssignment[]>([]);
-  const [history, setHistory] = useState<RemoteHistory | null>(null);
-  const [comparison, setComparison] = useState<RemoteComparison | null>(null);
+  const [skillFeedback, setSkillFeedback] = useContextValue<SkillFeedback[]>(evidenceContext, []);
+  const [feedbackSummary, setFeedbackSummary] = useContextValue<FeedbackSummary | null>(evidenceContext, null);
+  const [skillNotes, setSkillNotes] = useContextValue<SkillNote[]>(evidenceContext, []);
+  const [evaluationSummary, setEvaluationSummary] = useContextValue<EvaluationSummary | null>(evidenceContext, null);
+  const [loadingSkillEvidence, setLoadingSkillEvidence] = useContextValue(evidenceContext, Boolean(catalogApi));
+  const [recordingFeedback, setRecordingFeedback] = useContextValue(evidenceContext, false);
+  const [recordingNote, setRecordingNote] = useContextValue(evidenceContext, false);
+  const [projectAssignments, setProjectAssignments] = useContextValue<RemoteAssignment[]>(projectContext, []);
+  const [history, setHistory] = useContextValue<RemoteHistory | null>(projectContext, null);
+  const comparisonContext = JSON.stringify([projectContext, history?.plan_id, history?.recorded_at]);
+  const [comparison, setComparison] = useContextValue<RemoteComparison | null>(comparisonContext, null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [sourceCandidates, setSourceCandidates] = useState<SourceAdoptionCandidate[]>([]);
   const [sourceReviewSummaries, setSourceReviewSummaries] = useState<Record<string, string>>({});
   const [sourceActionId, setSourceActionId] = useState<string | null>(null);
-  const [updatingDefault, setUpdatingDefault] = useState(false);
-  const [updatingOverlay, setUpdatingOverlay] = useState(false);
-  const [updatingSkillId, setUpdatingSkillId] = useState<string | null>(null);
-  const [policyVersion, setPolicyVersion] = useState(0);
+  const [updatingDefault, setUpdatingDefault] = useContextValue(projectContext, false);
+  const [updatingOverlay, setUpdatingOverlay] = useContextValue(projectContext, false);
+  const [updatingSkillId, setUpdatingSkillId] = useContextValue<string | null>(projectContext, null);
   const [activePage, setActivePage] = useState("Projects");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
-  const [globalStatus, setGlobalStatus] = useState<UpstreamStatus | null>(null);
-  const [projectStatus, setProjectStatus] = useState<UpstreamStatus | null>(null);
-  const [loadingLiveStatus, setLoadingLiveStatus] = useState(false);
-  const [liveStatusError, setLiveStatusError] = useState<string | null>(null);
-  const [applyingPlan, setApplyingPlan] = useState(false);
-  const [applyProgress, setApplyProgress] = useState<ApplyProgress | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
-  const [progressModalTitle, setProgressModalTitle] = useState("Real-Time Activation Diagnostics");
-  const [progressModalSubtitle, setProgressModalSubtitle] = useState("Executing multi-provider activation pipeline");
-  const [modalProgress, setModalProgress] = useState<ApplyProgress | null>(null);
-  const [modalResult, setModalResult] = useState<ApplyResult | null>(null);
-  const [modalError, setModalError] = useState<string | null>(null);
-  const [isModalStreaming, setIsModalStreaming] = useState(false);
-  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [globalStatus, setGlobalStatus] = useContextValue<UpstreamStatus | null>(projectContext, null);
+  const [projectStatus, setProjectStatus] = useContextValue<UpstreamStatus | null>(projectContext, null);
+  const [loadingLiveStatus, setLoadingLiveStatus] = useContextValue(projectContext, Boolean(catalogApi));
+  const [liveStatusError, setLiveStatusError] = useContextValue<string | null>(projectContext, null);
+  const [applyingPlan, setApplyingPlan] = useContextValue(planContext, false);
+  const [applyProgress, setApplyProgress] = useContextValue<ApplyProgress | null>(planContext, null);
+  const [isDrawerOpen, setIsDrawerOpen] = useContextValue(projectContext, false);
+  const [isProgressModalOpen, setIsProgressModalOpen] = useContextValue(planContext, false);
+  const [progressModalTitle, setProgressModalTitle] = useContextValue(planContext, "Real-Time Activation Diagnostics");
+  const [progressModalSubtitle, setProgressModalSubtitle] = useContextValue(planContext, "Executing multi-provider activation pipeline");
+  const [modalProgress, setModalProgress] = useContextValue<ApplyProgress | null>(planContext, null);
+  const [modalResult, setModalResult] = useContextValue<ApplyResult | null>(planContext, null);
+  const [modalMode, setModalMode] = useContextValue<"preview" | "apply">(planContext, "apply");
+  const [modalPreviewResult, setModalPreviewResult] = useContextValue<ActivationPreviewResult | null>(planContext, null);
+  const [modalError, setModalError] = useContextValue<string | null>(planContext, null);
+  const [isModalStreaming, setIsModalStreaming] = useContextValue(planContext, false);
+  const [activePlanId, setActivePlanId] = useContextValue<string | null>(planContext, null);
+  const beginEvidenceRequest = useLatestRequest(evidenceContext);
+  const beginEvidenceMutation = useLatestRequest(evidenceContext);
+  const beginResolutionRequest = useLatestRequest(projectContext);
+  const beginHistoryRequest = useLatestRequest(projectContext);
+  const beginLiveRequest = useLatestRequest(projectContext);
+  const beginPlanRequest = useLatestRequest(planContext);
+  const beginPolicyMutation = useLatestRequest(projectContext);
+  const beginPromptRequest = useLatestRequest(projectContext);
+  const beginCatalogSkillsRequest = useLatestRequest("catalog-skills");
+  const resolutionPending = Boolean(catalogApi && (!selectedProjectId || !remoteSet));
+  const policyPending = resolutionPending || updatingDefault || updatingOverlay || Boolean(updatingSkillId) || applyingPlan;
 
   const refreshSourceCandidates = useCallback(() => {
     if (!catalogApi) return Promise.resolve();
@@ -189,15 +214,21 @@ export function CatalogApp() {
 
   const refreshCatalogSkills = useCallback(() => {
     if (!catalogApi) return Promise.resolve();
+    const current = beginCatalogSkillsRequest();
     return fetch(`${catalogApi}/api/skills`)
       .then((response) =>
         response.ok ? response.json() : Promise.reject(new Error("Could not load managed skills")),
       )
-      .then((body: { skills: CatalogSkill[] }) => setCatalogSkills(body.skills));
-  }, []);
+      .then((body: { skills: CatalogSkill[] }) => { if (current()) setCatalogSkills(body.skills); })
+      .catch((error: Error) => {
+        if (!current()) return;
+        setCatalogSkills([]);
+        throw error;
+      });
+  }, [beginCatalogSkillsRequest]);
 
   useEffect(() => {
-    void refreshCatalogSkills().catch(() => setCatalogSkills([]));
+    void refreshCatalogSkills().catch(() => undefined);
   }, [refreshCatalogSkills]);
 
   useEffect(() => {
@@ -206,16 +237,17 @@ export function CatalogApp() {
   }, [catalogSkills, selectedSkillLineageId]);
 
   const refreshSkillEvidence = useCallback(() => {
+    const current = beginEvidenceRequest();
+    if (!current()) return Promise.resolve();
     if (!catalogApi || !selectedSkillLineageId) {
       setSkillFeedback([]);
       setFeedbackSummary(null);
       setSkillNotes([]);
       setEvaluationSummary(null);
+      setLoadingSkillEvidence(false);
       return Promise.resolve();
     }
-    const sourceRevisionId = catalogSkills.find(
-      (skill) => skill.lineage.id === selectedSkillLineageId,
-    )?.latest_skill?.source_revision_id;
+    const sourceRevisionId = selectedSourceRevisionId;
     setLoadingSkillEvidence(true);
     return Promise.all([
       fetch(`${catalogApi}/api/skills/${encodeURIComponent(selectedSkillLineageId)}/feedback`).then(
@@ -248,6 +280,7 @@ export function CatalogApp() {
           { notes: SkillNote[] },
           EvaluationSummary,
         ]) => {
+          if (!current()) return;
           setSkillFeedback(feedbackBody.feedback);
           setFeedbackSummary(summaryBody);
           setSkillNotes(notesBody.notes);
@@ -255,13 +288,14 @@ export function CatalogApp() {
         },
       )
       .catch(() => {
+        if (!current()) return;
         setSkillFeedback([]);
         setFeedbackSummary(null);
         setSkillNotes([]);
         setEvaluationSummary(null);
       })
-      .finally(() => setLoadingSkillEvidence(false));
-  }, [catalogSkills, selectedSkillLineageId]);
+      .finally(() => { if (current()) setLoadingSkillEvidence(false); });
+  }, [beginEvidenceRequest, selectedSourceRevisionId, selectedSkillLineageId]);
 
   useEffect(() => {
     void refreshSkillEvidence();
@@ -306,25 +340,6 @@ export function CatalogApp() {
     );
   }, [presets, selectedTemplateId]);
 
-  useEffect(() => {
-    if (!catalogApi || !selectedProjectId) return;
-    let active = true;
-    fetch(
-      `${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/preset-assignments`,
-    )
-      .then((response) =>
-        response.ok
-          ? response.json()
-          : Promise.reject(new Error("Could not load project template assignments")),
-      )
-      .then(
-        (body: { assignments: RemoteAssignment[] }) => active && setProjectAssignments(body.assignments),
-      )
-      .catch(() => active && setProjectAssignments([]));
-    return () => {
-      active = false;
-    };
-  }, [policyVersion, selectedProjectId]);
 
   useEffect(() => {
     refreshSourceCandidates().catch(() => setSourceCandidates([]));
@@ -346,48 +361,35 @@ export function CatalogApp() {
 
   useEffect(() => {
     if (!catalogApi || !selectedProjectId) return;
-    let active = true;
+    const current = beginResolutionRequest();
     const params = new URLSearchParams({ work_scope: scope });
     if (pristine) params.set("preset", "builtin-pristine");
-    fetch(
-      `${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/effective-set?${params}`,
-    )
-      .then((response) =>
-        response.ok
-          ? response.json()
-          : Promise.reject(new Error("Could not resolve the selected project")),
-      )
-      .then((body: RemoteSet) => {
-        if (active) {
-          setRemoteSet(body);
-          setRemoteError(null);
-        }
-      })
-      .catch((error: Error) => active && setRemoteError(error.message));
-    return () => {
-      active = false;
-    };
-  }, [scope, pristine, selectedProjectId, policyVersion]);
-
-  useEffect(() => {
-    // A preview is immutable. Any policy input change requires a new preview
-    // before the plan can be applied.
-    setActivePlanId(null);
-  }, [scope, pristine, selectedProjectId, policyVersion]);
+    const projectUrl = `${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}`;
+    fetch(`${projectUrl}/effective-set?${params}`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not resolve the selected project")))
+      .then((body: RemoteSet) => current() ? resolveProjectSnapshot(body, () =>
+        fetch(`${projectUrl}/preset-assignments`)
+          .then((response) => response.ok ? response.json() : Promise.reject(new Error("Could not load project template assignments")))
+          .then((legacy: { assignments: RemoteAssignment[] }) => legacy.assignments),
+      ) : null)
+      .then((snapshot) => {
+        if (!current() || !snapshot) return;
+        setRemoteSet(snapshot.effectiveSet);
+        setProjectAssignments(snapshot.assignments);
+        setRemoteError(null);
+      }).catch((error: Error) => { if (current()) setRemoteError(error.message); });
+  }, [beginResolutionRequest, scope, pristine, selectedProjectId]);
 
   useEffect(() => {
     if (!catalogApi || !selectedProjectId) return;
-    let active = true;
+    const current = beginHistoryRequest();
     fetch(`${catalogApi}/api/projects/${encodeURIComponent(selectedProjectId)}/history`)
       .then((response) =>
         response.ok ? response.json() : Promise.reject(new Error("Could not load project history")),
       )
-      .then((body: { history: RemoteHistory[] }) => active && setHistory(body.history[0] ?? null))
-      .catch(() => active && setHistory(null));
-    return () => {
-      active = false;
-    };
-  }, [selectedProjectId, notice]);
+      .then((body: { history: RemoteHistory[] }) => current() && setHistory(body.history[0] ?? null))
+      .catch(() => current() && setHistory(null));
+  }, [beginHistoryRequest, selectedProjectId, notice]);
 
   useEffect(() => {
     if (!catalogApi || !history?.plan_id) {
@@ -408,13 +410,16 @@ export function CatalogApp() {
     return () => {
       active = false;
     };
-  }, [history?.plan_id]);
+  }, [history?.plan_id, comparisonContext]);
 
   const refreshLiveStatus = useCallback(() => {
+    const current = beginLiveRequest();
+    if (!current()) return Promise.resolve();
     if (!catalogApi) {
       setGlobalStatus(null);
       setProjectStatus(null);
       setLiveStatusError(null);
+      setLoadingLiveStatus(false);
       return Promise.resolve();
     }
     setLoadingLiveStatus(true);
@@ -439,13 +444,14 @@ export function CatalogApp() {
           { status: UpstreamStatus },
           { status: UpstreamStatus } | null,
         ]) => {
+          if (!current()) return;
           setGlobalStatus(globalBody.status);
           setProjectStatus(projectBody?.status ?? null);
         },
       )
-      .catch((error: Error) => setLiveStatusError(error.message))
-      .finally(() => setLoadingLiveStatus(false));
-  }, [selectedProjectId]);
+      .catch((error: Error) => { if (current()) setLiveStatusError(error.message); })
+      .finally(() => { if (current()) setLoadingLiveStatus(false); });
+  }, [beginLiveRequest, selectedProjectId]);
 
   useEffect(() => {
     void refreshLiveStatus();
@@ -454,35 +460,22 @@ export function CatalogApp() {
   const skills = useMemo<DisplaySkill[]>(
     () =>
       remoteSet
-        ? remoteSet.skills.map((skill) => {
-            const assignment = remoteSet.assignments.find(
-              (item) => item.preset_id === skill.selected_by?.preset_id,
-            );
-            return {
-              name: skill.skill_name,
-              registry_skill_id: skill.registry_skill_id,
-              lineage_id: skill.lineage_id,
-              source: assignment?.name ?? (pristine ? "Pristine" : "Catalog"),
-              enabled: skill.desired_state === "enabled",
-              reason: skill.reason.replaceAll("_", " "),
-              artifact_type: skill.artifact_type,
-              invocation_mode: skill.invocation_mode,
-              override: skill.override,
-            };
-          })
-        : sampleSkills(scope, pristine),
+        ? remoteSet.skills.map((skill) => displayEffectiveSkill(skill, remoteSet.assignments, pristine))
+        : catalogApi ? [] : sampleSkills(scope, pristine),
     [remoteSet, scope, pristine],
   );
 
   const enabledCount = useMemo(() => skills.filter((skill) => skill.enabled).length, [skills]);
   const defaultTemplate = remoteSet
     ? presetName(remoteSet.assignments, "default", "Pristine")
-    : "Build v2";
+    : catalogApi ? "Waiting for project resolution" : "Build v2";
   const defaultPresetId =
     remoteSet?.assignments.find((assignment) => assignment.role === "default")?.preset_id ?? null;
-  const overlayTemplate = remoteSet
-    ? presetName(remoteSet.assignments, "work_scope_overlay", "None")
-    : "Verification v1";
+  const appliedOverlays = remoteSet
+    ? remoteSet.assignments.filter((assignment) => assignment.role === "work_scope_overlay")
+    : !catalogApi && scope === "implementation" && !pristine
+      ? [{ preset_id: "sample-verification", name: "Verification", template_version: 1, role: "work_scope_overlay", priority: 0, work_scope_tags: [scope] }]
+      : [];
   const configuredOverlay =
     projectAssignments.find(
       (assignment) =>
@@ -492,20 +485,7 @@ export function CatalogApp() {
         assignment.work_scope_tags[0] === scope,
     ) ?? null;
   const overlayPresetId = configuredOverlay?.preset_id ?? null;
-  const overlayActive = remoteSet ? overlayTemplate !== "None" : scope === "implementation";
 
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? null,
-    [projects, selectedProjectId],
-  );
-
-  const activeProviderId = useMemo(() => {
-    return (
-      selectedProject?.provider_id ||
-      globalStatus?.inventory.providers.find((p) => p.detected)?.provider_id ||
-      "codex"
-    );
-  }, [selectedProject, globalStatus]);
 
   const projectStatusState = useMemo(() => {
     return calculateProjectStatus({
@@ -517,13 +497,15 @@ export function CatalogApp() {
   }, [pristine, defaultPresetId, comparison, history]);
 
   const togglePristine = useCallback(() => {
+    if (policyPending) return;
     setPristine((current) => !current);
     setNotice(null);
-  }, []);
+  }, [policyPending]);
 
   const updateDefaultTemplate = useCallback(
     (presetId: string) => {
-      if (!catalogApi || !selectedProjectId || !presetId) return;
+      if (!catalogApi || !selectedProjectId || !presetId || policyPending) return;
+      const current = beginPolicyMutation();
       setUpdatingDefault(true);
       setNotice(null);
       fetch(
@@ -538,20 +520,22 @@ export function CatalogApp() {
           response.ok ? response.json() : Promise.reject(new Error("Project default template was rejected")),
         )
         .then(() => {
+          if (!current()) return;
           setPristine(false);
           setPolicyVersion((current) => current + 1);
           const preset = presets.find((item) => item.id === presetId);
           setNotice(`${preset?.name ?? presetId} is now pinned as this project's default template.`);
         })
-        .catch((error: Error) => setNotice(error.message))
-        .finally(() => setUpdatingDefault(false));
+        .catch((error: Error) => { if (current()) setNotice(error.message); })
+        .finally(() => { if (current()) setUpdatingDefault(false); });
     },
-    [presets, selectedProjectId],
+    [presets, selectedProjectId, policyPending, beginPolicyMutation],
   );
 
   const updateWorkScopeOverlay = useCallback(
     (presetId: string) => {
-      if (!catalogApi || !selectedProjectId) return;
+      if (!catalogApi || !selectedProjectId || policyPending) return;
+      const current = beginPolicyMutation();
       setUpdatingOverlay(true);
       setNotice(null);
       fetch(
@@ -566,6 +550,7 @@ export function CatalogApp() {
           response.ok ? response.json() : Promise.reject(new Error("Work-scope overlay was rejected")),
         )
         .then(() => {
+          if (!current()) return;
           setPolicyVersion((current) => current + 1);
           const preset = presets.find((item) => item.id === presetId);
           setNotice(
@@ -574,18 +559,20 @@ export function CatalogApp() {
               : `No template applies during ${scope}.`,
           );
         })
-        .catch((error: Error) => setNotice(error.message))
-        .finally(() => setUpdatingOverlay(false));
+        .catch((error: Error) => { if (current()) setNotice(error.message); })
+        .finally(() => { if (current()) setUpdatingOverlay(false); });
     },
-    [presets, scope, selectedProjectId],
+    [presets, scope, selectedProjectId, policyPending, beginPolicyMutation],
   );
 
   const updateProjectSkillState = useCallback(
     (skill: DisplaySkill, desiredState: "enabled" | "disabled" | "inherit") => {
+      if (policyPending) return;
       if (!catalogApi || !selectedProjectId || !skill.lineage_id || !skill.registry_skill_id) {
         setNotice("Connect the Catalog bridge before changing an individual skill state.");
         return;
       }
+      const current = beginPolicyMutation();
       setUpdatingSkillId(skill.registry_skill_id);
       setNotice(null);
       setProjectSkillOverrideApi({
@@ -595,6 +582,7 @@ export function CatalogApp() {
         desiredState,
       })
         .then(() => {
+          if (!current()) return;
           setActivePlanId(null);
           setPolicyVersion((version) => version + 1);
           setNotice(
@@ -603,10 +591,10 @@ export function CatalogApp() {
               : `${skill.name} is explicitly ${desiredState} for this project. Preview is required before apply.`,
           );
         })
-        .catch((error: Error) => setNotice(error.message))
-        .finally(() => setUpdatingSkillId(null));
+        .catch((error: Error) => { if (current()) setNotice(error.message); })
+        .finally(() => { if (current()) setUpdatingSkillId(null); });
     },
-    [selectedProjectId],
+    [selectedProjectId, policyPending, beginPolicyMutation],
   );
 
   const saveTemplateMembership = useCallback(
@@ -702,6 +690,7 @@ export function CatalogApp() {
       patch: { outcome: string; evidence_type: string; summary: string },
     ) => {
       if (!catalogApi) return;
+      const current = beginEvidenceMutation();
       setRecordingFeedback(true);
       fetch(`${catalogApi}/api/skills/${encodeURIComponent(lineageId)}/feedback`, {
         method: "POST",
@@ -711,16 +700,16 @@ export function CatalogApp() {
         .then((response) =>
           response.ok ? response.json() : Promise.reject(new Error("Feedback was rejected")),
         )
-        .then(() => refreshSkillEvidence())
+        .then(() => current() ? refreshSkillEvidence() : undefined)
         .then(() =>
-          setNotice(
+          current() && setNotice(
             "Feedback recorded for this skill. Templates and provider bindings were not changed.",
           ),
         )
-        .catch((error: Error) => setNotice(error.message))
-        .finally(() => setRecordingFeedback(false));
+        .catch((error: Error) => { if (current()) setNotice(error.message); })
+        .finally(() => { if (current()) setRecordingFeedback(false); });
     },
-    [refreshSkillEvidence],
+    [refreshSkillEvidence, beginEvidenceMutation],
   );
 
   const addSkillUsageNote = useCallback(
@@ -729,6 +718,7 @@ export function CatalogApp() {
       patch: { kind: string; body: string; inject_into_prompt: boolean },
     ) => {
       if (!catalogApi) return;
+      const current = beginEvidenceMutation();
       setRecordingNote(true);
       fetch(`${catalogApi}/api/skills/${encodeURIComponent(lineageId)}/notes`, {
         method: "POST",
@@ -738,22 +728,28 @@ export function CatalogApp() {
         .then((response) =>
           response.ok ? response.json() : Promise.reject(new Error("Skill note was rejected")),
         )
-        .then(() => refreshSkillEvidence())
+        .then(() => current() ? Promise.all([refreshSkillEvidence(), refreshCatalogSkills()]) : undefined)
         .then(() =>
-          setNotice(
+          current() && setNotice(
             "Skill note saved. It is injected only when explicitly marked for prompts.",
           ),
         )
-        .catch((error: Error) => setNotice(error.message))
-        .finally(() => setRecordingNote(false));
+        .catch((error: Error) => { if (current()) setNotice(error.message); })
+        .finally(() => { if (current()) setRecordingNote(false); });
     },
-    [refreshSkillEvidence],
+    [refreshSkillEvidence, refreshCatalogSkills, beginEvidenceMutation],
   );
 
   const previewPlan = useCallback(() => {
+    if (policyPending || previewing) return;
+    const current = beginPlanRequest();
+    if (!current()) return;
+    setActivePlanId(null);
     setPreviewing(true);
     setNotice(null);
     setIsProgressModalOpen(true);
+    setModalMode("preview");
+    setModalPreviewResult(null);
     setProgressModalTitle("Activation Plan Preview");
     setProgressModalSubtitle(`Inspecting and resolving effective skills for ${scope} scope`);
     setModalError(null);
@@ -767,7 +763,8 @@ export function CatalogApp() {
     });
 
     if (catalogApi && selectedProjectId) {
-      setTimeout(() => {
+      const inspectionTimer = window.setTimeout(() => {
+        if (!current()) return;
         setModalProgress({
           stage: "inspect",
           completed: 2,
@@ -783,56 +780,64 @@ export function CatalogApp() {
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            work_scope_tags: [scope],
-            preset_id: pristine ? "builtin-pristine" : undefined,
-            preflight: true,
-          }),
+          body: JSON.stringify(projectPreviewRequest(scope, pristine, sharedConsent)),
         },
       )
         .then((response) =>
           response.ok ? response.json() : Promise.reject(new Error("Preview request was rejected")),
         )
-        .then((body: {
-          plan: { operations: unknown[]; plan_id?: string };
-          preflight?: { status: string; requires_shared_confirmation?: boolean } | null;
-        }) => {
-          const count = body.plan.operations.length;
-          setActivePlanId(body.plan.plan_id ?? null);
-          if (body.preflight?.requires_shared_confirmation) {
-            throw new Error("This target requires a shared-root confirmation plan before it can be applied.");
+        .then((body: ProjectPlanPreview) => {
+          if (!current()) return;
+          const snapshot = embeddedProjectSnapshot(body.effective_set);
+          if (snapshot) {
+            setRemoteSet(snapshot.effectiveSet);
+            setProjectAssignments(snapshot.assignments);
+            setRemoteError(null);
           }
+          const count = body.plan.operations.length;
+          const review = sharedPreviewReview(body);
+          setSharedReview(review);
+          if (sharedConsent && review.requiresConfirmation
+            && sharedImpactSignature(review.impacts) !== sharedImpactSignature(sharedReview?.impacts ?? [])) {
+            setSharedConsent(false);
+            setNotice("Shared impacts changed. Review the current impact list and create a new preview with confirmation.");
+            return;
+          }
+          const readyForApply = canApplyProjectPreview(body, sharedConsent);
+          setActivePlanId(readyForApply ? body.plan.plan_id ?? null : null);
+          const message = readyForApply
+            ? `${count} operations were recorded and preflighted. The same immutable plan is ready for delivery.`
+            : "Shared effects require confirmation. Close this preview, review the impact list, and create a new preview after confirming.";
           setModalProgress({
-            stage: "completed",
+            stage: "preview",
             completed: count,
             total: count,
-            message: `${count} operations were recorded and preflighted. The same immutable plan is ready for delivery.`,
+            message,
           });
-          setModalResult({
-            status: "succeeded",
-            report: {
-              summary: { applied: count, skipped: 0, failed: 0 },
-            },
-          });
+          setModalPreviewResult({ planned: count, preflighted: Boolean(body.preflight), readyForApply });
           setNotice(
-            `${count} operations were recorded and preflighted as plan ${body.plan.plan_id}.`,
+            readyForApply ? `${count} operations were recorded and preflighted as plan ${body.plan.plan_id}.` : message,
           );
         })
         .catch((error: Error) => {
+          if (!current()) return;
           setActivePlanId(null);
           setModalError(error.message);
           setModalProgress({ stage: "failed", completed: 0, total: 0, message: error.message });
           setNotice(error.message);
         })
         .finally(() => {
+          window.clearTimeout(inspectionTimer);
+          if (!current()) return;
           setPreviewing(false);
           setIsModalStreaming(false);
         });
       return;
     }
 
-    // Demo/offline preview simulation with realistic 5-step stages
+    // Demo/offline preview does not inspect or apply real provider bindings.
     window.setTimeout(() => {
+      if (!current()) return;
       setModalProgress({
         stage: "inspect",
         completed: 1,
@@ -842,6 +847,7 @@ export function CatalogApp() {
     }, 150);
 
     window.setTimeout(() => {
+      if (!current()) return;
       setModalProgress({
         stage: "preview",
         completed: 2,
@@ -851,31 +857,28 @@ export function CatalogApp() {
     }, 350);
 
     window.setTimeout(() => {
+      if (!current()) return;
       setPreviewing(false);
       setIsModalStreaming(false);
       setModalProgress({
-        stage: "completed",
+        stage: "preview",
         completed: 3,
         total: 3,
         message: `${enabledCount} enabled and ${
           3 - enabledCount
         } disabled operations are ready for preview.`,
       });
-      setModalResult({
-        status: "succeeded",
-        report: {
-          summary: { applied: enabledCount, skipped: 3 - enabledCount, failed: 0 },
-        },
-      });
+      setModalPreviewResult({ planned: 3, preflighted: false });
       setNotice(
         `${enabledCount} enabled and ${
           3 - enabledCount
         } disabled operations are ready for preview.`,
       );
     }, 600);
-  }, [enabledCount, pristine, scope, selectedProjectId]);
+  }, [enabledCount, pristine, scope, selectedProjectId, policyPending, previewing, beginPlanRequest, sharedConsent, sharedReview]);
 
   const applyPlan = useCallback(() => {
+    if (policyPending || previewing) return;
     if (!catalogApi || !selectedProjectId) {
       setNotice("Connect the local Catalog bridge before applying through Skills Manager CLI.");
       return;
@@ -891,9 +894,13 @@ export function CatalogApp() {
     ) {
       return;
     }
+    const current = beginPlanRequest();
+    if (!current()) return;
     setApplyingPlan(true);
     setNotice(null);
     setIsProgressModalOpen(true);
+    setModalMode("apply");
+    setModalPreviewResult(null);
     setProgressModalTitle("Materializing Activation Plan");
     setProgressModalSubtitle("Executing live filesystem symlink materialization through Skills Manager CLI");
     setModalError(null);
@@ -918,10 +925,12 @@ export function CatalogApp() {
       },
     )
       .then((response) => readApplyStream(response, (p) => {
+          if (!current()) return;
           setApplyProgress(p);
           setModalProgress(p);
         }))
       .then((body) => {
+        if (!current()) return;
         setModalResult(body);
         const summary = body.report.summary;
         setNotice(
@@ -931,6 +940,7 @@ export function CatalogApp() {
         void refreshLiveStatus();
       })
       .catch((error: Error) => {
+        if (!current()) return;
         const failProg: ApplyProgress = {
           stage: "failed",
           completed: 0,
@@ -943,12 +953,16 @@ export function CatalogApp() {
         setNotice(error.message);
       })
       .finally(() => {
+        if (!current()) return;
         setApplyingPlan(false);
         setIsModalStreaming(false);
       });
-  }, [activePlanId, refreshLiveStatus, selectedProjectId]);
+  }, [activePlanId, refreshLiveStatus, selectedProjectId, policyPending, previewing, beginPlanRequest]);
 
   const copySystemPrompt = useCallback(() => {
+    if (policyPending) return;
+    const current = beginPromptRequest();
+    if (!current()) return;
     if (!catalogApi || !selectedProjectId) {
       setNotice("Connect the local Catalog bridge before copying a resolved system prompt.");
       return;
@@ -970,18 +984,18 @@ export function CatalogApp() {
           content: string;
           included_skill_ids: string[];
           skipped_skill_ids: string[];
-        }) => copyText(body.content).then(() => body),
+        }) => current() ? copyText(body.content).then(() => body) : null,
       )
       .then((body) =>
-        setNotice(
+        body && current() && setNotice(
           `Copied ${body.included_skill_ids.length} pinned skill prompt${
             body.included_skill_ids.length === 1 ? "" : "s"
           }${body.skipped_skill_ids.length ? `; ${body.skipped_skill_ids.length} skipped` : ""}.`,
         ),
       )
-      .catch((error: Error) => setNotice(error.message))
-      .finally(() => setCopyingPrompt(false));
-  }, [pristine, scope, selectedProjectId]);
+      .catch((error: Error) => { if (current()) setNotice(error.message); })
+      .finally(() => { if (current()) setCopyingPrompt(false); });
+  }, [pristine, scope, selectedProjectId, policyPending, beginPromptRequest]);
 
   const updateSourceSummary = useCallback((sourceRevisionId: string, summary: string) => {
     setSourceReviewSummaries((current) => ({ ...current, [sourceRevisionId]: summary }));
@@ -1059,11 +1073,11 @@ export function CatalogApp() {
               onSelect={setSelectedSkillLineageId}
               onSave={saveSkillProfile}
               saving={savingSkillProfile}
-              feedback={skillFeedback}
-              feedbackSummary={feedbackSummary}
-              notes={skillNotes}
-              evaluationSummary={evaluationSummary}
-              loadingEvidence={loadingSkillEvidence}
+              feedback={resolutionPending ? [] : skillFeedback}
+              feedbackSummary={resolutionPending ? null : feedbackSummary}
+              notes={resolutionPending ? [] : skillNotes}
+              evaluationSummary={resolutionPending ? null : evaluationSummary}
+              loadingEvidence={resolutionPending || loadingSkillEvidence}
               recordingFeedback={recordingFeedback}
               recordingNote={recordingNote}
               onRecordFeedback={recordSkillFeedback}
@@ -1137,7 +1151,7 @@ export function CatalogApp() {
                   <ChevronDown size={18} aria-hidden="true" />
                 </label>
               ) : (
-                <h1>Acme Web</h1>
+                <h1>{catalogApi ? remoteError ? "Catalog projects unavailable" : "Loading Catalog projects…" : "Acme Web"}</h1>
               )}
               <div className="topbar-status-badges">
                 <ProviderBadge
@@ -1145,7 +1159,7 @@ export function CatalogApp() {
                   showDeliveryPath={true}
                   showTooltip={true}
                 />
-                <ProjectStatusPill status={projectStatusState} showTooltip={true} />
+                {resolutionPending ? <span role="status">Resolving project…</span> : <ProjectStatusPill status={projectStatusState} showTooltip={true} />}
               </div>
               <label className="scope-select">
                 Work scope
@@ -1177,20 +1191,22 @@ export function CatalogApp() {
                     <h2 id="effective-set-title">Effective skill set</h2>
                     <p>Resolved from pinned templates and the selected work scope.</p>
                   </div>
-                  <button className="pristine-button" onClick={togglePristine} type="button">
+                  <button className="pristine-button" onClick={togglePristine} type="button" disabled={policyPending || previewing}>
                     <RefreshCcw size={18} /> {pristine ? "Restore" : "Pristine"}
                   </button>
                 </div>
+                {resolutionPending ? <p role="status">Waiting for this project's effective skills and assignments.</p> : null}
                 <SkillTable
                   skills={skills}
                   providerId={activeProviderId}
                   onSkillStateChange={updateProjectSkillState}
                   updatingSkillId={updatingSkillId}
+                  disabled={policyPending || previewing}
                 />
                 <LiveActivationStatus
-                  globalStatus={globalStatus}
-                  projectStatus={projectStatus}
-                  loading={loadingLiveStatus}
+                  globalStatus={resolutionPending ? null : globalStatus}
+                  projectStatus={resolutionPending ? null : projectStatus}
+                  loading={resolutionPending || loadingLiveStatus}
                   error={liveStatusError}
                   onRefresh={() => void refreshLiveStatus()}
                   onOpenDrawer={() => setIsDrawerOpen(true)}
@@ -1215,9 +1231,8 @@ export function CatalogApp() {
                 defaultTemplate={defaultTemplate}
                 defaultPresetId={defaultPresetId}
                 presets={presets}
-                overlayTemplate={overlayTemplate}
+                appliedOverlays={appliedOverlays}
                 overlayPresetId={overlayPresetId}
-                overlayActive={overlayActive}
                 providerId={activeProviderId}
                 onPristine={togglePristine}
                 onDefaultTemplate={updateDefaultTemplate}
@@ -1232,20 +1247,33 @@ export function CatalogApp() {
                 updatingDefault={updatingDefault}
                 updatingOverlay={updatingOverlay}
                 planReady={Boolean(activePlanId)}
+                pending={resolutionPending}
+                controlsDisabled={policyPending || previewing}
+                sharedImpacts={sharedReview?.impacts ?? []}
+                requiresSharedConfirmation={sharedReview?.requiresConfirmation ?? false}
+                sharedConsent={sharedConsent}
+                onSharedConsentChange={(consent) => {
+                  if (policyPending || previewing) return;
+                  setActivePlanId(null);
+                  setSharedConsent(consent);
+                  setNotice(consent
+                    ? "Shared effects accepted for a new preview. Preview again to record a new immutable plan."
+                    : "Shared confirmation cleared. A new preview is required before apply.");
+                }}
               />
             </div>
-            <PlanHistory
+            {!resolutionPending && <PlanHistory
               scope={scope}
               pristine={pristine}
               previewing={previewing}
               skills={skills}
               defaultTemplate={defaultTemplate}
-              remote={remoteSet !== null}
+              remote={Boolean(catalogApi)}
               history={history}
               comparison={comparison}
               providerId={activeProviderId}
               onViewDetails={() => setIsDrawerOpen(true)}
-            />
+            />}
           </>
         )}
       </div>
@@ -1257,21 +1285,23 @@ export function CatalogApp() {
         subtitle={progressModalSubtitle}
         progress={modalProgress}
         result={modalResult}
+        mode={modalMode}
+        previewResult={modalPreviewResult}
         error={modalError}
         isStreaming={isModalStreaming}
         planId={activePlanId}
         providerId={activeProviderId}
-        onRetry={applyPlan}
+        onRetry={modalMode === "preview" ? previewPlan : applyPlan}
       />
 
       <LiveActivationDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        globalStatus={globalStatus}
-        projectStatus={projectStatus}
-        comparison={comparison}
-        history={history}
-        loading={loadingLiveStatus}
+        globalStatus={resolutionPending ? null : globalStatus}
+        projectStatus={resolutionPending ? null : projectStatus}
+        comparison={resolutionPending ? null : comparison}
+        history={resolutionPending ? null : history}
+        loading={resolutionPending || loadingLiveStatus}
         error={liveStatusError}
         selectedProjectId={selectedProjectId}
         providerId={activeProviderId}

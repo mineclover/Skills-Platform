@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -233,6 +233,7 @@ export function formatStageMetric(
 
 export interface ActivationStepperProps {
   currentStage: string;
+  mode?: "preview" | "apply";
   isFailed?: boolean;
   isCompleted?: boolean;
   className?: string;
@@ -240,25 +241,27 @@ export interface ActivationStepperProps {
 
 export function ActivationStepper({
   currentStage,
+  mode = "apply",
   isFailed = false,
   isCompleted = false,
   className = "",
 }: ActivationStepperProps) {
   const activeStage = mapStageToDiagnosticStep(currentStage);
-  const activeIndex = getDiagnosticStepIndex(activeStage);
+  const steps = mode === "preview" ? DIAGNOSTIC_STEPS.slice(0, 3) : DIAGNOSTIC_STEPS;
+  const activeIndex = Math.min(getDiagnosticStepIndex(activeStage), steps.length - 1);
 
   return (
     <div
       className={`activation-stepper ${className}`.trim()}
       role="progressbar"
-      aria-label="Activation progress stepper"
+      aria-label={mode === "preview" ? "Activation preview progress stepper" : "Activation progress stepper"}
       aria-valuenow={activeIndex + 1}
       aria-valuemin={1}
-      aria-valuemax={5}
+      aria-valuemax={steps.length}
     >
-      {DIAGNOSTIC_STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const status = getStepNodeState(index, currentStage, isFailed, isCompleted);
-        const isLast = index === DIAGNOSTIC_STEPS.length - 1;
+        const isLast = index === steps.length - 1;
 
         return (
           <React.Fragment key={step.id}>
@@ -306,6 +309,12 @@ export function ActivationStepper({
 // 3. Main ActivationProgressModal Component
 // ============================================================================
 
+export interface ActivationPreviewResult {
+  planned: number;
+  preflighted: boolean;
+  readyForApply?: boolean;
+}
+
 export interface ActivationProgressModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -313,6 +322,8 @@ export interface ActivationProgressModalProps {
   subtitle?: string;
   progress: ApplyProgress | null;
   result: ApplyResult | null;
+  mode?: "preview" | "apply";
+  previewResult?: ActivationPreviewResult | null;
   error?: string | null;
   isStreaming?: boolean;
   planId?: string | null;
@@ -323,10 +334,12 @@ export interface ActivationProgressModalProps {
 export function ActivationProgressModal({
   isOpen,
   onClose,
-  title = "Real-Time Activation Diagnostics",
-  subtitle = "Executing multi-provider activation pipeline and filesystem symlink materialization",
+  title,
+  subtitle,
   progress,
   result,
+  mode = "apply",
+  previewResult = null,
   error = null,
   isStreaming = false,
   planId,
@@ -335,31 +348,39 @@ export function ActivationProgressModal({
 }: ActivationProgressModalProps) {
   if (!isOpen) return null;
 
-  const isFailed = Boolean(error || result?.status === "failed" || progress?.stage === "failed");
-  const isCompleted = Boolean(
-    !isFailed && (result?.status === "succeeded" || result?.status === "applied" || progress?.stage === "completed"),
+  const isPreview = mode === "preview";
+  const isFailed = Boolean(error || (!isPreview && result?.status === "failed") || progress?.stage === "failed");
+  const isApplyCompleted = Boolean(
+    !isPreview && !isFailed && result?.report?.summary &&
+    (result.status === "succeeded" || result.status === "applied"),
   );
+  const isPreviewCompleted = Boolean(isPreview && !isFailed && previewResult);
+  const isCompleted = isPreviewCompleted || isApplyCompleted;
 
-  const percent = calculateStageProgressPercent(progress, isCompleted, isFailed);
-  const currentStage = progress?.stage || (isCompleted ? "completed" : isFailed ? "failed" : "plan");
+  const stagePercent = calculateStageProgressPercent(progress, isCompleted, isFailed);
+  const percent = isCompleted ? 100 : Math.min(isFailed ? 100 : 98, Math.round(isPreview ? stagePercent / 0.6 : stagePercent));
+  const currentStage = isPreviewCompleted ? "preview" : progress?.stage || (isCompleted ? "completed" : isFailed ? "failed" : "plan");
   const providerMeta = getProviderInfo(providerId);
   const requiresCodexRestart = providerMeta.id === "codex" && Boolean(
     result?.report?.operations?.some((operation) => operation.restart_required === true),
   );
 
-  const metricText = useMemo(() => {
-    if (isCompleted && result?.report?.summary) {
+  const metricText = (() => {
+    if (isPreviewCompleted && previewResult) {
+      return `Preview Complete: ${previewResult.planned} planned · ${previewResult.preflighted ? "preflighted" : "preflight not run"}`;
+    }
+    if (isApplyCompleted && result?.report?.summary) {
       const s = result.report.summary;
       return `Activation Complete: ${s.applied} applied · ${s.skipped} skipped · ${s.failed} failed`;
     }
     if (isFailed) {
-      return `Activation Halted: ${error || progress?.message || "Operation encountered an error"}`;
+      return `${isPreview ? "Preview" : "Activation"} Halted: ${error || progress?.message || "Operation encountered an error"}`;
     }
     if (progress) {
       return formatStageMetric(progress.stage, progress.completed, progress.total, progress.message);
     }
-    return "Initializing activation pipeline...";
-  }, [isCompleted, isFailed, result, error, progress]);
+    return isPreview ? "Initializing activation preview..." : "Initializing activation pipeline...";
+  })();
 
   return (
     <div
@@ -376,7 +397,7 @@ export function ActivationProgressModal({
               <span className={`activation-status-pill ${isCompleted ? "completed" : isFailed ? "failed" : "running"}`}>
                 {isCompleted ? (
                   <>
-                    <CheckCircle2 size={13} /> Succeeded
+                    <CheckCircle2 size={13} /> {isPreview ? "Preview Complete" : "Succeeded"}
                   </>
                 ) : isFailed ? (
                   <>
@@ -384,7 +405,7 @@ export function ActivationProgressModal({
                   </>
                 ) : (
                   <>
-                    <LoaderCircle size={13} className="spin" /> Materializing Live
+                    <LoaderCircle size={13} className="spin" /> {isPreview ? "Previewing" : "Materializing Live"}
                   </>
                 )}
               </span>
@@ -395,8 +416,12 @@ export function ActivationProgressModal({
               )}
               {planId && <span className="plan-id-tag">Plan: {planId.slice(0, 8)}</span>}
             </div>
-            <h2 id="activation-modal-title">{title}</h2>
-            <p className="modal-subtitle">{subtitle}</p>
+            <h2 id="activation-modal-title">{title ?? (isPreview ? "Activation Plan Preview" : "Real-Time Activation Diagnostics")}</h2>
+            <p className="modal-subtitle">
+              {subtitle ?? (isPreview
+                ? "Recording and preflighting provider operations for later application"
+                : "Executing multi-provider activation pipeline and filesystem symlink materialization")}
+            </p>
           </div>
 
           <button
@@ -414,6 +439,7 @@ export function ActivationProgressModal({
         <div className="stepper-container">
           <ActivationStepper
             currentStage={currentStage}
+            mode={mode}
             isFailed={isFailed}
             isCompleted={isCompleted}
           />
@@ -458,7 +484,7 @@ export function ActivationProgressModal({
         </div>
 
         {/* Execution Summary Report (Shown upon completion or failure) */}
-        {(isCompleted || isFailed) && result?.report?.summary && (
+        {!isPreview && (isApplyCompleted || isFailed) && result?.report?.summary && (
           <div className="execution-summary-section">
             <h3 className="summary-title">
               <ShieldCheck size={16} className="mint" /> Execution Report Metrics
@@ -492,7 +518,7 @@ export function ActivationProgressModal({
           </div>
         )}
 
-        {isCompleted && requiresCodexRestart && (
+        {isApplyCompleted && requiresCodexRestart && (
           <div
             role="status"
             aria-label="Codex restart required"
@@ -523,7 +549,7 @@ export function ActivationProgressModal({
           <div className="activation-error-banner" role="alert">
             <AlertCircle size={18} className="error-icon" />
             <div className="error-content">
-              <strong>Activation Error Encountered</strong>
+              <strong>{isPreview ? "Preview Error Encountered" : "Activation Error Encountered"}</strong>
               <p>{error || progress?.message || "An unexpected error occurred during execution."}</p>
             </div>
           </div>
@@ -533,9 +559,15 @@ export function ActivationProgressModal({
         <div className="modal-footer activation-modal-footer">
           <div className="footer-left-info">
             <small>
-              {isStreaming
+              {isPreviewCompleted
+                ? previewResult?.readyForApply === false
+                  ? "Review the shared impact list and confirm it before creating a new preview."
+                  : "Preview is ready. Apply the previewed plan to change provider bindings."
+                : isStreaming && isPreview
+                ? "Recording and preflighting the activation plan..."
+                : isStreaming
                 ? "Streaming live NDJSON events from Skills Manager bridge..."
-                : isCompleted
+                : isApplyCompleted
                 ? "All provider symlinks and delivery paths verified."
                 : isFailed
                 ? "Review diagnostics and retry or inspect bindings in drawer."
@@ -545,7 +577,7 @@ export function ActivationProgressModal({
           <div className="footer-actions">
             {isFailed && onRetry && (
               <button className="retry-action-btn" type="button" onClick={onRetry}>
-                <RefreshCcw size={15} /> Retry Activation
+                <RefreshCcw size={15} /> {isPreview ? "Retry Preview" : "Retry Activation"}
               </button>
             )}
             <button

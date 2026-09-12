@@ -22,23 +22,27 @@ import {
 } from "../visual-identity";
 import type {
   ApplyProgress,
+  Assignment,
   DisplaySkill,
   RemoteComparison,
   RemoteHistory,
   RemotePreset,
   Scope,
 } from "../types";
+import type { SharedBindingImpact } from "../project-resolution";
 
 export function ProjectSkillGrid({
   skills,
   providerId = "antigravity",
   onSkillStateChange,
   updatingSkillId,
+  disabled = false,
 }: {
   skills: DisplaySkill[];
   providerId?: string;
   onSkillStateChange?: (skill: DisplaySkill, state: "enabled" | "disabled" | "inherit") => void;
   updatingSkillId?: string | null;
+  disabled?: boolean;
 }) {
   if (skills.length === 0) {
     return (
@@ -95,7 +99,7 @@ export function ProjectSkillGrid({
                   <button
                     type="button"
                     className="quiet-action"
-                    disabled={updatingSkillId === skill.registry_skill_id}
+                    disabled={disabled || updatingSkillId === skill.registry_skill_id}
                     onClick={() => onSkillStateChange(skill, skill.enabled ? "disabled" : "enabled")}
                   >
                     {skill.enabled ? "Disable" : "Enable"}
@@ -104,7 +108,7 @@ export function ProjectSkillGrid({
                     <button
                       type="button"
                       className="quiet-action"
-                      disabled={updatingSkillId === skill.registry_skill_id}
+                      disabled={disabled || updatingSkillId === skill.registry_skill_id}
                       onClick={() => onSkillStateChange(skill, "inherit")}
                     >
                       Use template
@@ -125,11 +129,13 @@ export function SkillTable({
   providerId = "antigravity",
   onSkillStateChange,
   updatingSkillId,
+  disabled = false,
 }: {
   skills: DisplaySkill[];
   providerId?: string;
   onSkillStateChange?: (skill: DisplaySkill, state: "enabled" | "disabled" | "inherit") => void;
   updatingSkillId?: string | null;
+  disabled?: boolean;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [invocationFilter, setInvocationFilter] = useState<InvocationFilterMode>("all");
@@ -182,6 +188,7 @@ export function SkillTable({
           providerId={providerId}
           onSkillStateChange={onSkillStateChange}
           updatingSkillId={updatingSkillId}
+          disabled={disabled}
         />
       ) : (
         <section className="skill-table" aria-labelledby="effective-set-title">
@@ -218,7 +225,7 @@ export function SkillTable({
                 <div className="source">
                   <strong>{skill.source}</strong>
                   <small>
-                    {skill.source === "Pristine" ? "Managed baseline" : "Pinned template"}
+                    {skill.override ? "Explicit project override" : skill.source === "Pristine" ? "Managed baseline" : "Pinned template"}
                   </small>
                 </div>
                 <span className="reason">{skill.reason}</span>
@@ -227,7 +234,7 @@ export function SkillTable({
                     <button
                       type="button"
                       className="quiet-action"
-                      disabled={updatingSkillId === skill.registry_skill_id}
+                      disabled={disabled || updatingSkillId === skill.registry_skill_id}
                       onClick={() => onSkillStateChange(skill, skill.enabled ? "disabled" : "enabled")}
                     >
                       {skill.enabled ? "Disable" : "Enable"}
@@ -236,7 +243,7 @@ export function SkillTable({
                       <button
                         type="button"
                         className="quiet-action"
-                        disabled={updatingSkillId === skill.registry_skill_id}
+                        disabled={disabled || updatingSkillId === skill.registry_skill_id}
                         onClick={() => onSkillStateChange(skill, "inherit")}
                       >
                         Inherit
@@ -295,9 +302,8 @@ export function TemplateInspector({
   defaultTemplate,
   defaultPresetId,
   presets,
-  overlayTemplate,
+  appliedOverlays,
   overlayPresetId,
-  overlayActive,
   providerId = "antigravity",
   onPristine,
   onDefaultTemplate,
@@ -312,15 +318,20 @@ export function TemplateInspector({
   updatingDefault,
   updatingOverlay,
   planReady,
+  pending = false,
+  controlsDisabled = false,
+  sharedImpacts = [],
+  requiresSharedConfirmation = false,
+  sharedConsent = false,
+  onSharedConsentChange,
 }: {
   scope: Scope;
   pristine: boolean;
   defaultTemplate: string;
   defaultPresetId: string | null;
   presets: RemotePreset[];
-  overlayTemplate: string;
+  appliedOverlays: Assignment[];
   overlayPresetId: string | null;
-  overlayActive: boolean;
   providerId?: string;
   onPristine: () => void;
   onDefaultTemplate: (presetId: string) => void;
@@ -335,8 +346,14 @@ export function TemplateInspector({
   updatingDefault: boolean;
   updatingOverlay: boolean;
   planReady: boolean;
+  pending?: boolean;
+  controlsDisabled?: boolean;
+  sharedImpacts?: SharedBindingImpact[];
+  requiresSharedConfirmation?: boolean;
+  sharedConsent?: boolean;
+  onSharedConsentChange?: (consent: boolean) => void;
 }) {
-  const overlayShown = overlayActive && !pristine;
+  const overlays = pristine ? [] : appliedOverlays;
   const providerMeta = getProviderInfo(providerId);
 
   return (
@@ -349,8 +366,8 @@ export function TemplateInspector({
         <div className="template-tile">
           <FileText size={30} strokeWidth={1.4} />
           <div>
-            <strong>{pristine ? "Pristine" : defaultTemplate}</strong>
-            <small>{pristine ? "Clean managed baseline" : "Default template · pinned"}</small>
+            <strong>{pending ? "Resolving project policy…" : pristine ? "Pristine" : defaultTemplate}</strong>
+            <small>{pending ? "Waiting for the selected project and scope" : pristine ? "Clean managed baseline" : "Default template · pinned"}</small>
           </div>
           <Check size={20} className="mint" />
         </div>
@@ -359,7 +376,7 @@ export function TemplateInspector({
             <span>Set as project default</span>
             <select
               value={defaultPresetId ?? ""}
-              disabled={updatingDefault}
+              disabled={pending || controlsDisabled || updatingDefault}
               onChange={(event) => onDefaultTemplate(event.target.value)}
             >
               {presets.map((preset) => (
@@ -372,37 +389,36 @@ export function TemplateInspector({
         ) : null}
       </div>
       <div className="inspector-section overlay-section">
-        <p className="section-label">Work-scope overlay</p>
-        <div
-          className={
-            overlayShown && overlayTemplate !== "None"
-              ? "template-tile overlay-tile"
-              : "template-tile overlay-tile inactive"
-          }
-        >
-          <Layers3 size={30} strokeWidth={1.4} />
-          <div>
-            <strong>{overlayTemplate}</strong>
-            <small>
-              {overlayShown && overlayTemplate !== "None"
-                ? "Matches selected work scope"
-                : "No matching overlay"}
-            </small>
+        <p className="section-label">Matching work-scope overlays ({overlays.length})</p>
+        {overlays.length > 0 ? (
+          <div role="list" aria-label="Applied work-scope overlays">
+            {overlays.map((overlay, index) => (
+              <div className="template-tile overlay-tile" role="listitem" key={`${overlay.preset_id}:${overlay.template_version}:${index}`}>
+                <Layers3 size={30} strokeWidth={1.4} />
+                <div>
+                  <strong>{overlay.name ?? overlay.preset_id} · v{overlay.template_version}</strong>
+                  <small>Priority {overlay.priority ?? 0} · {overlay.work_scope_tags?.join(", ") || "All scopes"}</small>
+                </div>
+                <Eye size={20} className="mint" />
+              </div>
+            ))}
+            <p className="project-skill-reason">Applied in shown order. Higher priority selects the revision when overlays include the same skill. Each skill shows its final selection source.</p>
           </div>
-          <Eye
-            size={20}
-            className={overlayShown && overlayTemplate !== "None" ? "mint" : "muted"}
-          />
-        </div>
+        ) : (
+          <div className="template-tile overlay-tile inactive">
+            <Layers3 size={30} strokeWidth={1.4} />
+            <div><strong>{pending ? "Loading…" : "None"}</strong><small>{pending ? "Waiting for resolved overlays" : "No matching overlay"}</small></div>
+          </div>
+        )}
         {presets.length > 0 ? (
           <label className="template-picker">
-            <span>Set overlay for {scope}</span>
+            <span>Replace overlays tagged only {scope}</span>
             <select
               value={overlayPresetId ?? ""}
-              disabled={updatingOverlay}
+              disabled={pending || controlsDisabled || updatingOverlay}
               onChange={(event) => onOverlayTemplate(event.target.value)}
             >
-              <option value="">No overlay</option>
+              <option value="">No scope-only overlay</option>
               {presets
                 .filter((preset) => preset.id !== "builtin-pristine")
                 .map((preset) => (
@@ -429,25 +445,54 @@ export function TemplateInspector({
           <strong>{pristine ? "Pristine" : defaultTemplate}</strong>
         </div>
         <div>
-          <span>Overlay source</span>
-          <strong>{overlayShown ? overlayTemplate : "None"}</strong>
+          <span>Overlay sources</span>
+          <strong>{overlays.length > 0 ? overlays.map((overlay) => `${overlay.name ?? overlay.preset_id} (P${overlay.priority ?? 0})`).join(", ") : "None"}</strong>
         </div>
       </div>
       <div className="inspector-actions">
+        {(requiresSharedConfirmation || sharedImpacts.length > 0) && (
+          <section aria-label="Shared delivery impact review">
+            <p className="section-label">Delivery impacts</p>
+            <ul>
+              {sharedImpacts.map((impact) => (
+                <li key={JSON.stringify([impact.provider_id, impact.root_path ?? null])}>
+                  <strong>{impact.display_name} ({impact.provider_id})</strong>
+                  {impact.root_path ? <div><code>{impact.root_path}</code></div> : null}
+                  <small>{impact.shared ? "Shared binding" : "Provider binding"}{impact.reason ? ` · ${impact.reason}` : ""}</small>
+                </li>
+              ))}
+            </ul>
+            {requiresSharedConfirmation && (
+              <>
+                <label>
+                  <input type="checkbox" checked={sharedConsent}
+                    disabled={pending || controlsDisabled || previewing || sharedImpacts.length === 0}
+                    onChange={(event) => onSharedConsentChange?.(event.target.checked)} />
+                  I reviewed these shared effects and consent to a new preview with shared-root confirmation.
+                </label>
+                <p>{sharedImpacts.length === 0
+                  ? "Impact details are unavailable. Create a new preview to inspect them before confirming."
+                  : !planReady
+                    ? "Create a new preview after confirming. The existing immutable plan remains unchanged."
+                    : "The previewed plan records this shared-root confirmation."}</p>
+              </>
+            )}
+          </section>
+        )}
         <button
           className="primary-action"
           type="button"
           onClick={onPreview}
-          disabled={previewing}
+          disabled={pending || controlsDisabled || previewing}
         >
           {previewing ? <LoaderCircle size={21} className="spin" /> : <Eye size={21} />}{" "}
-          {previewing ? "Resolving plan…" : "Preview activation plan"}
+          {previewing ? "Resolving plan…" : sharedConsent ? "Preview with shared confirmation" : "Preview activation plan"}
         </button>
         <button
           className="quiet-action apply-action"
           type="button"
           onClick={onApply}
-          disabled={applying || previewing || !planReady}
+          disabled={pending || controlsDisabled || applying || previewing || !planReady || (requiresSharedConfirmation && !sharedConsent)}
         >
           {applying ? <LoaderCircle size={17} className="spin" /> : <Check size={17} />}{" "}
           {applying ? "Applying through CLI…" : planReady ? "Apply previewed plan" : "Preview required before apply"}
@@ -457,12 +502,12 @@ export function TemplateInspector({
           className="quiet-action prompt-copy"
           type="button"
           onClick={onCopyPrompt}
-          disabled={copyingPrompt}
+          disabled={pending || controlsDisabled || copyingPrompt}
         >
           {copyingPrompt ? <LoaderCircle size={17} className="spin" /> : <Copy size={17} />}{" "}
           {copyingPrompt ? "Preparing prompt…" : "Copy system prompt"}
         </button>
-        <button className="quiet-action" type="button" onClick={onPristine}>
+        <button className="quiet-action" type="button" onClick={onPristine} disabled={pending || controlsDisabled}>
           <RefreshCcw size={17} /> {pristine ? "Restore project template" : "Return to Pristine"}
         </button>
         <p>

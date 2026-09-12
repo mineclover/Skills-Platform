@@ -1,5 +1,19 @@
-import test from "node:test";
+import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
+import { createServer } from "vite";
+
+let vite;
+let filterSkills;
+before(async () => {
+  vite = await createServer({
+    root: fileURLToPath(new URL("..", import.meta.url)),
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+    appType: "custom",
+  });
+  ({ filterWorkspaceSkills: filterSkills } = await vite.ssrLoadModule("/src/skill-search.ts"));
+});
+after(async () => { await vite?.close(); });
 
 // Navigation tabs specification
 const NAVIGATION_TABS = [
@@ -48,6 +62,7 @@ const sampleSkills = [
       invocation_mode: "model_invoked",
       risk_level: "low",
       tags: ["planning", "antigravity", "reasoning"],
+      provider_constraints: ["antigravity"],
       use_when: ["Before coding", "During design"],
     },
     latest_skill: {
@@ -67,6 +82,7 @@ const sampleSkills = [
       invocation_mode: "user_invoked",
       risk_level: "medium",
       tags: ["testing", "codex", "qa"],
+      provider_constraints: ["codex"],
       use_when: ["After implementation", "Before PR"],
     },
     latest_skill: {
@@ -86,6 +102,7 @@ const sampleSkills = [
       invocation_mode: "hybrid",
       risk_level: "low",
       tags: ["review", "claude", "quality"],
+      provider_constraints: ["claude"],
       use_when: ["During PR review"],
     },
     latest_skill: {
@@ -105,6 +122,7 @@ const sampleSkills = [
       invocation_mode: "unspecified",
       risk_level: "high",
       tags: ["db", "legacy"],
+      provider_constraints: [],
       use_when: ["Deprecated workflows"],
     },
     latest_skill: {
@@ -115,56 +133,6 @@ const sampleSkills = [
     },
   },
 ];
-
-// Reusable filter function implementing FilterToolbar logic
-function filterSkills(skills, { invocationFilter = "all", providerFilter = "all", searchQuery = "" }) {
-  return skills.filter((skill) => {
-    // 1. Invocation mode filter
-    if (invocationFilter !== "all") {
-      const mode =
-        skill.profile?.invocation_mode ??
-        skill.latest_skill?.invocation_mode ??
-        skill.lineage?.invocation_mode ??
-        skill.invocation_mode ??
-        "unspecified";
-      if (mode !== invocationFilter) return false;
-    }
-
-    // 2. Provider filter
-    if (providerFilter !== "all") {
-      const tags = (skill.profile?.tags || []).map((t) => t.toLowerCase());
-      const desc = (skill.latest_skill?.description || "").toLowerCase();
-      const prov = providerFilter.toLowerCase();
-      const matches =
-        tags.some((t) => t.includes(prov)) ||
-        desc.includes(prov) ||
-        (skill.lineage?.id || "").toLowerCase().includes(prov);
-      if (!matches) return false;
-    }
-
-    // 3. Search query
-    const needle = searchQuery.trim().toLowerCase();
-    if (!needle) return true;
-
-    const searchable = [
-      skill.lineage?.skill_name,
-      skill.name,
-      skill.profile?.title,
-      skill.profile?.summary,
-      skill.profile?.purpose,
-      skill.latest_skill?.description,
-      skill.reason,
-      skill.source,
-      ...(skill.profile?.tags || []),
-      ...(skill.profile?.use_when || []),
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-
-    return searchable.includes(needle);
-  });
-}
 
 test("FilterToolbar: Invocation mode chip filtering works accurately", () => {
   const allResults = filterSkills(sampleSkills, { invocationFilter: "all" });

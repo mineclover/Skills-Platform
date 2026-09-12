@@ -386,8 +386,8 @@ export function SourceChangeQueue({
         <div>
           <h2 id="source-changes-title">Source change decisions</h2>
           <p>
-            Imported revisions stay isolated until reviewed, then create a new template version only
-            when adopted.
+            Compare the latest import with the latest approved update. Adoption creates a new
+            template version; project activation is a separate action.
           </p>
         </div>
         <span>
@@ -413,7 +413,12 @@ export function SourceChangeQueue({
                   <div>
                     <strong>{candidate.skill_name}</strong>
                     <small>
-                      Candidate {candidate.source_revision_id.slice(0, 12)} · imported{" "}
+                      {candidate.candidate_kind === "latest_approved"
+                        ? "Latest approved update"
+                        : candidate.candidate_kind === "latest_import"
+                          ? "Latest import"
+                          : "Candidate"}{" "}
+                      {candidate.source_revision_id.slice(0, 12)} · imported{" "}
                       {new Date(candidate.imported_at).toLocaleDateString()}
                     </small>
                   </div>
@@ -427,6 +432,14 @@ export function SourceChangeQueue({
                     {candidate.review?.decision ?? "needs review"}
                   </span>
                 </div>
+                {candidate.candidate_kind === "latest_approved" && candidate.latest_import &&
+                candidate.latest_import.source_revision_id !== candidate.source_revision_id ? (
+                  <p className="review-summary">
+                    Newer import {candidate.latest_import?.source_revision_id.slice(0, 12)} is{" "}
+                    {candidate.latest_import?.review?.decision ?? "not reviewed"}. This approved
+                    revision remains available for adoption.
+                  </p>
+                ) : null}
                 {candidate.review ? (
                   <p className="review-summary">{candidate.review.summary}</p>
                 ) : (
