@@ -1,94 +1,68 @@
 # Skills Platform: Current Status
 
-> Local state snapshot: 2026-09-04 13:39 KST. This section describes the
-> inspected checkout and does not assert that the worktree is clean or that a
-> later test run has passed.
+> 현재 확인: **2026-09-08, macOS 로컬 환경**. 현재 상태와 검증 근거는
+> [안정화 결과](./reports/2026-09-08-platform-stabilization.md)에 기록한다.
 
-## Control-plane capabilities
+Skills Platform은 원본·불변 revision·검토·프로젝트 선택·전달 결과를 구분한다.
+현재 Catalog의 등록·검색·추천·고정 계획·검토 필수 적용과 Manager UI/CLI 전달 경로를
+검증했다. source/profile의 검토 표시와 실제 호스트 사용의 증거도 구분한다.
 
-- **Portable immutable registry**: canonical artifacts are stored below
-  `.skills-platform/registry/revisions/` and referenced with registry-relative
-  paths so a checkout can move between Windows and macOS.
-- **Project package SSOT**: `skills-platform-authoring-recipe.json`, the source
-  packages under `skills-packages/`, and their immutable registry snapshots are
-  repository-owned state. The local Catalog database and delivered skill links
-  are reconstructible machine state.
-- **Provider-aware authoring**: common structural checks feed independently
-  versioned Codex and Antigravity rulesets. Static analysis and reader
-  annotations remain execution-neutral.
-- **Exact activation**: desired, applied, and observed state are separate.
-  Preview and apply use immutable revision and content identities; managed
-  links or copies are replaced only after ownership verification.
-- **Native hook control**: Codex and Antigravity provider files preserve
-  entries the platform does not own. Codex configuration synchronization and
-  `/hooks` trust are reported separately.
-- **Cross-platform delivery**: project-local Codex skills use
-  `.agents/skills`; the adapter uses directory symlinks on macOS/Linux and
-  junctions on Windows.
+## 현재 프로젝트
 
-## Project-managed authoring packages
+| 항목 | 현재 값 |
+| --- | --- |
+| Catalog 프로젝트 | `skills-platform-codex` |
+| 검토 정책 | `require_approved` |
+| 기본 preset | `skills-platform-authoring-codex@5` |
+| 실제 설치 | `skills-platform-guide`, `skill-authoring-standard`, `writing-great-skills` |
+| 선택형 추천 | `skills-platform-debugging-codex@2`, 미설치 |
+| 전달 루트 | 프로젝트 `.agents/skills` |
+| Manager 연결 | `workspace-4844cf93282d94de` |
 
-The checked-in `skills-platform-authoring-recipe.json` declares three source
-packages and separates their source-management role from runtime activation:
+`writing-great-skills`는 Codex 명시 호출 전용이며, 저장소 `skill-creator` 사본은 비교용으로
+관리한다. Antigravity preset은 별도로 유지하며 현재 프로젝트에 혼합 적용하지 않는다.
 
-| Package | Repository role | Codex project | Antigravity |
-| --- | --- | --- | --- |
-| `skill-authoring-standard` | Provider router and shared authoring contract | Active | Present in the Antigravity preset |
-| `writing-great-skills` | Explicit Codex instruction-quality review | Active | Not included in the Antigravity preset |
-| `skill-creator` | Pinned source for validation, comparison, and update review | Intentionally not activated | Not included |
+## 지원하는 운영 계약
 
-The repository copy of `skill-creator` is retained in the registry but is not
-materialized into `.agents/skills`. Codex already bundles a system skill with
-that name, and the [official Codex skills documentation](https://developers.openai.com/codex/skills)
-states that same-named skills are not merged and may both appear in selectors.
-Keeping the repository copy inactive avoids an ambiguous `$skill-creator`
-choice while preserving a reviewable source snapshot.
+- Catalog·Registry 변경은 프로세스 간 파일 잠금과 최신 snapshot 트랜잭션으로 저장한다.
+  오래된 low-level snapshot 저장은 충돌로 거절한다.
+- 같은 물리 전달 루트에 대한 Catalog reference/Manager bridge 적용은 직렬화한다.
+  검토 정책과 실제 revision은 변경 직전에 재검사한다.
+- `history record-plan`과 `history apply`로 같은 계획을 preview/apply하고 이력을 남긴다.
+  실패 보고서가 성공·후속 작업으로 전파되지 않도록 처리한다.
+- 추천 후보와 범위 overlay는 별도 역할이다. Manager store v3는 배열 태그의 AND 조건과
+  이전 역할·scalar 데이터를 호환한다.
+- 공유·간접 symlink 영향을 표시하고 실제 공유 변경에 확인을 요구한다. noop은 추가 확인이
+  필요 없다. 동의는 기존 계획 수정이 아닌 새 계획 생성에 포함한다.
+- UI/API/CLI는 검색 계약을 공유한다. 연결 로딩·프로젝트 전환과 늦은 응답을 구분하며,
+  미리보기·실패·표본 없는 지표를 성공으로 표현하지 않는다.
 
-At the timestamp above, the local Catalog contains the
-`skills-platform-codex` project and the `skills-platform-authoring-codex` and
-`skills-platform-authoring-antigravity` presets. Both presets are owned by
-Skills Platform and have the `reviewed` lifecycle. The recipe declares the
-Codex delivery root as the portable project-relative `.agents/skills`, and the
-Codex project has managed links for `skill-authoring-standard` and
-`writing-great-skills`. The
-Antigravity preset and ruleset are ready, but no Antigravity project or binding
-is materialized in this checkout; that rollout must use a separate provider
-project and an explicitly reviewed binding target.
+## 원본과 머신별 상태
 
-## State ownership
+원본 패키지는 `skills-packages/`, 동결 instance는 `skills-instances/`, 불변 revision은
+`.skills-platform/registry/`에서 관리한다. recipe는 이식 가능한 구성 선언이다.
+프로젝트 export는 포함된 profile과 assignment를 보존하지만 전체 Registry 백업이나
+source 승인·평가 이력의 자동 복원은 아니다.
 
-| State | Version-controlled authority | Machine-local reconstruction |
-| --- | --- | --- |
-| Package intent and provider split | `skills-platform-authoring-recipe.json` | Recipe inspection result |
-| Editable canonical source | `skills-packages/...` | None |
-| Frozen instance snapshots | `skills-instances/...` | None |
-| Immutable revision | `.skills-platform/registry/registry.json` and `revisions/` | Hydrated absolute canonical path |
-| Projects, profiles, preset assignments, analysis records | Recreated from the recipe and subsequent governance operations | `.skills-platform/catalog/` |
-| Provider discovery binding | Activation plan and adapter ownership contract | `.agents/skills/` |
-| Codex enablement | Desired state plus adapter result | `~/.codex/config.toml` |
+`.skills-platform/catalog/`, `.agents/skills/`, Manager 연결과 Codex enablement는 머신별
+상태다. clone 후에는 [패키지 관리](./guides/project-skill-package-management.md) 절차로
+재구성하고, 검토 필수 프로젝트는 해당 revision 검토 후 전달한다.
 
-`.skills-platform/catalog/` and `.agents/` are intentionally ignored. Do not
-treat their absence after a clone as lost package state; reconstruct them from
-the checked-in recipe and registry. See [Project skill package
-management](./guides/project-skill-package-management.md) for the lifecycle and
-recovery commands.
-
-## Verification contract
-
-This status page deliberately carries no evergreen test totals or Git
-synchronization claim. Verify the checkout that will be shipped:
+## 검증과 사용 안내
 
 ```bash
 npm run check
 npm run build
 npm test
-node apps/skills-catalog/src/cli.js recipe inspect \
-  skills-platform-authoring-recipe.json
+node apps/skills-catalog/src/cli.js recipe inspect skills-platform-project-recipe.json
 node apps/skills-catalog/src/cli.js project resolve skills-platform-codex \
-  --catalog ./.skills-platform/catalog \
-  --registry ./.skills-platform/registry
+  --catalog ./.skills-platform/catalog --registry ./.skills-platform/registry
 ```
 
-Use `project apply --enabled-only` for a non-destructive first bootstrap. Use a
-previewed full `project apply` only when the Catalog should reconcile the
-complete managed desired set, including explicit disables.
+[활용 가이드](./skills-usage.md), [설치 가이드](./guides/skills-installation-guide.md),
+[추천·정렬 가이드](./guides/recommended-skillsets-guide.md)를 현재 운영 절차로 사용한다.
+
+이전 관찰은 [초기 적용 평가](./reports/2026-09-08-skill-platform-evaluation.md)와
+[후속 보완](./reports/2026-09-08-platform-hardening.md)에 보존한다. Windows 전용 검사와
+장기 작업 품질은 이번 로컬 검증의 범위에 포함하지 않는다. 외부 도구의 임의 파일 변경까지
+하나의 원자적 작업으로 묶는 계약은 아니다.

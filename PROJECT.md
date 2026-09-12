@@ -1,5 +1,10 @@
 # Project: Skills-Platform Procedure-Responsible Workspaces & Git-Native Sequential Merge Engine
 
+> This is the procedure-workspace feature specification and milestone record.
+> For the platform's current purpose and user entry point, read [README](./README.md),
+> the [usage guide](./docs/skills-usage.md), and the
+> [installation guidebook](./docs/guides/skills-installation-guide.md).
+
 ## Architecture
 
 The Skills Platform is transitioning from legacy physical NTFS junction hot-swapping on the root workspace to an **Isolated Git Worktree & Sequential Merge Pipeline** architecture.

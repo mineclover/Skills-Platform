@@ -6,6 +6,11 @@
 
 ## How to use this catalog
 
+For platform onboarding or installation, start with the
+[usage guide](./skills-usage.md), [installation guidebook](./guides/skills-installation-guide.md),
+or [skills-platform-guide](../skills-packages/platform-core/skills-platform-guide/SKILL.md).
+This catalog covers authoring; static package validation does not establish installation or host use.
+
 1. Select the target provider. Use the
    [provider-aware authoring router](../skills-packages/platform-core/skill-authoring-standard/SKILL.md)
    and load only its Codex or Antigravity reference.
@@ -30,6 +35,10 @@ separate findings.
 | Global discovery | `$HOME/.agents/skills`; admin `/etc/codex/skills` | `~/.gemini/config/skills` |
 | Documented optional directories | `scripts/`, `references/`, `assets/`, `agents/` | `scripts/`, `examples/`, `resources/` |
 | Provider extension | Optional `agents/openai.yaml` for interface, invocation policy, and tool dependencies | No `agents/openai.yaml` extension is documented |
+
+These are host-documented discovery paths, checked on 2026-09-08. An installer
+can target different paths: compare Vercel CLI's versioned agent mapping with
+the host paths using the [installation guidebook](./guides/skills-installation-guide.md).
 
 For Codex, `description` remains required for explicit-only skills. Configure
 explicit-only invocation with `agents/openai.yaml`:
@@ -99,8 +108,9 @@ the same content across both directory trees.
 - Are risky actions protected by host permissions or validation, not just a
   textual reminder?
 - Is the expected result testable with a realistic example or evaluation?
-- Has the source, review state, and intended work scope been recorded in the
-  Catalog before delivery?
+- For Catalog-managed delivery, has the source, review state, and intended
+  work scope been recorded? Direct CLI installation follows its own source
+  and scope tracking and does not imply Catalog registration.
 - If more than one provider is targeted, were differences reported separately
   instead of treating provider-specific metadata as universal?
 - Did static analysis remain advisory, with no change to canonical content,

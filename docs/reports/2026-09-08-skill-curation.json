@@ -1,0 +1,1003 @@
+{
+  "evidence_version": 1,
+  "observed_date": "2026-09-08",
+  "kind": "Catalog curation evidence; not an import recipe",
+  "project_id": "skills-platform-codex",
+  "before": {
+    "skills": 79,
+    "tagged_profiles": 3,
+    "purpose_profiles": 3,
+    "installed_skills": 2
+  },
+  "after": {
+    "skills": 81,
+    "tagged_profiles": 81,
+    "purpose_profiles": 9,
+    "installed_skills": 3
+  },
+  "plan_id": "759d4c0b-b1e4-41fc-befe-13d8397946f5",
+  "evaluation_case_id": "platform-guide-live-curation-2026-09-08",
+  "evaluation_run_id": "evaluation_run_8ef11f43-67a7-4c03-81ff-cb49e11df0cb",
+  "feedback_id": "feedback_53c35ef3-fa72-4947-b6e3-0d23703f9b73",
+  "source_revision_id": "revision_f7160bda00f7639d81619bcb",
+  "skills": [
+    {
+      "name": "aim",
+      "lineage_id": "lineage_64ee29f35b1ffd891c66",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "autobahn",
+      "lineage_id": "lineage_ab8ef1997ac5c9da3fdf",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-boundary-problem-router",
+      "lineage_id": "lineage_5f17757175f7c6d434b1",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-context-behavior-separation-validator",
+      "lineage_id": "lineage_b718d0df39722600206a",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-context-version-controller",
+      "lineage_id": "lineage_d2d57a0497b80079dcaa",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-convention-registry",
+      "lineage_id": "lineage_2328928b4338bac438d9",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-ai-agent-systems",
+      "lineage_id": "lineage_1082f86019d5eab8ec84",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-browser-devtools",
+      "lineage_id": "lineage_6b34903b430fc048be42",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-data-state",
+      "lineage_id": "lineage_53eebc1678feeaecffd3",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-delivery-roadmap",
+      "lineage_id": "lineage_1afc45429e063626bd60",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-graphics-3d-motion",
+      "lineage_id": "lineage_c70c7280b67e7d70686c",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-interfaces",
+      "lineage_id": "lineage_774a6a2700f63d94b30f",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-knowledge-publishing",
+      "lineage_id": "lineage_29c7c8fc4ea38d17f786",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-product-requirements",
+      "lineage_id": "lineage_1543f7dc9453c262c261",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-quality-operations",
+      "lineage_id": "lineage_63d3b0e58d3ba0a4dcd2",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-router",
+      "lineage_id": "lineage_df0e705bda33e0c4ed79",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-runtime-workflows",
+      "lineage_id": "lineage_11acd304f3d4b9267744",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-system-architecture",
+      "lineage_id": "lineage_960a16c7ab25cdfb1f02",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-testing-acceptance",
+      "lineage_id": "lineage_c9fb5ea63feb0c7e6668",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-domain-ui-editor",
+      "lineage_id": "lineage_2a549a06fe18ddcb6902",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-element-registry",
+      "lineage_id": "lineage_487c0d87fc2bc04e33a7",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-horizontal-context-builder",
+      "lineage_id": "lineage_3de8704fe2c4a4e6c10a",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-horizontal-exploration-behavior",
+      "lineage_id": "lineage_4f324db1655bd90d79a9",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-recursive-context-composer",
+      "lineage_id": "lineage_1fac30b8f99e101711b2",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-reference-pack-builder",
+      "lineage_id": "lineage_e4d2c1401e830253cfee",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-responsibility-registry",
+      "lineage_id": "lineage_656215fb46b76c51451e",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-responsibility-resolution-gate",
+      "lineage_id": "lineage_787be3f1f89be2548e58",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-task-mode-router",
+      "lineage_id": "lineage_4ed3ac61c1e2fee66050",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-topic-handoff-compiler",
+      "lineage_id": "lineage_953582205477a70d3815",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-topic-registry",
+      "lineage_id": "lineage_a2adaa8674bf7651609c",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-vertical-context-builder",
+      "lineage_id": "lineage_c17f71c1c1b04790a1fe",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "baseline-vertical-resolution-behavior",
+      "lineage_id": "lineage_86841f0ee83361fb7007",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "bounded-baseline-condenser",
+      "lineage_id": "lineage_f132e147b8f0e2765de3",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "baseline-suite",
+      "tags": [
+        "collection:baseline-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "catchup",
+      "lineage_id": "lineage_01cd8fd6852431573fb4",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "code-review",
+      "lineage_id": "lineage_390ec0c1c0b4f03720c7",
+      "source_id": "source_local_f04e8c34cb90a83d",
+      "collection": "community-codex",
+      "tags": [
+        "collection:community-codex",
+        "skills-platform:needs-setup"
+      ],
+      "purpose": "문서화된 기준과 요구사항을 분리하는 코드 리뷰",
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "codebase-design",
+      "lineage_id": "lineage_d22d0fa6221a1be64000",
+      "source_id": "source_local_944f38370b666e03",
+      "collection": "community-codex",
+      "tags": [
+        "collection:community-codex",
+        "skills-platform:architecture-opt-in"
+      ],
+      "purpose": "코드 구조와 모듈 경계를 설명하는 설계 기준",
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "debloat",
+      "lineage_id": "lineage_bb3851db271060506d28",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "dedash",
+      "lineage_id": "lineage_232ff435ff78f51bad43",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "detool",
+      "lineage_id": "lineage_02416ea9aca82af7576e",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "diagnosing-bugs",
+      "lineage_id": "lineage_10b15af9f8327bfc52fc",
+      "source_id": "source_local_4a65ffa53f80d846",
+      "collection": "community-codex",
+      "tags": [
+        "collection:community-codex",
+        "skills-platform:debugging"
+      ],
+      "purpose": "재현 가능한 버그·성능 회귀의 원인 진단",
+      "profile_review": "reviewed"
+    },
+    {
+      "name": "factchk",
+      "lineage_id": "lineage_6b7bd2853c70c44ad727",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "feynman",
+      "lineage_id": "lineage_e2f875851c0df93c2ba9",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "hate",
+      "lineage_id": "lineage_ea180f1e004065405be2",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "macrothink",
+      "lineage_id": "lineage_2e3e5a15d229080ea48e",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-closure-learning",
+      "lineage_id": "lineage_458dbce2630be7479432",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-context-drift-detector",
+      "lineage_id": "lineage_d2fc567a9e6068eaf404",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-lifecycle-controller",
+      "lineage_id": "lineage_3d196c5894b6e7101f5a",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-method-registry",
+      "lineage_id": "lineage_86687bb711b13708ded8",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-release-stabilization",
+      "lineage_id": "lineage_9542e4ede3f848c2e51b",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-signal-intake",
+      "lineage_id": "lineage_50422a9eb943e2c62d4e",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-tool-effectiveness-reviewer",
+      "lineage_id": "lineage_c48a59e833143715d94a",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-tool-invocation-guard",
+      "lineage_id": "lineage_ba9f50a7ea3a03ecba52",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-tool-registry",
+      "lineage_id": "lineage_5248880a01f01fb99af7",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-tool-result-normalizer",
+      "lineage_id": "lineage_86626611755b6b64df37",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-toolchain-planner",
+      "lineage_id": "lineage_78655b818ecc7fbf06be",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "maintenance-validation-gate",
+      "lineage_id": "lineage_010474cada81a3b763d0",
+      "source_id": "source_local_979b585fd46689d6",
+      "collection": "maintenance-suite",
+      "tags": [
+        "collection:maintenance-suite",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "mandela",
+      "lineage_id": "lineage_b93836f609772ec074ec",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "modelchk",
+      "lineage_id": "lineage_255ad74b881bcc24ff7f",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "nba",
+      "lineage_id": "lineage_f0459f9eb5db8f174ed5",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "paperthin",
+      "lineage_id": "lineage_94d2bdb05c7cb8c7fd11",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "prism",
+      "lineage_id": "lineage_86650cef939af413e682",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "re0",
+      "lineage_id": "lineage_b1f11781c5d949bee4e9",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "re0-git",
+      "lineage_id": "lineage_e5106e6f07e12ae515ee",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "re0-loop",
+      "lineage_id": "lineage_3f2b0c675817fdcbaf5a",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "re0-memo",
+      "lineage_id": "lineage_d6b6e5e8a670ae8a3176",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "re0-merge",
+      "lineage_id": "lineage_1d203a55ef49d7130781",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "re0-plan",
+      "lineage_id": "lineage_d73e5fe4c73d1ef3f97b",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "re0-release",
+      "lineage_id": "lineage_2464b40beb627e315706",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "re0-upgrade",
+      "lineage_id": "lineage_3f81dfcb91902b8088b8",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "re0-work",
+      "lineage_id": "lineage_d15bc8e21a5e4e5ec465",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "readchk",
+      "lineage_id": "lineage_7c132929d52d5bac907e",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "reorder",
+      "lineage_id": "lineage_4b2f1a1b14b238b1e06e",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "shower",
+      "lineage_id": "lineage_ca0be9aef8dfe77ac1f1",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "sip",
+      "lineage_id": "lineage_b99a080e12ca38687c49",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "skill-authoring-standard",
+      "lineage_id": "lineage_66da5b284b5655167d17",
+      "source_id": "source_local_05a23d0ba2577995",
+      "collection": "platform-core",
+      "tags": [
+        "authoring",
+        "governance",
+        "collection:platform-core",
+        "skills-platform:base"
+      ],
+      "purpose": "호스트별 스킬 작성 규칙과 정적 검증",
+      "profile_review": "reviewed"
+    },
+    {
+      "name": "skill-creator",
+      "lineage_id": "lineage_1a552533433ff36f585f",
+      "source_id": "source_local_b8b99c51afd14104",
+      "collection": "community-codex",
+      "tags": [
+        "authoring",
+        "codex",
+        "collection:community-codex",
+        "skills-platform:reference-only"
+      ],
+      "purpose": "내장 Skill Creator와 비교할 저장소 고정 참조",
+      "profile_review": "reviewed"
+    },
+    {
+      "name": "skills-platform-guide",
+      "lineage_id": "lineage_71bc04923e334df357d2",
+      "source_id": "source_local_286f992105ff8e54",
+      "collection": "platform-core",
+      "tags": [
+        "collection:platform-core",
+        "skills-platform:base"
+      ],
+      "purpose": "플랫폼 사용·설치 경로 선택·결과 확인",
+      "profile_review": "reviewed"
+    },
+    {
+      "name": "ssotize",
+      "lineage_id": "lineage_021dfa6016d6599dc824",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "collection": "paperthin",
+      "tags": [
+        "collection:paperthin",
+        "skills-platform:review-before-selection"
+      ],
+      "purpose": null,
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "svg-authoring",
+      "lineage_id": "lineage_e95b938b1f1be8fc3d30",
+      "source_id": "source_local_0926b791b8fe5bf0",
+      "collection": "platform-core",
+      "tags": [
+        "collection:platform-core",
+        "skills-platform:visuals-opt-in"
+      ],
+      "purpose": "SVG 작성과 기하 계산 검증",
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "tdd",
+      "lineage_id": "lineage_a9906bc4276d7346c808",
+      "source_id": "source_local_ad0a6c5afc20a667",
+      "collection": "community-codex",
+      "tags": [
+        "collection:community-codex",
+        "skills-platform:test-first-opt-in"
+      ],
+      "purpose": "행동 기준 테스트와 테스트 우선 구현",
+      "profile_review": "unreviewed"
+    },
+    {
+      "name": "writing-great-skills",
+      "lineage_id": "lineage_d95a52b1dacec87258c5",
+      "source_id": "source_local_ef4f86b90b4258ae",
+      "collection": "community-codex",
+      "tags": [
+        "authoring",
+        "codex",
+        "collection:community-codex",
+        "skills-platform:base"
+      ],
+      "purpose": "Codex 스킬 지침의 범위·구조·중복 리뷰",
+      "profile_review": "reviewed"
+    }
+  ]
+}

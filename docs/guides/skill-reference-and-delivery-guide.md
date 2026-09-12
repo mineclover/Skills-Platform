@@ -2,6 +2,13 @@
 
 This guide defines the architectural philosophy, core concepts, and operational workflows for connecting, developing, and delivering skills between the central Skills Platform store and target project environments.
 
+For first-time installation and the distinction between Vercel `skills` CLI
+installation and Catalog-managed delivery, start with the
+[official installation guidebook](./skills-installation-guide.md).
+This document covers the advanced direct-reference workflow. `project link`
+changes files immediately; the standard reviewed delivery path is Catalog
+registration, selection, `project apply` preview, then `project apply --confirm`.
+
 ---
 
 ## 1. Architectural Philosophy: The True Role of a Skill Manager
@@ -10,7 +17,7 @@ A skill management system should not burden developers with heavyweight synchron
 
 The core value of the **Skills Manager** is:
 1. **Friction-Free Reference Linking**: Seamlessly connecting central skill packages (`skills-packages/`) to target project runtimes (`.agents/skills/`) without duplicating files or causing source divergence.
-2. **Deterministic Ownership & Safety**: Preventing accidental file collisions, unauthorized directory overwrites, or broken links via lightweight ownership sidecars (`*.skills-platform-link-ownership.json`).
+2. **Explicit Ownership**: Recording the delivery owner through lightweight sidecars (`*.skills-platform-link-ownership.json`). Adapter preview/apply checks ownership; a sidecar does not prevent external tools from modifying the path, and the direct-link path has weaker checks described below.
 3. **Two-Tier Flexibility**: Providing instantaneous "just refresh" live development for local inner-loop authoring, while preserving cryptographic immutability (SHA-256 snapshots) whenever official versioning or release governance is needed.
 
 ---
@@ -45,27 +52,27 @@ Skills Platform operates on a 2-tier delivery architecture:
 - **Binding Policy**: `"floating_latest"`
 - **Key Characteristics**:
   - **Zero Sync Overhead**: No compilation, no snapshot ingestion, no watch daemon required.
-  - **Instant Live Reflection**: Saving an edit in `SKILL.md`, `references/`, or `scripts/` takes effect immediately in the project workspace.
+  - **Live File Reflection**: Saving an edit in `SKILL.md`, `references/`, or `scripts/` makes the new bytes visible through the project link. Agent rediscovery and instruction loading remain provider-specific.
   - **Bidirectional Editing**: Developers and autonomous agents navigating into `.agents/skills/<skill-name>` modify the canonical source directly, eliminating out-of-sync workspace drift.
-  - **Agent / IDE Refresh**: After saving changes, simply re-read the file in chat or reload the IDE. The agent reads the newest instructions instantly.
-  - **Ownership Protected**: Managed by a sidecar record with `"method": "direct_source_symlink"`, preventing external tools from deleting or overwriting it.
+  - **Agent / IDE Refresh**: After saving changes, explicitly reload or re-read the skill through the host's supported workflow and verify its behavior in a new task when needed.
+  - **Ownership Recorded**: A sidecar with `"method": "direct_source_symlink"` identifies the link. External installers do not enforce this record; use one owner per skill delivery path.
 
 ### Tier 2: Governed Version-Pinned Mode ("Dedicated Instance Repository")
 - **How it works**:
   - **Local Development Standard (Most Effective)**: The project points directly to an instance snapshot in the dedicated instances repository (`skills-instances/<group>/<skill-name>@<version>`), keeping the distribution store (`skills-packages/`) clean while keeping instances human-readable and instantly diffable.
-  - **Central/CI Registry Mode**: For air-gapped CI/CD and formal audit logs, an immutable revision is ingested into `.skills-platform/registry/revisions/<revision_id>/artifacts/` and pinned via cryptographic SHA-256 hash.
+  - **Registry Plan Mode**: The standard Catalog workflow imports an immutable revision into `.skills-platform/registry/revisions/<revision_id>/artifacts/`, records its digest, and delivers it through preview/apply. This works for local team projects as well as CI and audit workflows.
 - **Binding Policy**: `"version_pinned"`
 - **Key Characteristics**:
   - **Distribution Tree Hygiene**: `skills-packages/` remains strictly for canonical package authoring, free from clutter of immutable historical versions.
   - **Ripple Protection**: Prevents prompt experiments in `latest` from accidentally breaking production agent behaviors.
   - **Human-Readable Clarity**: Inspecting symlinks clearly displays the target version (e.g. `@1.0.0`) without querying metadata catalogs.
-  - **Review & Approval Gate**: Integrates with catalog source reviews, health evaluations, and preset versioning.
+  - **Separate Review Evidence**: Catalog review and preset selection govern the registry-plan workflow. A direct `project link --version` does not itself check source approval or evaluation results.
 
 ---
 
 ## 3. Skill Versioning & Agent Spec Ripple Control: Floating Latest vs. Version Pinning
 
-Because skills directly govern an agent's behavioral instructions, tool usage rules, and system prompt constraints, **updating a referenced skill immediately alters the execution specification of all agents consuming that skill**.
+Skills influence an agent's workflow instructions. **Changing a shared source makes the new files visible to every linked project**; behavior changes when each host next loads those instructions. File visibility and instruction reload are separate events.
 
 Without strict version governance, a change made to improve an authoring skill in Project A could inadvertently alter the prompt behavior or output formatting of an agent in Project B, causing regressions or unexpected runtime drift.
 
@@ -102,13 +109,16 @@ To resolve this, Skills Platform establishes a formal distinction between two bi
 
 ### 3.3. Semantic Versioning (SemVer) Contract for Skills
 
-Skill packages follow Semantic Versioning (`version: <major>.<minor>.<patch>` in `SKILL.md` frontmatter):
+The platform's `freeze`/instance workflow uses semantic versions to identify
+local snapshots. A top-level `version` field in `SKILL.md` is not a portable
+provider requirement; validate the manifest against its claimed provider.
+Version labels communicate intended change scope, not a guarantee of agent behavior:
 
 | Version Bump | Change Type | Example | Impact on Consuming Agents |
 | :--- | :--- | :--- | :--- |
-| **Major (`X.0.0`)** | Breaking Change | Redesigned workflow, altered tool parameters, incompatible output format | **High Risk**: Will break assumptions in existing agent prompts. Projects on `version_pinned` remain isolated and protected. |
-| **Minor (`0.X.0`)** | Additive Feature | New reference documents, additional optional recipes, expanded guidelines | **Low Risk**: Consuming agents gain new capabilities without losing existing contracts. |
-| **Patch (`0.0.X`)** | Refinement & Fix | Typo corrections, clearer prompt phrasing, lint fixes | **Zero Risk**: Improves instruction adherence and clarity without altering interfaces. |
+| **Major (`X.0.0`)** | Breaking Change | Redesigned workflow, altered tool parameters, incompatible output format | Review consuming workflows before adoption. |
+| **Minor (`0.X.0`)** | Additive Feature | New reference documents, additional optional recipes, expanded guidelines | Validate affected representative tasks. |
+| **Patch (`0.0.X`)** | Refinement & Fix | Typo corrections, clearer prompt phrasing, lint fixes | Prompt changes can still alter behavior; check the intended correction. |
 
 ### 3.4. Sidecar Representation
 
@@ -143,7 +153,7 @@ The ownership sidecar (`*.skills-platform-link-ownership.json`) explicitly recor
 
 ### 4.1. Mounting Links via Platform CLI (`skills-catalog project link`)
 
-The Skills Platform CLI manages both `floating_latest` and `version_pinned` modes automatically, including sidecar creation:
+The Skills Platform CLI manages both `floating_latest` and `version_pinned` modes, including sidecar creation. Run from the Skills Platform repository root against an already registered project. This is an immediate mutation with no preview or `--confirm` gate. Inspect the existing path and sidecar first: the current implementation can replace an existing symlink regardless of ownership and treats sidecar presence as sufficient to replace a directory. Do not use it to resolve a conflict raised by adapter preview.
 
 ```bash
 # 1. Mount directly to latest working source (floating_latest mode)
@@ -176,7 +186,7 @@ Output highlights:
 
 ### 4.3. Inspecting Live Project Skills (`skills-catalog project status`)
 
-To check the active binding policy, target path, and health of all skills linked in a project:
+To inspect the active binding policy, target path, and basic link state in a project:
 
 ```bash
 node apps/skills-catalog/src/cli.js project status information-ui-catalog
@@ -201,23 +211,34 @@ Output highlights:
 }
 ```
 
-### 4.4. Daily Development Inner Loop: "Just Refresh"
+`managed: true` in this output means that a sidecar exists; it does not prove
+that its content matches the current link or that the package digest is valid.
+
+### 4.4. Daily Development Inner Loop: Re-read the Updated Skill
 
 1. Open and edit the skill in your editor or IDE:
    `skills-packages/platform-core/svg-authoring/SKILL.md`
    *(or navigate through the project link `/path/to/my-project/.agents/skills/svg-authoring/SKILL.md`)*
 2. Save the file.
-3. In your agent session (Antigravity, Codex, etc.), **simply refresh or continue chatting**.
-   The agent automatically reads the updated instructions from disk with zero intermediate steps.
+3. Re-read the skill or use the host's supported refresh/new-session workflow.
+   Verify the intended behavior with a representative task. Continuing an
+   existing conversation alone does not guarantee instruction reload.
 
-### 4.5. On-Demand Registry Ingestion (Optional Tier 2 CI/CD Audit)
+### 4.5. On-Demand Registry Ingestion
 
-When you need an immutable SHA-256 hash registered in the central `.skills-platform/registry/revisions/` store for formal audit logs:
+To import one source into the immutable Registry without selecting or delivering it to a project:
 
 ```bash
-# Run on-demand single-skill partial update
-node apps/skills-catalog/src/cli.js sync svg-authoring --project information-ui-catalog --confirm
+node apps/skills-catalog/src/cli.js import-local \
+  skills-packages/platform-core/svg-authoring \
+  --registry .skills-platform/registry
 ```
+
+Import is separate from review and delivery. The `sync` convenience command
+can continue through project registration, selection, plan creation and,
+with `--confirm`, delivery. It is not an import-only command. Use the
+[installation guidebook's Catalog workflow](./skills-installation-guide.md#5-catalog로-공식-관리하기)
+when those effects should be reviewed separately.
 
 ---
 
@@ -227,21 +248,21 @@ node apps/skills-catalog/src/cli.js sync svg-authoring --project information-ui-
 | :--- | :--- | :--- |
 | **Primary Use Case** | Daily development, prototyping, authoring | Release governance, CI/CD, production |
 | **Binding Policy** | `floating_latest` | `version_pinned` |
-| **Link Target** | `skills-packages/<group>/<skill>` | `.skills-platform/registry/revisions/...` |
-| **Update Mechanism** | File Save $\rightarrow$ **Just Refresh** | `skills-catalog sync` (Partial Update) |
-| **Agent Spec Effect** | Immediate live update on file save | Isolated & frozen until explicit update |
+| **Link Target** | `skills-packages/<group>/<skill>` | Direct instance: `skills-instances/...`; registry plan: `.skills-platform/registry/revisions/...` |
+| **Update Mechanism** | Save source, then verify host reload | Select the intended instance or import/review/select a registry revision and preview/apply |
+| **Agent Spec Effect** | New files are visible immediately; host instruction loading is separate | Pinned source remains selected until explicit change; host reload still applies |
 | **Divergence Risk** | Zero (links directly to canonical source) | Version-pinned (requires explicit update) |
 | **Audit & Reproducibility** | Reflects live working tree | Cryptographically frozen & immutable |
-| **Sidecar Marker** | `method: "direct_source_symlink"` | `method: "symlink"` |
+| **Sidecar Marker** | `method: "direct_source_symlink"` | Direct instance: `direct_source_symlink`; registry adapter link: `symlink` |
 
 ---
 
 ## 6. Summary & Best Practices
 
-1. **Default to Direct Reference during active iteration**: Do not generate temporary plans or run heavy sync commands while actively tuning prompts and documentation.
+1. **Use Direct Reference for an intentional shared-source development loop**: Establish the link after checking its existing owner. Ordinary team installation follows Catalog preview/apply; editing an established direct link needs no repeated ingestion.
 2. **Be conscious of Agent Spec Ripple Effects**: When multiple projects or production agents consume a skill, keep production projects on `version_pinned` to isolate them from breaking changes during authoring.
-3. **Let the sidecar protect the link**: Always maintain the companion `.skills-platform-link-ownership.json` sidecar alongside the symlink so team members and automated tools recognize the managed link.
-4. **Use Partial Updates for milestones**: When you are ready to ship or share a reviewed baseline across teams, use `skills-catalog sync <skill> --confirm` to produce a permanent SHA-256 audit trail.
+3. **Preserve ownership evidence**: Keep the companion `.skills-platform-link-ownership.json` sidecar. It identifies the intended owner but cannot protect a path from another installer or a manual filesystem change.
+4. **Record reviewable milestones**: Import a new immutable revision, review it, select it in project policy, then preview/apply. Ingestion alone is not approval or delivery.
 
 ---
 
@@ -253,29 +274,33 @@ When a project runtime mounts a skill via `floating_latest`, editing files insid
 - **Target Project Repository**: Tracks only the project linkage. The project Git should never commit physical duplicates of skill contents.
 
 ### 7.2. Project `.gitignore` and Link Sharing Policy
-Target project teams should decide how to track `.agents/skills/`:
-- **Shared Team Workspace (Recommended)**: Commit the symlinks, sidecars, and `.agents/skills/README.md` into the project repository so that every team member or CI runner shares the identical skill binding configuration.
-  ```gitignore
-  # Do not ignore managed skills and sidecars if team shares standard links:
-  !.agents/skills/*.skills-platform-link-ownership.json
-  !.agents/skills/README.md
-  ```
-- **Local-Only Workspaces**: If individual developers manage their own private skills, add `.agents/skills/` to the project's `.gitignore`.
+For Skills Platform-managed projects, share portable recipe/source declarations
+and reconstruct bindings at each checkout. Direct links and sidecars contain
+machine paths; committing them does not reproduce the same source on another
+PC. This repository ignores materialized `.agents/skills/` and local Catalog
+state as documented in the [package management guide](./project-skill-package-management.md).
+
+For projects using Vercel CLI direct installation, review `skills-lock.json`
+and the installed content under that tool's workflow. Do not mix that policy
+with Platform-managed bindings in the same delivery path.
 
 ### 7.3. Global Host Synchronization (Antigravity & Codex)
 AI agents operating outside any specific repository (or in ad-hoc terminal sessions) discover skills from global host roots:
 - **Google Antigravity**: `~/.gemini/config/skills/`
 - **OpenAI Codex**: `~/.agents/skills/`
 
-To prevent divergence between repository agent sessions and global agent sessions, global roots should also symlink directly to canonical packages in `Skills-Platform/skills-packages/`:
-```bash
-# Antigravity global link
-ln -s ~/workflow/Skills-Platform/skills-packages/openwiki/openwiki-cli ~/.gemini/config/skills/openwiki-cli
-ln -s ~/workflow/Skills-Platform/skills-packages/openwiki/openwiki-grounding ~/.gemini/config/skills/openwiki-grounding
+These are the host documentation paths and Catalog defaults, checked on
+2026-09-08. Vercel `skills@1.5.24` declares different agent global paths in
+its README/config, while its installer resolves both agents through the
+universal canonical root `~/.agents/skills/`. Antigravity's host global path
+therefore still differs from the installer's calculated target.
+The [installation guidebook](./skills-installation-guide.md#설치-도구의-경로와-에이전트의-검색-경로)
+explains canonical copies, environment overrides, and host verification.
 
-# Codex global link
-ln -s ~/workflow/Skills-Platform/skills-packages/openwiki/openwiki-cli ~/.agents/skills/openwiki-cli
-```
+Choose global scope only when the skill is intended for every project. Use
+the selected owner to manage that scope and inspect existing names before
+creating a binding. Do not add a second global copy merely to work around
+a discovery failure; confirm the host search path first.
 
 ### 7.4. Dual-Role Repositories: Agent Skills vs. Bundled Product Skills
 Certain projects (e.g. OpenWiki, developer tooling, CLI frameworks) play a dual role:
