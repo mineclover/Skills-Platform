@@ -59,6 +59,7 @@ after selecting Antigravity and only when that workflow is relevant.
 | [OpenAI: Build skills for ChatGPT and Codex](https://developers.openai.com/codex/skills) | Creating or revising any Codex skill. | Defines `SKILL.md`, clear trigger descriptions, progressive disclosure, and repository/user/admin skill locations. |
 | [Google Antigravity: Agent Skills](https://antigravity.google/docs/skills) | Creating or revising an Antigravity skill. | Defines optional `name`, required `description`, workspace/global discovery roots, and the `scripts`/`examples`/`resources` package shape. |
 | [Open Agent Skills specification](https://agentskills.io/specification) | Checking portable skill structure or interoperability. | Defines the open skill package format shared across compatible agent hosts. |
+| [Skill Addition & Integration Guide](./guides/skill-addition-guide.md) | Adding, validating, importing, and composably binding a new skill to the platform. | 5-stage end-to-end workflow: design, static checks, registry import, open composability binding, and host verification. |
 | [Skills usage guide](./skills-usage.md) | Importing, reviewing, selecting, or delivering a skill through this Platform. | Separates Catalog policy and immutable revisions from Skills Manager delivery. |
 | [Skills Platform roadmap](./roadmap.md) | Deciding where profiles, notes, evaluations, presets, and source provenance belong. | Explains the intended lifecycle and the management data that must not overwrite canonical `SKILL.md` content. |
 

@@ -51,6 +51,8 @@ For a side-by-side schema or directory audit, use the
 - For installation and onboarding requests, use `skills-platform-guide` when available. Authoring
   validates a package; it does not install it or prove host discovery. Do not require Catalog
   registration for a user who selected direct installation with Vercel Skills CLI.
+- For the end-to-end 5-stage lifecycle of adding, validating, registering, and composably binding a
+  new skill to the platform, follow [docs/guides/skill-addition-guide.md](../../../docs/guides/skill-addition-guide.md).
 
 ## Review output
 

@@ -78,7 +78,7 @@ $skills-platform-guide 이 외부 스킬을 프로젝트 범위로 설치하는 
 $skills-platform-guide 스킬 파일은 있는데 에이전트가 발견하지 못하는 이유를 확인해 줘.
 ```
 
-저장소에 `SKILL.md`가 존재하는 것만으로 호출 가능해지지는 않습니다. 자체 운영 스킬의 설치도 [설치 가이드북](./docs/guides/skills-installation-guide.md)의 프로젝트 설치 절차를 거칩니다.
+저장소에 `SKILL.md`가 존재하는 것만으로 호출 가능해지지는 않습니다. 자체 운영 스킬의 설치도 [설치 가이드북](./docs/guides/skills-installation-guide.md)의 프로젝트 설치 절차를 거칩니다. 새로운 스킬의 기획·작성·정적 검사·등록·개방형 오버레이 바인딩 절차는 [스킬 추가 완벽 가이드북](./docs/guides/skill-addition-guide.md)을 참고합니다.
 
 ## 저장소 구성과 책임
 

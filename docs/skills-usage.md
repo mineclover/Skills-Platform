@@ -102,7 +102,7 @@ UI·API·CLI는 같은 검색 계약을 사용합니다. provider 필터는 prof
 
 ## 3. 스킬을 검사하고 Registry에 등록하기
 
-이 절은 recipe에 선언되지 않은 개별 로컬 패키지의 등록 예제입니다. `/absolute/path/to/my-skill`과 `my-skill`을 실제 패키지 경로·이름으로 바꾸고, 지원할 provider의 작성 규칙을 검사합니다. 외부 Git 출처와 `npx skills` 명령은 [설치 가이드북](./guides/skills-installation-guide.md)을 따릅니다.
+이 절은 recipe에 선언되지 않은 개별 로컬 패키지의 등록 예제입니다. 신규 스킬의 설계, 정적 검증, 레지스트리 임포트, 개방형 조합(오버레이/추천) 바인딩 및 호스트 발견 검증의 5단계 전체 수명주기는 [스킬 추가 완벽 가이드북](./guides/skill-addition-guide.md)을 참고하십시오. `/absolute/path/to/my-skill`과 `my-skill`을 실제 패키지 경로·이름으로 바꾸고, 지원할 provider의 작성 규칙을 검사합니다. 외부 Git 출처와 `npx skills` 명령은 [설치 가이드북](./guides/skills-installation-guide.md)을 따릅니다.
 
 이 저장소 recipe가 관리하는 `skills-platform-guide`, `skill-authoring-standard`, `writing-great-skills`, `skill-creator`는 다음 절의 `recipe apply`로 등록합니다. 일반 `import-local`은 절대 경로를 source locator로 사용하지만 recipe는 선언된 상대 locator를 유지하므로, 같은 패키지를 두 방식으로 등록하면 별도 출처·lineage가 생길 수 있습니다.
 
