@@ -1,6 +1,6 @@
 ---
 name: baseline-context-behavior-separation-validator
-description: Validate that prior context and action behavior remain separate: contexts contain declarative identity, goals, conventions, methods, responsibility, and acceptance; behaviors contain execution, tool calls, changes, and results. Use before publishing contexts, behaviors, or maintenance runs.
+description: "Validate that prior context and action behavior remain separate: contexts contain declarative identity, goals, conventions, methods, responsibility, and acceptance; behaviors contain execution, tool calls, changes, and results. Use before publishing contexts, behaviors, or maintenance runs."
 ---
 
 # Context–Behavior Separation Validator

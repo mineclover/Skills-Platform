@@ -1,5 +1,5 @@
 ---
-name: generative_ui
+name: generative-ui
 description: How to render rich interactive HTML widgets inline in the chat or as standalone artifacts. Use this skill when you want to show the user diagrams, data visualizations, interactive controls, educational walkthroughs, or any rich visual content beyond plain text and markdown.
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: baseline-horizontal-exploration-behavior
-description: Execute horizontal exploration from a published horizontal context: select methods, plan tools, discover and normalize candidate topics, compare evidence and ownership, deduplicate, rank, and select topics for vertical handoff. Use for broad investigation and topic selection, not implementation.
+description: "Execute horizontal exploration from a published horizontal context: select methods, plan tools, discover and normalize candidate topics, compare evidence and ownership, deduplicate, rank, and select topics for vertical handoff. Use for broad investigation and topic selection, not implementation."
 ---
 
 # Horizontal Exploration Behavior

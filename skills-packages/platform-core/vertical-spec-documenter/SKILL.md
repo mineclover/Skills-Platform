@@ -1,6 +1,23 @@
 ---
 name: vertical-spec-documenter
 description: Build, compile, and validate bounded Vertical Topic Specification documents for autonomous and HT maintenance cycles. Treats horizontal and vertical contexts as relative fractal planes with canonical topic IDs, owned scopes, topology awareness, strict invariants, and pinpoint verification gates.
+hooks:
+  - id: scope-boundary-enforcer
+    name: Scope Boundary Enforcer
+    event: post_tool_use
+    description: Audits file modifications against active topic scope and detects out-of-bounds mutations.
+    enabled: true
+    matcher: "write_to_file|replace_file_content"
+    handler:
+      type: script
+      target: scripts/scope-boundary-enforcer.js
+      timeout_ms: 5000
+    priority: 20
+    providers:
+      - antigravity
+      - claude
+      - codex
+    failure_policy: open
 ---
 
 # Vertical Spec Documenter (Sujik Spec Documentation)

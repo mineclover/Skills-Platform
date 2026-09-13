@@ -672,7 +672,9 @@ export interface RecipeSkill {
 }
 
 export interface RecipePresetEntry {
-  skill_name: string;
+  skill_name?: string;
+  skill_id?: string;
+  version?: string;
   source_relative_path?: string;
   artifact_type?: ArtifactType;
   source_id?: string;
@@ -867,6 +869,8 @@ export interface HookDefinition {
    * manifests default to `open` for backwards compatibility.
    */
   failure_policy?: HookFailurePolicy;
+  /** Owning skill identity binding or origin lineage. */
+  associated_skill?: string | null;
   metadata?: Record<string, any>;
 }
 

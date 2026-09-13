@@ -1,61 +1,79 @@
 # Universal Skill Telemetry Hooks & Lifecycle Loop Guide
 
-This guide explains how to configure, customize, and operate the **Universal Skill Usage Telemetry Hook Engine**, **Standard Lifecycle Hook Manager**, and the **3Phrase Autonomous Loop Runner** in Skills Platform.
+This guide explains how to configure, customize, and operate the **Universal Skill Usage Telemetry Hook Engine**, **Standard Lifecycle Hook Manager**, **Companion Hook Architecture**, and the **3-Phase Autonomous Loop Runner** in Skills Platform.
+
+> For the comprehensive technical specification, Protojson contracts, and schema invariants, see [hook-system-and-protojson-spec.md](hook-system-and-protojson-spec.md).
 
 ---
 
-## 1. Standard Lifecycle Hooks Configuration (`skills-platform hook`)J
-All hooks are declaratively defined in `.ckills-platform/hooks/manifest.json` and automatically compiled into agent-native configs:
-- *Google Antigravity*: `.agents/hooks.json`
+## 1. Lifecycle & Companion Hooks Architecture
+
+Hooks in Skills Platform are divided into two distinct tiers:
+1. **Universal Security Baseline**: Essential system guards (`secret-leak-guard`, `destructive-command-blocker`, `context-budget-guard`, `subagent-recursion-limiter`, `scope-boundary-enforcer`, and telemetry) defined in `.skills-platform/hooks/manifest.json`.
+2. **Companion Hooks**: Domain-specific guards co-located inside skill packages (e.g. `test-storm-guard` inside `scoped-tdd-executor`) that automatically mount, rebase, and cascade enable/disable with their parent skills.
+
+All hooks are automatically compiled into native agent configuration files:
+- *Google Antigravity*: `.agents/hooks.json` (Strict Protojson contract)
+- *OpenAI Codex*: `.codex/hooks.json` (Event dispatchers)
 - *Anthropic Claude*: `.claude/hooks.json`
-- *Codex CLI / Ralph-TUI*: STDIO stream parser
 
-### CLI Commands
+---
 
+## 2. Hook Control CLI (`bin/sp-hooks`)
+
+The `./bin/sp-hooks` CLI (or `node apps/skills-catalog/src/cli.js hook`) provides centralized control:
+
+### 2.1 Inspection & Audit
 ```bash
-# 1. List all managed hooks and their event mappings
-skills-platform hook list
+# 1. Inspect hooks grouped by owning skill
+./bin/sp-hooks list --by-skill
 
-# 2. Add a new custom hook (runs a shell command or script)
-skills-platform hook add \
-  --id pre-commit-lint \
-  --name "Pre-Commit Linter" \
-  --event pre_tool_use \
-  --matcher run_command \
-  --command "npm run lint --silent"
- 
-# 3. Enable or disable a hook
-skills-platform hook disable test-storm-guard
-skills-platform hook enable test-storm-guard
+# 2. Filter hooks for a specific skill
+./bin/sp-hooks list --skill scoped-tdd-executor
 
-# 4. Test a event trigger locally
-skills-platform hook test --event on_test_run
+# 3. Formatted ASCII table view
+./bin/sp-hooks list --table
 
-# 5. Sync manifest into .agents/hooks.json and .claude/hooks.json
-skills-platform hook sync
+# 4. Audit hook health, script permissions, and provider synchronization
+./bin/sp-hooks audit
+```
+
+### 2.2 Toggling & Cascading
+```bash
+# Cascade enable / disable all companion hooks for a skill
+./bin/sp-hooks enable --skill scoped-tdd-executor
+./bin/sp-hooks disable --skill scoped-tdd-executor
+
+# Safe-mode emergency toggle (all hooks)
+./bin/sp-hooks disable --all
+./bin/sp-hooks enable --all
+
+# Single hook toggle
+./bin/sp-hooks enable secret-leak-guard
+./bin/sp-hooks disable secret-leak-guard
 ```
 
 ---
 
-## 2. The 3-Phase Autonomous Lifecycle Loop (`skills-platform loop`)
+## 3. The 3-Phase Autonomous Lifecycle Loop (`skills-catalog loop run`)
 
 When running large autonomous workflows (like Ralph-TUI iterative TDD loops), run the lifecycle loop command:
 
 ```bash
-skills-platform loop run --prd ./tasks/PRD.md --project ./my-project --provider codex
+skills-catalog loop run --prd ./tasks/PRD.md --project ./my-project --provider antigravity
 ```
 
-### Execution Steps:
-1. **Phase 1 (plan)**: Mounts `task-planning-recipe.json`, parses the PRD into atomic tasks, and extracts `prd.json`/0task-queue.json`.
-2. **Phase 2 (execute)**: Hot-swaps symlinks to `scoped-inner-loop-recipe.json`. Runs pinpoint unit tests (`e.g. node --test foo.test.js`). **Stops any full test suite scan from happening in the inner loop.*
-3. **Phase 3 (gate)**: When all atomic tasks pass, hot-swaps to `release-governance-recipe.json`, executes a *single* full regression run, and compacts changes into `MASTER_BASELINE.md`.
+### Execution Phases:
+1. **Phase 1 (Plan)**: Mounts `task-planning-recipe.json`, parses the PRD into atomic tasks, and extracts `prd.json`/`task-queue.json`.
+2. **Phase 2 (Execute - Inner Loop)**: Hot-swaps to `scoped-inner-loop-recipe.json`. Executes pinpoint unit tests (e.g., `node --test foo.test.js`). **`test-storm-guard` strictly suppresses unauthorized full regression test runs during this phase.*
+3. **Phase 3 (Gate - Release Governance)**: When all atomic tasks pass, hot-swaps to `release-governance-recipe.json`, executes a *single* full regression run, and compacts changes into `MASTER_BASELINE.md`.
 
 ---
 
-## 3. Real-Time Web UI Telemetry & Evidence Analytics
+## 4. Real-Time Web UI Telemetry & Evidence Analytics
 
 Open the Catalog Web UI (`apps/catalog-ui`):
 - **SkillWorkspace**: Browse Real-Time Telemetry Gauges (Invocation Count, Avg Latency, Success Rate, Active Providers).
-- **Invocation Mode Ratio Stacked Bar**: Visualizes proportions of âœ© Model-invoked (Reflex), pŸ‘¨ User-invoked (Command), âŸ” Hubrid workloads.
-- **ReviewQueue**: Automatically flags risk events, corrections, and latency spikes (>150ms) for human decisions.
+- **Invocation Mode Ratio**: Visualizes proportions of Model-invoked (Reflex), User-invoked (Command), and Hybrid workloads.
+- **ReviewQueue**: Automatically flags risk events, corrections, and latency spikes (>150ms) for human review.
 - **LiveActivationDrawer**: Shows currently materialized symlink delivery junctions with live sync status.

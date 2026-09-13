@@ -17,20 +17,64 @@ const MAX_DEPTH = 3;
 const MAX_CONCURRENT = 4;
 
 /**
+ * Extracts candidate source objects from payload and nested toolCall structures.
+ */
+function candidateSources(payload) {
+  if (!payload || typeof payload !== "object") return [];
+  const sources = [payload];
+  if (payload.toolCall && typeof payload.toolCall === "object") {
+    sources.push(payload.toolCall);
+    if (payload.toolCall.args && typeof payload.toolCall.args === "object") {
+      sources.push(payload.toolCall.args);
+    } else if (typeof payload.toolCall.args === "string") {
+      try {
+        const parsed = JSON.parse(payload.toolCall.args);
+        if (parsed && typeof parsed === "object") sources.push(parsed);
+      } catch {}
+    }
+  }
+  if (payload.tool_call && typeof payload.tool_call === "object") {
+    sources.push(payload.tool_call);
+    if (payload.tool_call.args && typeof payload.tool_call.args === "object") {
+      sources.push(payload.tool_call.args);
+    } else if (typeof payload.tool_call.args === "string") {
+      try {
+        const parsed = JSON.parse(payload.tool_call.args);
+        if (parsed && typeof parsed === "object") sources.push(parsed);
+      } catch {}
+    }
+  }
+  for (const k of ["args", "parameters", "arguments", "tool_input", "toolInput", "input"]) {
+    if (payload[k] && typeof payload[k] === "object") {
+      sources.push(payload[k]);
+    } else if (typeof payload[k] === "string") {
+      try {
+        const parsed = JSON.parse(payload[k]);
+        if (parsed && typeof parsed === "object") sources.push(parsed);
+      } catch {}
+    }
+  }
+  return sources;
+}
+
+/**
  * Extracts invocation lineage / call chain from payload and environment.
  */
 function extractLineage(payload = {}, env = process.env) {
-  if (Array.isArray(payload.call_chain)) return [...payload.call_chain];
-  if (Array.isArray(payload.callChain)) return [...payload.callChain];
-  if (Array.isArray(payload.lineage)) return [...payload.lineage];
-  if (Array.isArray(payload.agent_hierarchy)) return [...payload.agent_hierarchy];
-  if (Array.isArray(payload.ancestors)) return [...payload.ancestors];
+  const sources = candidateSources(payload);
+  for (const src of sources) {
+    if (Array.isArray(src.call_chain)) return [...src.call_chain];
+    if (Array.isArray(src.callChain)) return [...src.callChain];
+    if (Array.isArray(src.lineage)) return [...src.lineage];
+    if (Array.isArray(src.agent_hierarchy)) return [...src.agent_hierarchy];
+    if (Array.isArray(src.ancestors)) return [...src.ancestors];
 
-  if (typeof payload.call_chain === "string") {
-    return payload.call_chain.split(/->|,/).map((s) => s.trim()).filter(Boolean);
-  }
-  if (typeof payload.lineage === "string") {
-    return payload.lineage.split(/->|,/).map((s) => s.trim()).filter(Boolean);
+    if (typeof src.call_chain === "string") {
+      return src.call_chain.split(/->|,/).map((s) => s.trim()).filter(Boolean);
+    }
+    if (typeof src.lineage === "string") {
+      return src.lineage.split(/->|,/).map((s) => s.trim()).filter(Boolean);
+    }
   }
 
   if (env.SUBAGENT_LINEAGE) {
@@ -44,16 +88,19 @@ function extractLineage(payload = {}, env = process.env) {
  * Extracts current invocation depth from payload or lineage.
  */
 function extractCurrentDepth(payload = {}, lineage = [], env = process.env) {
-  if (typeof payload.current_depth === "number") return payload.current_depth;
-  if (typeof payload.currentDepth === "number") return payload.currentDepth;
-  if (typeof payload.depth === "number") return payload.depth;
-  if (typeof payload.subagent_depth === "number") return payload.subagent_depth;
+  const sources = candidateSources(payload);
+  for (const src of sources) {
+    if (typeof src.current_depth === "number") return src.current_depth;
+    if (typeof src.currentDepth === "number") return src.currentDepth;
+    if (typeof src.depth === "number") return src.depth;
+    if (typeof src.subagent_depth === "number") return src.subagent_depth;
 
-  if (typeof payload.current_depth === "string" && !isNaN(Number(payload.current_depth))) {
-    return parseInt(payload.current_depth, 10);
-  }
-  if (typeof payload.depth === "string" && !isNaN(Number(payload.depth))) {
-    return parseInt(payload.depth, 10);
+    if (typeof src.current_depth === "string" && !isNaN(Number(src.current_depth))) {
+      return parseInt(src.current_depth, 10);
+    }
+    if (typeof src.depth === "string" && !isNaN(Number(src.depth))) {
+      return parseInt(src.depth, 10);
+    }
   }
 
   if (lineage.length > 0) {
@@ -71,16 +118,19 @@ function extractCurrentDepth(payload = {}, lineage = [], env = process.env) {
  * Extracts concurrent subagent count from payload and environment.
  */
 function extractConcurrentCount(payload = {}, env = process.env) {
-  if (typeof payload.concurrent_count === "number") return payload.concurrent_count;
-  if (typeof payload.concurrentCount === "number") return payload.concurrentCount;
-  if (typeof payload.active_subagents === "number") return payload.active_subagents;
-  if (typeof payload.activeSubagents === "number") return payload.activeSubagents;
+  const sources = candidateSources(payload);
+  for (const src of sources) {
+    if (typeof src.concurrent_count === "number") return src.concurrent_count;
+    if (typeof src.concurrentCount === "number") return src.concurrentCount;
+    if (typeof src.active_subagents === "number") return src.active_subagents;
+    if (typeof src.activeSubagents === "number") return src.activeSubagents;
 
-  if (typeof payload.concurrent_count === "string" && !isNaN(Number(payload.concurrent_count))) {
-    return parseInt(payload.concurrent_count, 10);
-  }
-  if (typeof payload.active_subagents === "string" && !isNaN(Number(payload.active_subagents))) {
-    return parseInt(payload.active_subagents, 10);
+    if (typeof src.concurrent_count === "string" && !isNaN(Number(src.concurrent_count))) {
+      return parseInt(src.concurrent_count, 10);
+    }
+    if (typeof src.active_subagents === "string" && !isNaN(Number(src.active_subagents))) {
+      return parseInt(src.active_subagents, 10);
+    }
   }
 
   if (env.ACTIVE_SUBAGENT_COUNT && !isNaN(Number(env.ACTIVE_SUBAGENT_COUNT))) {
@@ -185,9 +235,9 @@ function parseCliArgs(argv = process.argv.slice(2)) {
 /**
  * Reads all data from stdin with short timeout.
  */
-function readAllStdin(timeoutMs = 15) {
+function readAllStdin(timeoutMs = 3000) {
   return new Promise((resolve) => {
-    if (process.stdin.isTTY || process.stdin.readableEnded || !process.stdin.readable) {
+    if (process.stdin.isTTY || process.stdin.readableEnded) {
       return resolve("");
     }
     let data = "";
@@ -201,6 +251,7 @@ function readAllStdin(timeoutMs = 15) {
     }
 
     const timer = setTimeout(finish, timeoutMs);
+    if (timer.unref) timer.unref();
     process.stdin.setEncoding("utf8");
     process.stdin.on("data", (chunk) => {
       data += chunk;
@@ -246,36 +297,99 @@ function resolvePayload(cliArgs = {}, env = process.env, stdinData = "") {
 }
 
 /**
+ * Checks if current execution is in Antigravity mode.
+ */
+function isAntigravityMode(payload = {}, env = process.env, cliArgs = {}, rawStdin = "") {
+  if (env.HOOK_RUNTIME === "antigravity" || cliArgs.runtime === "antigravity") {
+    return true;
+  }
+  const p = payload || {};
+  if (
+    p.conversationId ||
+    p.conversation_id ||
+    p.workspacePaths ||
+    p.workspace_paths ||
+    p.transcriptPath ||
+    p.transcript_path ||
+    p.artifactDirectoryPath ||
+    p.artifact_directory_path ||
+    p.toolName ||
+    p.tool_name ||
+    p.modelName ||
+    p.model_name ||
+    p.stepIdx !== undefined ||
+    p.step_idx !== undefined ||
+    p.toolCall ||
+    p.tool_call ||
+    p.permissionOverrides ||
+    p.permission_overrides
+  ) {
+    return true;
+  }
+  if (typeof rawStdin === "string" && rawStdin) {
+    if (/(?:"conversation_id"|"conversationId"|"toolCall"|"tool_call"|"workspacePaths"|"workspace_paths"|"stepIdx"|"step_idx")/.test(rawStdin)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * CLI Main execution
  */
+function formatGuardStdout(result, payload = {}, env = process.env, cliArgs = {}, rawStdin = "") {
+  let effectivePayload = payload;
+  if (!effectivePayload || Object.keys(effectivePayload).length === 0) {
+    if (env.HOOK_PAYLOAD) {
+      try {
+        effectivePayload = JSON.parse(env.HOOK_PAYLOAD);
+      } catch {}
+    }
+  }
+  const isAntigravity = isAntigravityMode(effectivePayload, env, cliArgs, rawStdin);
+  if (isAntigravity) {
+    const isBlocked = result.allow === false || result.decision === "block" || result.decision === "deny";
+    if (isBlocked) {
+      const reason = [
+        result.reason || "Subagent recursion/concurrency limit exceeded",
+        result.self_correct_hint ? `Hint: ${result.self_correct_hint}` : null,
+      ].filter(Boolean).join(" ");
+      return { decision: "deny", reason };
+    }
+    return { decision: "allow" };
+  }
+  return result;
+}
+
+let currentPayload = {};
+let currentStdin = "";
+let currentCliArgs = {};
+
 async function main(argv = process.argv.slice(2)) {
-  const cliArgs = parseCliArgs(argv);
-  const stdinData = await readAllStdin();
-  const payload = resolvePayload(cliArgs, process.env, stdinData);
+  currentCliArgs = parseCliArgs(argv);
+  currentStdin = await readAllStdin();
+  currentPayload = resolvePayload(currentCliArgs, process.env, currentStdin);
 
-  const maxDepth = cliArgs["max-depth"] ? parseInt(cliArgs["max-depth"], 10) : MAX_DEPTH;
-  const maxConcurrent = cliArgs["max-concurrent"] ? parseInt(cliArgs["max-concurrent"], 10) : MAX_CONCURRENT;
+  const maxDepth = currentCliArgs["max-depth"] ? parseInt(currentCliArgs["max-depth"], 10) : MAX_DEPTH;
+  const maxConcurrent = currentCliArgs["max-concurrent"] ? parseInt(currentCliArgs["max-concurrent"], 10) : MAX_CONCURRENT;
 
-  const result = evaluateSubagentRecursionLimiter(payload, { maxDepth, maxConcurrent });
-  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  const result = evaluateSubagentRecursionLimiter(currentPayload, { maxDepth, maxConcurrent });
+  const output = formatGuardStdout(result, currentPayload, process.env, currentCliArgs, currentStdin);
+  process.stdout.write(JSON.stringify(output, null, 2) + "\n");
   process.exit(0);
 }
 
 if (require.main === module) {
   main().catch((err) => {
-    process.stdout.write(
-      JSON.stringify(
-        {
-          allow: false,
-          decision: "block",
-          reason: `Subagent recursion limiter internal failure: ${err?.message}`,
-          self_correct_hint: "Verify subagent call parameters.",
-          violation_type: "subagent_limiter_error",
-        },
-        null,
-        2
-      ) + "\n"
-    );
+    const errorResult = {
+      allow: false,
+      decision: "deny",
+      reason: `Subagent recursion limiter internal failure: ${err?.message}`,
+      self_correct_hint: "Verify subagent call parameters.",
+      violation_type: "subagent_limiter_error",
+    };
+    const output = formatGuardStdout(errorResult, currentPayload, process.env, currentCliArgs, currentStdin);
+    process.stdout.write(JSON.stringify(output, null, 2) + "\n");
     process.exit(0);
   });
 }

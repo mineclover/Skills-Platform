@@ -1,0 +1,6 @@
+interface:
+  display_name: "Lean Architecture"
+  short_description: "Deep modules, boundary enforcement, and anti-bloat engine"
+  default_prompt: "Use $lean-architecture to review, enforce boundaries, and simplify our system architecture."
+policy:
+  allow_implicit_invocation: true

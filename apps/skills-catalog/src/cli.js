@@ -115,7 +115,29 @@ function parseArguments(argv) {
       positional.push(value);
       continue;
     }
-    const name = value.slice(2);
+    let name;
+    let explicitValue = null;
+    const eqIndex = value.indexOf("=");
+    if (eqIndex !== -1) {
+      name = value.slice(2, eqIndex);
+      explicitValue = value.slice(eqIndex + 1);
+    } else {
+      name = value.slice(2);
+    }
+
+    if (explicitValue !== null) {
+      if (MULTI_VALUE_FLAGS.has(name)) {
+        flags[name] = [...(flags[name] ?? []), explicitValue];
+      } else if (explicitValue === "true") {
+        flags[name] = true;
+      } else if (explicitValue === "false") {
+        flags[name] = false;
+      } else {
+        flags[name] = explicitValue;
+      }
+      continue;
+    }
+
     const next = argv[index + 1];
     if (!next || next.startsWith("--")) {
       flags[name] = true;
@@ -129,6 +151,119 @@ function parseArguments(argv) {
     }
   }
   return { positional, flags };
+}
+
+function formatHooksTable(hooks, { hideSkillColumn = false } = {}) {
+  if (!hooks || hooks.length === 0) return "No hooks configured.\n";
+  const hasSkill = !hideSkillColumn && hooks.some((h) => Boolean(h.associated_skill ?? h.metadata?.associated_skill));
+  const headers = hasSkill
+    ? ["ID", "Skill", "Event", "Policy", "Prio", "State", "Handler"]
+    : ["ID", "Event", "Policy", "Prio", "State", "Handler"];
+  const rows = hooks.map((h) => [
+    String(h.id ?? ""),
+    ...(hasSkill ? [String(h.associated_skill ?? h.metadata?.associated_skill ?? "-")] : []),
+    String(h.event ?? ""),
+    String(h.failure_policy ?? "open"),
+    String(h.priority ?? 100),
+    h.enabled ? "enabled" : "disabled",
+    String(h.target ?? h.handler?.target ?? h.handler?.command ?? h.handler?.url ?? "-"),
+  ]);
+
+  const colWidths = headers.map((header, i) =>
+    Math.max(header.length, ...rows.map((row) => (row[i] ? row[i].length : 0)))
+  );
+
+  const formatRow = (cells) =>
+    "│ " + cells.map((cell, i) => cell.padEnd(colWidths[i])).join(" │ ") + " │";
+
+  const topBorder = "┌─" + colWidths.map((w) => "─".repeat(w)).join("─┬─") + "─┐";
+  const midBorder = "├─" + colWidths.map((w) => "─".repeat(w)).join("─┼─") + "─┤";
+  const botBorder = "└─" + colWidths.map((w) => "─".repeat(w)).join("─┴─") + "─┘";
+
+  const lines = [
+    topBorder,
+    formatRow(headers),
+    midBorder,
+    ...rows.map((row) => formatRow(row)),
+    botBorder,
+  ];
+
+  return lines.join("\n");
+}
+
+function formatHooksBySkillTable(groupedData) {
+  const sections = [];
+  const bySkill = groupedData.by_skill || {};
+  const skillEntries = Object.entries(bySkill).sort(([a], [b]) => a.localeCompare(b));
+
+  for (const [skillId, hooks] of skillEntries) {
+    sections.push(`Owning Skill: ${skillId} (${hooks.length} hook${hooks.length === 1 ? "" : "s"})`);
+    sections.push(formatHooksTable(hooks, { hideSkillColumn: true }));
+    sections.push("");
+  }
+
+  const unassociated = groupedData.unassociated || [];
+  if (unassociated.length > 0) {
+    sections.push(`Unassociated System Guards (${unassociated.length} hook${unassociated.length === 1 ? "" : "s"})`);
+    sections.push(formatHooksTable(unassociated, { hideSkillColumn: true }));
+    sections.push("");
+  }
+
+  if (sections.length === 0) {
+    return "No hooks configured.\n";
+  }
+
+  return sections.join("\n").trimEnd() + "\n";
+}
+
+function formatDiagnosticsTable(diagnostics) {
+  const providerSummary = Object.entries(diagnostics.providers || {})
+    .map(([p, info]) => `${p}: ${info.status} (configured: ${info.configured}, synced: ${info.synced}, runtimeReady: ${info.runtimeReady})`)
+    .join("\n  ");
+  const orphanCount = diagnostics.summary?.orphan_count ?? diagnostics.summary?.orphanHooks ?? 0;
+  const orphanText = orphanCount > 0 ? `, ${orphanCount} orphan` : "";
+  const summaryLines = [
+    `Diagnostics Status : ${diagnostics.healthy ? "HEALTHY (0 issues)" : `WARNING (${diagnostics.issues?.length ?? 0} issues)`}`,
+    `Total Hooks        : ${diagnostics.desired?.total ?? 0} (${diagnostics.desired?.enabled ?? 0} enabled, ${diagnostics.desired?.disabled ?? 0} disabled${orphanText})`,
+    `Providers:\n  ${providerSummary}`,
+  ];
+  if (diagnostics.issues && diagnostics.issues.length > 0) {
+    summaryLines.push("\nIssues:");
+    for (const issue of diagnostics.issues) {
+      summaryLines.push(`  - ${issue}`);
+    }
+  }
+  const hooksTable = formatHooksTable(diagnostics.hooks?.map((h) => ({
+    id: h.id,
+    name: h.name,
+    event: h.event,
+    enabled: h.desiredEnabled,
+    associated_skill: h.associated_skill,
+    failure_policy: h.failurePolicy,
+    priority: h.priority,
+    target: h.handler?.target || h.handler?.command || h.handler?.url,
+    handler: h.handler,
+  })));
+  return `${summaryLines.join("\n")}\n\n${hooksTable}`;
+}
+
+function formatAuditTable(audit) {
+  const orphanText = audit.orphan_count !== undefined && audit.orphan_count > 0
+    ? `, ${audit.orphan_count} orphan`
+    : "";
+  const summaryLines = [
+    `Audit Status: ${audit.healthy ? "HEALTHY (0 issues)" : `WARNING (${audit.issues?.length ?? 0} issues)`}`,
+    `Total Hooks : ${audit.total_hooks ?? 0} (${audit.enabled_count ?? 0} enabled, ${audit.disabled_count ?? 0} disabled${orphanText})`,
+    `Providers   : Antigravity [${audit.provider_sync?.antigravity ?? "unknown"}], Codex [${audit.provider_sync?.codex ?? "unknown"}]`,
+  ];
+  if (audit.issues && audit.issues.length > 0) {
+    summaryLines.push("\nIssues:");
+    for (const issue of audit.issues) {
+      summaryLines.push(`  - ${issue}`);
+    }
+  }
+  const hooksTable = formatHooksTable(audit.hooks);
+  return `${summaryLines.join("\n")}\n\n${hooksTable}`;
 }
 
 function usage() {
@@ -187,9 +322,10 @@ function usage() {
     "      --summary <text> --criterion-results <json> | evaluation summary <lineage-id> | review queue",
     "  skills-catalog observed-state record <project-id> --provider <id> --inventory <file> --bindings <file>",
     "      | observed-state list [--project-id <id>] | observed-state compare <plan-id>",
-    "  skills-catalog hook list|diagnostics [--project <path>] [--event <name>]",
-    "  skills-catalog hook add --id <id> --name <name> --event <event> --handler <path> [--failure-policy open|closed] [--no-sync]",
-    "  skills-catalog hook enable|disable|remove <id> [--project <path>] [--no-sync] | hook sync | hook test --event <event>",
+    "  skills-catalog hook list|diagnostics|status|audit [--by-skill] [--skill <id>] [--project <path>] [--event <name>] [--table]",
+    "  skills-catalog hook add --id <id> --name <name> --event <event> --handler <path> [--skill <id>] [--failure-policy open|closed] [--no-sync]",
+    "  skills-catalog hook enable|disable <id>|--all|--skill <id> [--project <path>] [--no-sync]",
+    "  skills-catalog hook remove <id> [--project <path>] [--no-sync] | hook sync | hook test --event <event>",
     "  skills-catalog plan --skill <registry-skill-id>... --provider <id> --delivery-root <path>",
     "      [--registry <path>] [--project-id <id> --project-path <path> | --global] [--copy]",
     "  skills-catalog recipe export [--project <id>] [--preset <id>] [--name <text>] [--out <file>]",
@@ -202,6 +338,9 @@ function usage() {
 async function run(argv) {
   const { positional, flags } = parseArguments(argv);
   const [command, sourcePath] = positional;
+  if (!command || command === "help" || flags.help === true || flags.h === true) {
+    return usage();
+  }
   const registryRoot = path.resolve(flags.registry ?? defaultRegistryRoot());
   const catalogRoot = path.resolve(flags.catalog ?? path.join(registryRoot, "..", "catalog"));
 
@@ -1093,39 +1232,107 @@ async function run(argv) {
     const [action, targetId] = positional.slice(1);
     const {
       listHooks,
+      listHooksBySkill,
       registerHook,
       removeHook,
       updateHookStatus,
+      updateAllHooksStatus,
+      updateHooksBySkillStatus,
+      auditHooks,
       compileProviderConfigs,
       getHookDiagnostics,
       triggerHookEvent,
     } = require("./hooks-manager");
 
     const projectPath = flags.project ?? flags.path ?? process.cwd();
+    const useTable = (flags.table === true || flags.format === "table") && !flags.json && flags.format !== "json";
+
+    if (action === "help") {
+      return usage();
+    }
 
     if (!action || action === "list") {
+      const formatHookItem = (h) => ({
+        id: h.id,
+        name: h.name,
+        event: h.event,
+        enabled: h.enabled,
+        associated_skill: h.associated_skill ?? h.metadata?.associated_skill ?? null,
+        matcher: h.matcher,
+        description: h.description,
+        type: h.handler?.type,
+        target: h.target || h.handler?.target || h.handler?.command || h.handler?.url,
+        handler: h.handler,
+        timeout_ms: h.handler?.timeout_ms,
+        failure_policy: h.failure_policy ?? "open",
+        priority: h.priority ?? 100,
+        providers: h.providers ?? [],
+      });
+
+      if (flags["by-skill"]) {
+        const rawSkill = flags.skill;
+        const targetSkills = rawSkill ? (Array.isArray(rawSkill) ? rawSkill : [rawSkill]) : undefined;
+        const grouped = listHooksBySkill({ projectPath, eventName: flags.event, skillId: targetSkills });
+        const data = {
+          by_skill: Object.fromEntries(
+            Object.entries(grouped.by_skill).map(([skill, hooks]) => [
+              skill,
+              hooks.map(formatHookItem),
+            ])
+          ),
+          unassociated: grouped.unassociated.map(formatHookItem),
+          total_hooks: grouped.total_hooks,
+        };
+        if (useTable) return formatHooksBySkillTable(data);
+        return data;
+      }
+
+      const rawSkill = flags.skill;
+      if (rawSkill !== undefined) {
+        if (rawSkill === true) throw new Error("hook list requires --skill <id>");
+        const targetSkills = (Array.isArray(rawSkill) ? rawSkill : [rawSkill])
+          .map((s) => String(s).trim())
+          .filter((s) => s && s !== "true");
+        if (targetSkills.length === 0) throw new Error("hook list requires --skill <id>");
+        const allMatched = [];
+        for (const skillId of targetSkills) {
+          const hooks = listHooks({ projectPath, eventName: flags.event, skillId });
+          allMatched.push(...hooks);
+        }
+        const seenIds = new Set();
+        const deduped = allMatched.filter((h) => {
+          if (seenIds.has(h.id)) return false;
+          seenIds.add(h.id);
+          return true;
+        });
+        const data = {
+          skill: targetSkills.length === 1 ? targetSkills[0] : targetSkills,
+          hooks_count: deduped.length,
+          hooks: deduped.map(formatHookItem),
+        };
+        if (useTable) return formatHooksTable(data.hooks);
+        return data;
+      }
+
       const hooks = listHooks({ projectPath, eventName: flags.event });
-      return {
+      const data = {
         hooks_count: hooks.length,
-        hooks: hooks.map((h) => ({
-          id: h.id,
-          name: h.name,
-          event: h.event,
-          enabled: h.enabled,
-          matcher: h.matcher,
-          description: h.description,
-          type: h.handler.type,
-          target: h.handler.target || h.handler.command,
-          timeout_ms: h.handler.timeout_ms,
-          failure_policy: h.failure_policy ?? "open",
-          priority: h.priority ?? 100,
-          providers: h.providers ?? [],
-        })),
+        hooks: hooks.map(formatHookItem),
       };
+      if (useTable) return formatHooksTable(data.hooks);
+      return data;
     }
 
     if (action === "diagnostics" || action === "status") {
-      return getHookDiagnostics({ projectPath });
+      const diagnostics = getHookDiagnostics({ projectPath });
+      if (useTable) return formatDiagnosticsTable(diagnostics);
+      return diagnostics;
+    }
+
+    if (action === "audit") {
+      const audit = auditHooks({ projectPath });
+      if (useTable) return formatAuditTable(audit);
+      return audit;
     }
 
     if (action === "add" || action === "register") {
@@ -1135,6 +1342,9 @@ async function run(argv) {
       const handlerType = flags.type ?? (flags.command ? "command" : "script");
       const target = flags.target ?? flags.handler ?? flags.script;
       const cmd = flags.command;
+      const associatedSkill = flags.skill
+        ? (Array.isArray(flags.skill) ? flags.skill[0] : flags.skill)
+        : (flags["associated-skill"] ?? undefined);
 
       if (!id) throw new Error("hook add requires --id <id>");
       if (!target && !cmd && !flags.url) throw new Error("hook add requires --handler <path>, --command <cmd>, or --url <webhook>");
@@ -1148,6 +1358,7 @@ async function run(argv) {
           description: flags.desc ?? flags.description ?? null,
           enabled: flags.disabled !== true,
           matcher: flags.matcher ?? null,
+          associated_skill: associatedSkill,
           handler: {
             type: handlerType,
             target: target ?? undefined,
@@ -1170,15 +1381,105 @@ async function run(argv) {
     }
 
     if (action === "enable") {
+      if (flags.skill !== undefined) {
+        if (flags.skill === true) throw new Error("hook enable requires --skill <id>");
+        const rawSkills = Array.isArray(flags.skill) ? flags.skill : [flags.skill];
+        const skillIds = [...new Set(rawSkills.map((s) => String(s).trim()).filter((s) => s && s !== "true"))];
+        if (skillIds.length === 0) throw new Error("hook enable requires --skill <id>");
+        let total = 0;
+        let changed = 0;
+        const allHooks = [];
+        const seenHookIds = new Set();
+        for (const skillId of skillIds) {
+          const res = updateHooksBySkillStatus({ projectPath, skillId, enabled: true, sync: false });
+          total += res.total;
+          changed += res.changed;
+          for (const hook of res.hooks) {
+            if (!seenHookIds.has(hook.id)) {
+              seenHookIds.add(hook.id);
+              allHooks.push(hook);
+            }
+          }
+        }
+        if (flags["no-sync"] !== true) {
+          compileProviderConfigs({ projectPath });
+        }
+        const res = {
+          ok: true,
+          skill: skillIds.length === 1 ? skillIds[0] : skillIds,
+          total,
+          changed,
+          enabled: true,
+          hooks: allHooks,
+        };
+        if (useTable) {
+          return res.hooks.length === 0
+            ? `No hooks found for skill '${skillIds.join(", ")}'.\n`
+            : formatHooksTable(res.hooks);
+        }
+        return res;
+      }
+      if (flags.all || targetId === "all") {
+        const res = updateAllHooksStatus({ projectPath, enabled: true, sync: flags["no-sync"] !== true });
+        if (useTable) return formatHooksTable(res.hooks);
+        return res;
+      }
       const id = flags.id ?? targetId;
-      if (!id) throw new Error("hook enable requires <id>");
-      return updateHookStatus({ projectPath, hookId: id, enabled: true, sync: flags["no-sync"] !== true });
+      if (!id) throw new Error("hook enable requires <id>, --skill <id>, or --all");
+      const res = updateHookStatus({ projectPath, hookId: id, enabled: true, sync: flags["no-sync"] !== true });
+      if (useTable) return formatHooksTable([res]);
+      return res;
     }
 
     if (action === "disable") {
+      if (flags.skill !== undefined) {
+        if (flags.skill === true) throw new Error("hook disable requires --skill <id>");
+        const rawSkills = Array.isArray(flags.skill) ? flags.skill : [flags.skill];
+        const skillIds = [...new Set(rawSkills.map((s) => String(s).trim()).filter((s) => s && s !== "true"))];
+        if (skillIds.length === 0) throw new Error("hook disable requires --skill <id>");
+        let total = 0;
+        let changed = 0;
+        const allHooks = [];
+        const seenHookIds = new Set();
+        for (const skillId of skillIds) {
+          const res = updateHooksBySkillStatus({ projectPath, skillId, enabled: false, sync: false });
+          total += res.total;
+          changed += res.changed;
+          for (const hook of res.hooks) {
+            if (!seenHookIds.has(hook.id)) {
+              seenHookIds.add(hook.id);
+              allHooks.push(hook);
+            }
+          }
+        }
+        if (flags["no-sync"] !== true) {
+          compileProviderConfigs({ projectPath });
+        }
+        const res = {
+          ok: true,
+          skill: skillIds.length === 1 ? skillIds[0] : skillIds,
+          total,
+          changed,
+          enabled: false,
+          hooks: allHooks,
+        };
+        if (useTable) {
+          return res.hooks.length === 0
+            ? `No hooks found for skill '${skillIds.join(", ")}'.\n`
+            : formatHooksTable(res.hooks);
+        }
+        return res;
+      }
+      if (flags.all || targetId === "all") {
+        const res = updateAllHooksStatus({ projectPath, enabled: false, sync: flags["no-sync"] !== true });
+        if (useTable) return formatHooksTable(res.hooks);
+        return res;
+      }
       const id = flags.id ?? targetId;
-      if (!id) throw new Error("hook disable requires <id>");
-      return updateHookStatus({ projectPath, hookId: id, enabled: false, sync: flags["no-sync"] !== true });
+      if (!id) throw new Error("hook disable requires <id>, --skill <id>, or --all");
+      const res = updateHookStatus({ projectPath, hookId: id, enabled: false, sync: flags["no-sync"] !== true });
+      if (useTable) return formatHooksTable([res]);
+      return res;
     }
 
     if (action === "sync") {
@@ -1449,7 +1750,11 @@ async function run(argv) {
 async function main(cliArguments = process.argv.slice(2), { execute = run, stdout = process.stdout, stderr = process.stderr } = {}) {
   try {
     const result = await execute(cliArguments);
-    stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    if (typeof result === "string") {
+      stdout.write(result.endsWith("\n") ? result : `${result}\n`);
+    } else {
+      stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    }
     const failedReport = result?.status === "failed"
       || result?.report?.status === "failed"
       || result?.delivery?.report?.status === "failed";

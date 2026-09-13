@@ -1,6 +1,6 @@
 ---
 name: baseline-vertical-resolution-behavior
-description: Execute problem resolution for one canonical topic from a published vertical context: reproduce and measure, test hypotheses, choose an owned resolution location, design and apply allowed changes, validate evidence, and produce closure or reopen outputs. Use for implementation and verified problem solving.
+description: "Execute problem resolution for one canonical topic from a published vertical context: reproduce and measure, test hypotheses, choose an owned resolution location, design and apply allowed changes, validate evidence, and produce closure or reopen outputs. Use for implementation and verified problem solving."
 ---
 
 # Vertical Resolution Behavior

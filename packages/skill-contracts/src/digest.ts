@@ -5,6 +5,10 @@ import * as path from "node:path";
 
 export const DEFAULT_IGNORED_DIRECTORIES: ReadonlySet<string> = new Set([
   ".git",
+  ".agents",
+  ".codex",
+  ".claude",
+  ".skills-platform",
   "node_modules",
   "dist",
   "target",

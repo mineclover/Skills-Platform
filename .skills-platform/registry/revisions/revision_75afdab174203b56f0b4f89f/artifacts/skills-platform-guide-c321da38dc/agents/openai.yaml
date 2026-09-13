@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skills Platform Guide"
+  short_description: "스킬 플랫폼의 설치·사용 확인·업데이트를 일관되게 안내"
+  default_prompt: "Use $skills-platform-guide to choose a skill installation workflow for this project and verify it is usable."

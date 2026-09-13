@@ -478,6 +478,24 @@ async function linkProjectSkill({
   };
   await fs.writeFile(sidecarPath, JSON.stringify(sidecarRecord, null, 2) + "\n", "utf8");
 
+  const projectHooksPath = project.project_path || path.resolve(project.delivery_root, "..");
+  let companionHooks = [];
+  try {
+    const { discoverCompanionHooks, registerHook, compileProviderConfigs } = require("./hooks-manager");
+    companionHooks = discoverCompanionHooks({
+      skillPath: targetSourcePath,
+      skillName,
+      projectPath: projectHooksPath,
+      deliveryPath,
+    });
+    if (companionHooks.length > 0) {
+      for (const hook of companionHooks) {
+        registerHook({ projectPath: projectHooksPath, hook, sync: false });
+      }
+      compileProviderConfigs({ projectPath: projectHooksPath });
+    }
+  } catch {}
+
   return {
     linked: true,
     project_id: projectId,
@@ -486,6 +504,62 @@ async function linkProjectSkill({
     pinned_version: version ?? null,
     canonical_path: targetSourcePath,
     delivery_path: deliveryPath,
+    companion_hooks: companionHooks,
+  };
+}
+
+async function unlinkProjectSkill({
+  catalogRoot,
+  projectId,
+  skillName,
+}) {
+  const project = await getProject(catalogRoot, projectId);
+  if (!project.delivery_root) {
+    throw new Error(`Project ${projectId} does not have a delivery_root defined`);
+  }
+
+  const deliveryPath = path.join(project.delivery_root, skillName);
+  const sidecarPath = `${deliveryPath}.skills-platform-link-ownership.json`;
+
+  let unlinked = false;
+  try {
+    const lst = await fs.lstat(deliveryPath);
+    if (lst.isSymbolicLink()) {
+      await fs.unlink(deliveryPath);
+      unlinked = true;
+    } else if (lst.isDirectory()) {
+      await fs.rm(deliveryPath, { recursive: true, force: true });
+      unlinked = true;
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  try {
+    await fs.unlink(sidecarPath);
+  } catch {}
+
+  const projectHooksPath = project.project_path || path.resolve(project.delivery_root, "..");
+  let hooksDisabled = 0;
+  try {
+    const { updateHooksBySkillStatus, compileProviderConfigs } = require("./hooks-manager");
+    const result = updateHooksBySkillStatus({
+      projectPath: projectHooksPath,
+      skillId: skillName,
+      enabled: false,
+      sync: false,
+    });
+    hooksDisabled = result.changed;
+    if (hooksDisabled > 0) {
+      compileProviderConfigs({ projectPath: projectHooksPath });
+    }
+  } catch {}
+
+  return {
+    unlinked,
+    project_id: projectId,
+    skill_name: skillName,
+    hooks_disabled: hooksDisabled,
   };
 }
 
@@ -551,10 +625,12 @@ module.exports = {
   buildProjectSystemPrompt,
   buildSystemPrompt,
   createProjectPlan,
+  discoverCompanionHooks: require("./hooks-manager").discoverCompanionHooks,
   exportActivationPlan,
   getProjectSkillStatus,
   linkProjectSkill,
   resolveProjectEffectiveSet,
   resolveProjectSelection,
   resolveSkillPackageSource,
+  unlinkProjectSkill,
 };

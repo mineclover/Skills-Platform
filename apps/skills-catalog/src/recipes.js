@@ -231,7 +231,8 @@ function selectDeclaredProject(recipeProjects, providerId) {
 }
 
 function recipeSkillMatchesPresetEntry(skill, entry) {
-  return skill.name === entry.skill_name
+  const entrySkillName = entry.skill_name || (typeof entry.skill_id === "string" ? entry.skill_id.replace(/^skill:/, "") : undefined);
+  return skill.name === entrySkillName
     && (entry.source_relative_path === undefined || skill.source_relative_path === entry.source_relative_path)
     && (entry.artifact_type === undefined || (skill.artifact_type ?? "skill") === entry.artifact_type)
     && (entry.source_id === undefined || skill.source_id === entry.source_id)
@@ -380,13 +381,22 @@ async function applyRecipe({
   for (const specification of recipe.skills ?? []) {
     const recipeSource = (recipe.sources ?? []).find((source) => source.source_id === specification.source_id);
     if (!recipeSource) throw new Error(`Recipe skill ${specification.name} references an undeclared source ${specification.source_id}`);
-    const candidates = allLocalSkills.filter((skill) => (
+    let candidates = allLocalSkills.filter((skill) => (
       skill.skill_name === specification.name
       && skill.content_digest === specification.content_digest
       && skill.source_relative_path === specification.source_relative_path
       && (skill.artifact_type ?? "skill") === (specification.artifact_type ?? "skill")
       && candidateMatchesRecipeSource({ skill, recipeSource, registry: registryState })
     ));
+    const isExplicitHexDigest = typeof specification.content_digest === "string" && /^[0-9a-f]{64}$/i.test(specification.content_digest);
+    if (!isExplicitHexDigest && candidates.length === 0 && recipeSource?.type === "local") {
+      candidates = allLocalSkills.filter((skill) => (
+        skill.skill_name === specification.name
+        && skill.source_relative_path === specification.source_relative_path
+        && (skill.artifact_type ?? "skill") === (specification.artifact_type ?? "skill")
+        && candidateMatchesRecipeSource({ skill, recipeSource, registry: registryState })
+      ));
+    }
     if (candidates.length !== 1) {
       throw new Error(`Recipe skill ${specification.name} cannot be resolved to one immutable registry revision (${specification.content_digest})`);
     }
@@ -513,14 +523,15 @@ async function applyRecipe({
   const { createProject, assignPreset, setProjectReviewPolicy } = require("./catalog-state");
 
   let deliveryResult = null;
+  let project = null;
+  let declaredProject = null;
   if (projectPath) {
     const resolvedPath = path.resolve(projectPath);
-    const declaredProject = selectDeclaredProject(recipe.projects, providerId);
+    declaredProject = selectDeclaredProject(recipe.projects, providerId);
     const resolvedProvider = declaredProject?.provider_id ?? providerId ?? "codex";
     const projectId = declaredProject?.project_id
       ?? path.basename(resolvedPath).toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-    let project = null;
     try {
       project = await getProject(catalogRoot, projectId);
     } catch (error) {
@@ -625,25 +636,69 @@ async function applyRecipe({
 
   const hookResults = [];
   let hooksSyncResult = null;
-  if (Array.isArray(recipe.hooks) && recipe.hooks.length > 0
-    && !(confirm && deliveryResult && !deliveryResult.applied)) {
+  if (!(confirm && deliveryResult && !deliveryResult.applied)) {
     const hooksTarget = projectPath
       ? path.resolve(projectPath)
       : catalogRoot
         ? path.resolve(catalogRoot, "..")
         : process.cwd();
-    const { registerHook, compileProviderConfigs } = require("./hooks-manager");
-    for (const hook of recipe.hooks) {
-      const registered = registerHook({ projectPath: hooksTarget, hook, sync: false });
-      hookResults.push({
-        id: registered.id,
-        name: registered.name,
-        event: registered.event,
-        enabled: registered.enabled,
-        priority: registered.priority,
-      });
+    const { registerHook, compileProviderConfigs, discoverCompanionHooks } = require("./hooks-manager");
+
+    if (Array.isArray(recipe.hooks) && recipe.hooks.length > 0) {
+      for (const hook of recipe.hooks) {
+        const registered = registerHook({ projectPath: hooksTarget, hook, sync: false });
+        hookResults.push({
+          id: registered.id,
+          name: registered.name,
+          event: registered.event,
+          enabled: registered.enabled,
+          priority: registered.priority,
+        });
+      }
     }
-    hooksSyncResult = compileProviderConfigs({ projectPath: hooksTarget });
+
+    if (Array.isArray(recipe.skills) && recipe.skills.length > 0) {
+      const { resolveSkillPackageSource } = require("./catalog-workflows");
+      for (const skillSpec of recipe.skills) {
+        const skillName = skillSpec.name || skillSpec.skill_name || (typeof skillSpec.skill_id === "string" ? skillSpec.skill_id.replace(/^skill:/, "") : null);
+        if (!skillName) continue;
+        let skillSource = null;
+        try {
+          skillSource = await resolveSkillPackageSource({ skillName });
+        } catch {}
+        if (!skillSource && resolvedRecipeSkills.has(skillSpec)) {
+          skillSource = resolvedRecipeSkills.get(skillSpec)?.canonical_path;
+        }
+        if (skillSource) {
+          const effectiveDeliveryRoot = project?.delivery_root
+            || (declaredProject?.delivery_root_relative ? path.resolve(hooksTarget, declaredProject.delivery_root_relative) : null)
+            || path.join(hooksTarget, ".agents", "skills");
+          const deliveryPath = path.join(effectiveDeliveryRoot, skillName);
+          const companionHooks = discoverCompanionHooks({
+            skillPath: skillSource,
+            skillName,
+            projectPath: hooksTarget,
+            deliveryPath,
+          });
+          for (const hook of companionHooks) {
+            const registered = registerHook({ projectPath: hooksTarget, hook, sync: false });
+            if (!hookResults.some((h) => h.id === registered.id)) {
+              hookResults.push({
+                id: registered.id,
+                name: registered.name,
+                event: registered.event,
+                enabled: registered.enabled,
+                priority: registered.priority,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    if (hookResults.length > 0) {
+      hooksSyncResult = compileProviderConfigs({ projectPath: hooksTarget });
+    }
   }
 
   return {

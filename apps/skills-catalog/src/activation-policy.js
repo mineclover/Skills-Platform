@@ -110,12 +110,53 @@ async function applyCatalogActivationPlan({ catalogRoot, registryRoot, projectId
     const policy = { catalogRoot, registryRoot, projectId, plan, assignments };
     await assertActivationPolicy(policy);
     const deliveryAdapter = adapter ?? require("@skills-platform/skills-manager-adapter");
-    return deliveryAdapter.applyActivationPlan(plan, {
+    const report = await deliveryAdapter.applyActivationPlan(plan, {
       confirm: true,
       onProgress,
       // Re-read after the adapter's own preview and before every operation.
       beforeOperation: () => assertActivationPolicy(policy),
     });
+    if (report?.status === "completed" && plan.target?.project_path && Array.isArray(plan.operations)) {
+      const fsSync = require("node:fs");
+      try {
+        const { updateHooksBySkillStatus, discoverCompanionHooks, registerHook, compileProviderConfigs } = require("./hooks-manager");
+        let anyChanged = false;
+        for (const op of plan.operations) {
+          if (op.desired_state === "enabled") {
+            const skillSourcePath = op.canonical_path || op.source_path;
+            if (skillSourcePath) {
+              const discovered = discoverCompanionHooks({
+                skillPath: skillSourcePath,
+                skillName: op.skill_name,
+                projectPath: plan.target.project_path,
+                deliveryPath: op.target_path,
+              });
+              for (const hook of discovered) {
+                registerHook({ projectPath: plan.target.project_path, hook, sync: false });
+                anyChanged = true;
+              }
+            }
+          }
+          const hooksManifestPath = path.join(plan.target.project_path, ".skills-platform", "hooks", "manifest.json");
+          if (fsSync.existsSync(hooksManifestPath) && (op.desired_state === "enabled" || op.desired_state === "disabled")) {
+            const skillIds = [op.skill_name, op.lineage_id, op.registry_skill_id].filter(Boolean);
+            for (const sId of skillIds) {
+              const res = updateHooksBySkillStatus({
+                projectPath: plan.target.project_path,
+                skillId: sId,
+                enabled: op.desired_state === "enabled",
+                sync: false,
+              });
+              if (res.changed > 0) anyChanged = true;
+            }
+          }
+        }
+        if (anyChanged) {
+          compileProviderConfigs({ projectPath: plan.target.project_path });
+        }
+      } catch {}
+    }
+    return report;
   });
 }
 

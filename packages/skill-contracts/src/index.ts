@@ -863,7 +863,8 @@ export function validateSkillRecipe(recipe: unknown): ValidationResult {
             issues.push({ field: entryPrefix, message: "must be an object" });
             return;
           }
-          requiredString(entry.skill_name, `${entryPrefix}.skill_name`, issues);
+          const effectiveSkillName = entry.skill_name ?? (typeof entry.skill_id === "string" ? entry.skill_id.replace(/^skill:/, "") : undefined);
+          requiredString(effectiveSkillName, `${entryPrefix}.skill_name`, issues);
           for (const field of ["source_id", "content_digest"]) {
             if (entry[field] !== undefined) requiredString(entry[field], `${entryPrefix}.${field}`, issues);
           }
@@ -1086,8 +1087,33 @@ export function validateHookDefinition(hook: unknown): ValidationResult {
     }
   }
 
-  if (h.metadata !== undefined && (!h.metadata || typeof h.metadata !== "object" || Array.isArray(h.metadata))) {
-    issues.push({ field: "metadata", message: "must be an object" });
+  if (h.associated_skill !== undefined && h.associated_skill !== null) {
+    if (typeof h.associated_skill !== "string" || h.associated_skill.trim() === "") {
+      issues.push({ field: "associated_skill", message: "must be a non-empty string or null" });
+    }
+  }
+
+  if (h.metadata !== undefined) {
+    if (!h.metadata || typeof h.metadata !== "object" || Array.isArray(h.metadata)) {
+      issues.push({ field: "metadata", message: "must be an object" });
+    } else if (h.metadata.associated_skill !== undefined && h.metadata.associated_skill !== null) {
+      if (typeof h.metadata.associated_skill !== "string" || h.metadata.associated_skill.trim() === "") {
+        issues.push({ field: "metadata.associated_skill", message: "must be a non-empty string or null" });
+      }
+    }
+  }
+
+  const hasDirectSkill = h.associated_skill !== undefined;
+  const hasMetaSkill = h.metadata && typeof h.metadata === "object" && !Array.isArray(h.metadata) && h.metadata.associated_skill !== undefined;
+  if (hasDirectSkill && hasMetaSkill) {
+    const directVal = typeof h.associated_skill === "string" ? h.associated_skill.trim() : h.associated_skill;
+    const metaVal = typeof h.metadata.associated_skill === "string" ? h.metadata.associated_skill.trim() : h.metadata.associated_skill;
+    if (directVal !== metaVal) {
+      issues.push({
+        field: "associated_skill",
+        message: `associated_skill ('${h.associated_skill}') must match metadata.associated_skill ('${h.metadata.associated_skill}')`,
+      });
+    }
   }
 
   const handler = h.handler;
@@ -1304,6 +1330,13 @@ export function createCodexHooksConfig(config: CodexHooksConfig): CodexHooksConf
 }
 
 export function createHookDefinition(hook: Partial<HookDefinition> & { id: string; name: string; event: string; handler: HookHandler }): HookDefinition {
+  const associatedSkill = hook.associated_skill !== undefined
+    ? hook.associated_skill
+    : (hook.metadata?.associated_skill ?? null);
+  const metadata: Record<string, any> = hook.metadata === undefined ? {} : { ...hook.metadata };
+  if (associatedSkill && metadata.associated_skill === undefined) {
+    metadata.associated_skill = associatedSkill;
+  }
   const result: HookDefinition = {
     id: hook.id,
     name: hook.name,
@@ -1319,7 +1352,8 @@ export function createHookDefinition(hook: Partial<HookDefinition> & { id: strin
     priority: hook.priority === undefined ? 100 : hook.priority,
     providers: hook.providers === undefined ? ["antigravity", "claude", "codex"] : hook.providers,
     failure_policy: hook.failure_policy === undefined ? "open" : hook.failure_policy,
-    metadata: hook.metadata === undefined ? {} : hook.metadata,
+    associated_skill: associatedSkill,
+    metadata,
   };
   const validation = validateHookDefinition(result);
   if (!validation.valid) {

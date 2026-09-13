@@ -83,6 +83,36 @@ function evaluateContextBudgetGuard(payload, options = {}) {
       payload.message,
     ];
 
+    const inspectNested = (nested) => {
+      if (!nested || typeof nested !== "object") return;
+      candidates.push(
+        nested.CodeContent,
+        nested.ReplacementContent,
+        nested.TargetContent,
+        nested.CommandLine,
+        nested.command,
+        nested.content,
+        nested.text,
+        nested.data,
+        nested.raw,
+        nested.Message,
+        nested.message
+      );
+      if (nested.toolCall && typeof nested.toolCall === "object") inspectNested(nested.toolCall);
+      if (nested.tool_call && typeof nested.tool_call === "object") inspectNested(nested.tool_call);
+      for (const k of ["args", "parameters", "arguments", "tool_input", "toolInput", "input"]) {
+        if (nested[k] && typeof nested[k] === "object") {
+          inspectNested(nested[k]);
+        } else if (typeof nested[k] === "string") {
+          try {
+            const parsed = JSON.parse(nested[k]);
+            if (parsed && typeof parsed === "object") inspectNested(parsed);
+          } catch {}
+        }
+      }
+    };
+    inspectNested(payload);
+
     for (const item of candidates) {
       if (typeof item === "string") {
         const m = measureContent(item);
@@ -142,9 +172,9 @@ function parseCliArgs(argv = process.argv.slice(2)) {
 /**
  * Reads all data from stdin with short timeout.
  */
-function readAllStdin(timeoutMs = 15) {
+function readAllStdin(timeoutMs = 3000) {
   return new Promise((resolve) => {
-    if (process.stdin.isTTY || process.stdin.readableEnded || !process.stdin.readable) {
+    if (process.stdin.isTTY || process.stdin.readableEnded) {
       return resolve("");
     }
     let data = "";
@@ -158,6 +188,7 @@ function readAllStdin(timeoutMs = 15) {
     }
 
     const timer = setTimeout(finish, timeoutMs);
+    if (timer.unref) timer.unref();
     process.stdin.setEncoding("utf8");
     process.stdin.on("data", (chunk) => {
       data += chunk;
@@ -203,37 +234,100 @@ function resolvePayload(cliArgs = {}, env = process.env, stdinData = "") {
 }
 
 /**
+ * Checks if current execution is in Antigravity mode.
+ */
+function isAntigravityMode(payload = {}, env = process.env, cliArgs = {}, rawStdin = "") {
+  if (env.HOOK_RUNTIME === "antigravity" || cliArgs.runtime === "antigravity") {
+    return true;
+  }
+  const p = payload || {};
+  if (
+    p.conversationId ||
+    p.conversation_id ||
+    p.workspacePaths ||
+    p.workspace_paths ||
+    p.transcriptPath ||
+    p.transcript_path ||
+    p.artifactDirectoryPath ||
+    p.artifact_directory_path ||
+    p.toolName ||
+    p.tool_name ||
+    p.modelName ||
+    p.model_name ||
+    p.stepIdx !== undefined ||
+    p.step_idx !== undefined ||
+    p.toolCall ||
+    p.tool_call ||
+    p.permissionOverrides ||
+    p.permission_overrides
+  ) {
+    return true;
+  }
+  if (typeof rawStdin === "string" && rawStdin) {
+    if (/(?:"conversation_id"|"conversationId"|"toolCall"|"tool_call"|"workspacePaths"|"workspace_paths"|"stepIdx"|"step_idx")/.test(rawStdin)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * CLI Main execution
  */
-async function main(argv = process.argv.slice(2)) {
-  const cliArgs = parseCliArgs(argv);
-  const stdinData = await readAllStdin();
-  const payload = resolvePayload(cliArgs, process.env, stdinData);
+function formatGuardStdout(result, payload = {}, env = process.env, cliArgs = {}, rawStdin = "") {
+  let effectivePayload = payload;
+  if (!effectivePayload || Object.keys(effectivePayload).length === 0) {
+    if (env.HOOK_PAYLOAD) {
+      try {
+        effectivePayload = JSON.parse(env.HOOK_PAYLOAD);
+      } catch {}
+    }
+  }
+  const isAntigravity = isAntigravityMode(effectivePayload, env, cliArgs, rawStdin);
+  if (isAntigravity) {
+    const isBlocked = result.allow === false || result.decision === "block" || result.decision === "deny";
+    if (isBlocked) {
+      const reason = [
+        result.reason || "Context budget limit exceeded",
+        result.self_correct_hint ? `Hint: ${result.self_correct_hint}` : null,
+      ].filter(Boolean).join(" ");
+      return { decision: "deny", reason };
+    }
+    return { decision: "allow" };
+  }
+  return result;
+}
 
-  const thresholdKb = cliArgs.threshold ? parseInt(cliArgs.threshold, 10) : (process.env.CONTEXT_BUDGET_THRESHOLD_KB ? parseInt(process.env.CONTEXT_BUDGET_THRESHOLD_KB, 10) : DEFAULT_THRESHOLD_KB);
+let currentPayload = {};
+let currentStdin = "";
+let currentCliArgs = {};
+
+async function main(argv = process.argv.slice(2)) {
+  currentCliArgs = parseCliArgs(argv);
+  currentStdin = await readAllStdin();
+  currentPayload = resolvePayload(currentCliArgs, process.env, currentStdin);
+
+  const thresholdKb = currentCliArgs.threshold ? parseInt(currentCliArgs.threshold, 10) : (process.env.CONTEXT_BUDGET_THRESHOLD_KB ? parseInt(process.env.CONTEXT_BUDGET_THRESHOLD_KB, 10) : DEFAULT_THRESHOLD_KB);
   const maxBytes = thresholdKb * 1024;
   const maxChars = thresholdKb * 1000;
 
-  const result = evaluateContextBudgetGuard(payload, { thresholdKb, maxBytes, maxChars });
-  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  const result = evaluateContextBudgetGuard(currentPayload, { thresholdKb, maxBytes, maxChars });
+  const output = formatGuardStdout(result, currentPayload, process.env, currentCliArgs, currentStdin);
+  process.stdout.write(JSON.stringify(output, null, 2) + "\n");
   process.exit(0);
 }
 
 if (require.main === module) {
   main().catch((err) => {
-    process.stdout.write(
-      JSON.stringify(
-        {
-          allow: false,
-          decision: "block",
-          reason: `Context budget guard internal failure: ${err?.message}`,
-          self_correct_hint: "Verify payload size and format.",
-          violation_type: "context_budget_error",
-        },
-        null,
-        2
-      ) + "\n"
-    );
+    const errorResult = {
+      allow: false,
+      decision: "deny",
+      reason: `Context budget guard internal failure: ${err?.message}`,
+      self_correct_hint: "Verify file and command contents.",
+      violation_type: "context_budget_error",
+    };
+    const output = formatGuardStdout(errorResult, currentPayload, process.env, currentCliArgs, currentStdin);
+    process.stdout.write(JSON.stringify(output, null, 2) + "\n");
     process.exit(0);
   });
 }

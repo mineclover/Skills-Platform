@@ -77,6 +77,27 @@
       "locator": "./skills-packages/community-codex/diagnosing-bugs",
       "requested_ref": null,
       "created_at": "2026-09-07T22:54:22.670Z"
+    },
+    {
+      "id": "source_local_9de659f7de382e46",
+      "kind": "local",
+      "locator": "/Users/junwoobang/workflow/Skills-Platform/skills-packages/platform-core/workflow-feedback-optimizer",
+      "requested_ref": null,
+      "created_at": "2026-09-13T03:24:34.467Z"
+    },
+    {
+      "id": "source_local_e98f324f1cc91585",
+      "kind": "local",
+      "locator": "/Users/junwoobang/workflow/Skills-Platform/skills-packages/platform-core/skills-platform-guide",
+      "requested_ref": null,
+      "created_at": "2026-09-13T03:28:00.928Z"
+    },
+    {
+      "id": "source_local_ac4bbce16f32422a",
+      "kind": "local",
+      "locator": "/Users/junwoobang/workflow/Skills-Platform/skills-packages/platform-core/skill-authoring-standard",
+      "requested_ref": null,
+      "created_at": "2026-09-13T03:28:11.022Z"
     }
   ],
   "revisions": [
@@ -206,6 +227,30 @@
       "resolved_revision": "be1d1bea85f3dda8833095b2eba0805d93ed4670fbd91078ae6e78b96db982d5",
       "content_digest": "be1d1bea85f3dda8833095b2eba0805d93ed4670fbd91078ae6e78b96db982d5",
       "fetched_at": "2026-09-08T01:01:59.441Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_a35b7b3f626088f69632a355",
+      "source_id": "source_local_9de659f7de382e46",
+      "resolved_revision": "54576f393d8e3617cdb44d57bfea1a92af28067bb7257980a175388f6337f4bc",
+      "content_digest": "54576f393d8e3617cdb44d57bfea1a92af28067bb7257980a175388f6337f4bc",
+      "fetched_at": "2026-09-13T03:24:34.467Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_75afdab174203b56f0b4f89f",
+      "source_id": "source_local_e98f324f1cc91585",
+      "resolved_revision": "c321da38dc583509745da411a7a7538294c29f3b301661c93f5e450abc3b9f66",
+      "content_digest": "c321da38dc583509745da411a7a7538294c29f3b301661c93f5e450abc3b9f66",
+      "fetched_at": "2026-09-13T03:28:00.928Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_5e8094b57bb31730d7bf9c8a",
+      "source_id": "source_local_ac4bbce16f32422a",
+      "resolved_revision": "e1131227f04ef4162e9a4b1180f33512fe252c0df26a6ccd96d8835351b6bfdd",
+      "content_digest": "e1131227f04ef4162e9a4b1180f33512fe252c0df26a6ccd96d8835351b6bfdd",
+      "fetched_at": "2026-09-13T03:28:11.022Z",
       "review_state": "imported"
     }
   ],
@@ -1016,6 +1061,36 @@
       "source_relative_path": ".",
       "skill_name": "diagnosing-bugs",
       "created_at": "2026-09-07T22:54:22.670Z"
+    },
+    {
+      "id": "lineage_e7b5faeda1e14884940c",
+      "source_id": "source_local_9de659f7de382e46",
+      "artifact_key": "source_local_9de659f7de382e46:.",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "skill_name": "workflow-feedback-optimizer",
+      "created_at": "2026-09-13T03:24:34.467Z"
+    },
+    {
+      "id": "lineage_897a6dec49116469cb3e",
+      "source_id": "source_local_e98f324f1cc91585",
+      "artifact_key": "source_local_e98f324f1cc91585:.",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "skill_name": "skills-platform-guide",
+      "created_at": "2026-09-13T03:28:00.928Z"
+    },
+    {
+      "id": "lineage_9d81a8d1c195c074a056",
+      "source_id": "source_local_ac4bbce16f32422a",
+      "artifact_key": "source_local_ac4bbce16f32422a:.",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "skill_name": "skill-authoring-standard",
+      "created_at": "2026-09-13T03:28:11.022Z"
     }
   ],
   "skills": [
@@ -2599,6 +2674,90 @@
       "canonical_path": "revisions/revision_00e1070ca2c0448daf5eb2b5/artifacts/skills-platform-guide-be1d1bea85",
       "canonical_relative_path": "revisions/revision_00e1070ca2c0448daf5eb2b5/artifacts/skills-platform-guide-be1d1bea85",
       "imported_at": "2026-09-08T01:01:59.441Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_0f6f05a412fed27c22a7",
+      "source_id": "source_local_9de659f7de382e46",
+      "source_revision_id": "revision_a35b7b3f626088f69632a355",
+      "skill_name": "workflow-feedback-optimizer",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_9de659f7de382e46:.",
+      "lineage_id": "lineage_e7b5faeda1e14884940c",
+      "description": "워크플로우 구축 절차와 현재 작업 단계를 먼저 인식하고, 해당 절차에 연결되어 파이프라인을 설계·검토·개선한다. 단계별 산출물·정본·수정 권한·호출 목적·완료 조건·복귀 위치를 확인한 뒤, TextGrad에서 착안한 텍스트 피드백으로 실패를 수정 위치와 담당 구축 단계에 연결한다. 새 파이프라인 구축, 구축 중 단계 검토, 실행 실패 개선, 기존 작업 재개에 사용한다. 모델 가중치 학습이나 실행기 제공에는 사용하지 않는다.",
+      "manifest": {
+        "declared_name": "workflow-feedback-optimizer",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "54576f393d8e3617cdb44d57bfea1a92af28067bb7257980a175388f6337f4bc",
+      "canonical_path": "revisions/revision_a35b7b3f626088f69632a355/artifacts/workflow-feedback-optimizer-54576f393d",
+      "canonical_relative_path": "revisions/revision_a35b7b3f626088f69632a355/artifacts/workflow-feedback-optimizer-54576f393d",
+      "imported_at": "2026-09-13T03:24:34.467Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_31466cea0c36354abcc9",
+      "source_id": "source_local_e98f324f1cc91585",
+      "source_revision_id": "revision_75afdab174203b56f0b4f89f",
+      "skill_name": "skills-platform-guide",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_e98f324f1cc91585:.",
+      "lineage_id": "lineage_897a6dec49116469cb3e",
+      "description": "Skills Platform의 목적과 사용 흐름을 안내하고 스킬 탐색, 설치, 사용 확인, 업데이트, 제거를 지원한다. 플랫폼 온보딩, 추천 스킬셋과 검토 정책, Vercel Skills CLI 설치와 Catalog 관리 방식 선택, 설치된 스킬의 경로·중복·인식 문제를 다룰 때 사용한다. 시스템 훅과 가드 제어, 컴패니언 훅 연동, Antigravity Protojson 규격 검증도 안내한다.",
+      "manifest": {
+        "declared_name": "skills-platform-guide",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "c321da38dc583509745da411a7a7538294c29f3b301661c93f5e450abc3b9f66",
+      "canonical_path": "revisions/revision_75afdab174203b56f0b4f89f/artifacts/skills-platform-guide-c321da38dc",
+      "canonical_relative_path": "revisions/revision_75afdab174203b56f0b4f89f/artifacts/skills-platform-guide-c321da38dc",
+      "imported_at": "2026-09-13T03:28:00.928Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_543d8f0e996987756c9b",
+      "source_id": "source_local_ac4bbce16f32422a",
+      "source_revision_id": "revision_5e8094b57bb31730d7bf9c8a",
+      "skill_name": "skill-authoring-standard",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_ac4bbce16f32422a:.",
+      "lineage_id": "lineage_9d81a8d1c195c074a056",
+      "description": "Route skill authoring, review, and static validation through the official conventions for Codex or Google Antigravity. Use when creating or revising a skill, checking SKILL.md metadata and progressive disclosure, or explaining provider-specific discovery and package structure.",
+      "manifest": {
+        "declared_name": "skill-authoring-standard",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "e1131227f04ef4162e9a4b1180f33512fe252c0df26a6ccd96d8835351b6bfdd",
+      "canonical_path": "revisions/revision_5e8094b57bb31730d7bf9c8a/artifacts/skill-authoring-standard-e1131227f0",
+      "canonical_relative_path": "revisions/revision_5e8094b57bb31730d7bf9c8a/artifacts/skill-authoring-standard-e1131227f0",
+      "imported_at": "2026-09-13T03:28:11.022Z",
       "review_state": "imported"
     }
   ]

@@ -1,6 +1,14 @@
 ---
 name: tdd
 description: Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions "red-green-refactor", or wants integration tests.
+hooks:
+  - id: test-storm-guard
+    name: Test Storm Suppression Guard
+    event: on_test_run
+    matcher: "test|run_command"
+    handler:
+      type: script
+      target: scripts/test-storm-guard.js
 ---
 
 # Test-Driven Development

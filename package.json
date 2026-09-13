@@ -17,7 +17,9 @@
     "precheck": "npm run build --workspace @skills-platform/contracts",
     "check": "npm run --workspaces --if-present check",
     "pretest": "npm run build:packages",
-    "test": "npm run --workspaces --if-present test"
+    "test": "npm run --workspaces --if-present test",
+    "hook": "node apps/skills-catalog/src/cli.js hook",
+    "sp-hooks": "node bin/sp-hooks"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

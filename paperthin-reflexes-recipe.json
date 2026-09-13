@@ -9,7 +9,7 @@
     {
       "source_id": "src:skills-platform-core",
       "type": "local",
-      "locator": "./skills",
+      "locator": "./apps/skills-manager",
       "description": "Skills Platform built-in skills"
     }
   ],
@@ -20,7 +20,7 @@
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
       "source_relative_path": "skills/vertical-spec-documenter",
-      "content_digest": "sha256:paperthin01",
+      "content_digest": "32424c72b69dfab2d80a52d94ab71f1fdeb1270890a20417ec43cd662332ca4a",
       "invocation_mode": "hybrid",
       "description": "Build, compile, and validate bounded Vertical Topic Specification documents"
     },
@@ -30,7 +30,7 @@
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
       "source_relative_path": "skills/skills-manager-testing",
-      "content_digest": "sha256:paperthin02",
+      "content_digest": "c1aa336bd66b6a1305c835745f33adf3626c057860645f5234abe82fb9230f7d",
       "invocation_mode": "model_invoked",
       "description": "Testing conventions, scoped test execution, and quality gates"
     },
@@ -40,7 +40,7 @@
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
       "source_relative_path": "skills/skills-manager-architecture",
-      "content_digest": "sha256:paperthin03",
+      "content_digest": "dddbf3e0cf46605c09f39c32386437b625fe47cb235cdd74d297486904e3a8a3",
       "invocation_mode": "model_invoked",
       "description": "Architecture reference, control plane invariants, and subsystem boundaries"
     },
@@ -50,7 +50,7 @@
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
       "source_relative_path": "skills/skills-manager-ui",
-      "content_digest": "sha256:paperthin04",
+      "content_digest": "5747640b14f33091a244717a327c59df9f214e4edc9d16ac24ded6cefba30fd4",
       "invocation_mode": "hybrid",
       "description": "UI component design system, modern layouts, and visual indicators"
     },
@@ -60,7 +60,7 @@
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
       "source_relative_path": "skills/skills-manager-tauri",
-      "content_digest": "sha256:paperthin05",
+      "content_digest": "b05ff94715ce5ad3e76a5f3476482c1df85ff3477c270829e49684db76069548",
       "invocation_mode": "model_invoked",
       "description": "Desktop backend commands, IPC bridge, and filesystem permissions"
     },
@@ -70,7 +70,7 @@
       "version": "1.0.0",
       "source_id": "src:skills-platform-core",
       "source_relative_path": "skills/skills-manager-orca",
-      "content_digest": "sha256:paperthin06",
+      "content_digest": "21115378aaddf688fe60c5876b0d7ff35b78205d237e934c942e8a4963347db9",
       "invocation_mode": "model_invoked",
       "description": "Orchestration runtime, subagent coordination, and lifecycle monitoring"
     }
@@ -84,26 +84,32 @@
       "skills": [
         {
           "skill_id": "skill:vertical-spec-documenter",
+          "skill_name": "vertical-spec-documenter",
           "version": "1.0.0"
         },
         {
           "skill_id": "skill:skills-manager-testing",
+          "skill_name": "skills-manager-testing",
           "version": "1.0.0"
         },
         {
           "skill_id": "skill:skills-manager-architecture",
+          "skill_name": "skills-manager-architecture",
           "version": "1.0.0"
         },
         {
           "skill_id": "skill:skills-manager-ui",
+          "skill_name": "skills-manager-ui",
           "version": "1.0.0"
         },
         {
           "skill_id": "skill:skills-manager-tauri",
+          "skill_name": "skills-manager-tauri",
           "version": "1.0.0"
         },
         {
           "skill_id": "skill:skills-manager-orca",
+          "skill_name": "skills-manager-orca",
           "version": "1.0.0"
         }
       ]

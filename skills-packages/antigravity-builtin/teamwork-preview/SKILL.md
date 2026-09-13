@@ -164,7 +164,7 @@ When the user gives explicit approval ("go", "launch", "looks good", "run it"):
 
 ## 📚 References & Guides
 
-- **Multidimensional Matrix Axes Platform**: [Skills-Docs / docs / matrix-axes](../../../Skills-Docs/docs/matrix-axes/index.md)
+- **Multidimensional Matrix Axes Platform**: Skills-Docs / docs / matrix-axes
 - **Detailed 9-Step Runbook**: [references/nine-step-workflow.md](./references/nine-step-workflow.md)
 - **Swarm Team Shapes**: [references/team-shapes.md](./references/team-shapes.md)
 - **Prompt Scaffold Template**: [examples/prompt-draft-template.md](./examples/prompt-draft-template.md)

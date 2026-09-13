@@ -456,19 +456,33 @@ async function ensureCanonicalSkillsInRegistry(registryRoot, skills = []) {
         const revDir = path.resolve(registryRoot, "revisions", revisionId, skill.name);
         await fs.mkdir(revDir, { recursive: true });
 
-        const skillFile = path.join(revDir, "SKILL.md");
-        const skillContent = [
-          "---",
-          `name: ${skill.name}`,
-          `description: ${skill.description || "Lifecycle management skill"}`,
-          `invocation_mode: ${skill.invocation_mode || "model_invoked"}`,
-          "---",
-          `# ${skill.name}`,
-          "",
-          skill.description || "Lifecycle recipe skill.",
-        ].join("\n");
+        const { resolveSkillPackageSource } = require("./catalog-workflows");
+        let sourcePkg = null;
+        try {
+          sourcePkg = await resolveSkillPackageSource({ skillName: skill.name });
+        } catch {}
 
-        await fs.writeFile(skillFile, skillContent, "utf8");
+        if (sourcePkg) {
+          try {
+            await fs.cp(sourcePkg, revDir, { recursive: true });
+          } catch {
+            sourcePkg = null;
+          }
+        }
+        if (!sourcePkg) {
+          const skillFile = path.join(revDir, "SKILL.md");
+          const skillContent = [
+            "---",
+            `name: ${skill.name}`,
+            `description: ${skill.description || "Lifecycle management skill"}`,
+            `invocation_mode: ${skill.invocation_mode || "model_invoked"}`,
+            "---",
+            `# ${skill.name}`,
+            "",
+            skill.description || "Lifecycle recipe skill.",
+          ].join("\n");
+          await fs.writeFile(skillFile, skillContent, "utf8");
+        }
         const digest = await digestDirectory(revDir);
 
         if (!registry.revisions?.some((r) => r.id === revisionId)) {

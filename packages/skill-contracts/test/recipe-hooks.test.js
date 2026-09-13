@@ -282,3 +282,90 @@ test("hook factory does not coerce invalid desired-state values into enabled hoo
     (error) => error.issues.some((issue) => issue.field === "enabled"),
   );
 });
+
+test("hook definition supports associated_skill and metadata.associated_skill consistently", () => {
+  const hookWithSkill = createHookDefinition({
+    id: "skill-guard",
+    name: "Skill Guard",
+    event: "pre_tool_use",
+    associated_skill: "my-awesome-skill",
+    handler: { type: "command", command: "node -v" },
+  });
+  assert.equal(hookWithSkill.associated_skill, "my-awesome-skill");
+  assert.equal(hookWithSkill.metadata?.associated_skill, "my-awesome-skill");
+
+  const hookWithMetaSkill = createHookDefinition({
+    id: "meta-guard",
+    name: "Meta Guard",
+    event: "pre_tool_use",
+    metadata: { associated_skill: "from-metadata-skill" },
+    handler: { type: "command", command: "node -v" },
+  });
+  assert.equal(hookWithMetaSkill.associated_skill, "from-metadata-skill");
+  assert.equal(hookWithMetaSkill.metadata?.associated_skill, "from-metadata-skill");
+
+  // Rejects invalid associated_skill
+  const invalid = validateHookDefinition({
+    id: "bad-skill-hook",
+    name: "Bad Skill Hook",
+    event: "pre_tool_use",
+    enabled: true,
+    associated_skill: "",
+    handler: { type: "command", command: "node -v" },
+  });
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.issues.some((issue) => issue.field === "associated_skill"));
+
+  // Rejects mismatch between associated_skill and metadata.associated_skill
+  const mismatch = validateHookDefinition({
+    id: "mismatch-hook",
+    name: "Mismatch Hook",
+    event: "pre_tool_use",
+    enabled: true,
+    associated_skill: "skill-A",
+    metadata: { associated_skill: "skill-B" },
+    handler: { type: "command", command: "node -v" },
+  });
+  assert.equal(mismatch.valid, false);
+  assert.ok(mismatch.issues.some((issue) => issue.field === "associated_skill" && issue.message.includes("must match")));
+
+  // Rejects mismatch when one is string and the other is null
+  const mismatchNull1 = validateHookDefinition({
+    id: "mismatch-null-1",
+    name: "Mismatch Null 1",
+    event: "pre_tool_use",
+    enabled: true,
+    associated_skill: "skill-A",
+    metadata: { associated_skill: null },
+    handler: { type: "command", command: "node -v" },
+  });
+  assert.equal(mismatchNull1.valid, false);
+  assert.ok(mismatchNull1.issues.some((issue) => issue.field === "associated_skill" && issue.message.includes("must match")));
+
+  const mismatchNull2 = validateHookDefinition({
+    id: "mismatch-null-2",
+    name: "Mismatch Null 2",
+    event: "pre_tool_use",
+    enabled: true,
+    associated_skill: null,
+    metadata: { associated_skill: "skill-A" },
+    handler: { type: "command", command: "node -v" },
+  });
+  assert.equal(mismatchNull2.valid, false);
+  assert.ok(mismatchNull2.issues.some((issue) => issue.field === "associated_skill" && issue.message.includes("must match")));
+
+  // Rejects mismatch between empty string and null
+  const mismatchEmptyNull = validateHookDefinition({
+    id: "mismatch-empty-null",
+    name: "Mismatch Empty Null",
+    event: "pre_tool_use",
+    enabled: true,
+    associated_skill: "",
+    metadata: { associated_skill: null },
+    handler: { type: "command", command: "node -v" },
+  });
+  assert.equal(mismatchEmptyNull.valid, false);
+  assert.ok(mismatchEmptyNull.issues.some((issue) => issue.field === "associated_skill" && issue.message.includes("must match")));
+});
+
+

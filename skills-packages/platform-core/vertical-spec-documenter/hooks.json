@@ -1,0 +1,30 @@
+{
+  "hooks": [
+    {
+      "id": "scope-boundary-enforcer",
+      "name": "Scope Boundary Enforcer",
+      "event": "post_tool_use",
+      "description": "Audits file modifications against active topic scope and detects out-of-bounds mutations.",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content",
+      "handler": {
+        "type": "script",
+        "target": "scripts/scope-boundary-enforcer.js",
+        "timeout_ms": 5000
+      },
+      "priority": 20,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "failure_policy": "open",
+      "metadata": {
+        "system": true,
+        "category": "governance",
+        "associated_skill": "vertical-spec-documenter",
+        "companion": true
+      }
+    }
+  ]
+}

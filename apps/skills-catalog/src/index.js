@@ -19,4 +19,5 @@ module.exports = {
   ...require("./skills-updater"),
   ...require("./upstream-channel-manager"),
   ...require("./ledger-store"),
+  ...require("./hooks-manager"),
 };

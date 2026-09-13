@@ -772,6 +772,31 @@ async function setProjectSkillOverride({
     project.skill_overrides = normalizeSkillOverrides(project.skill_overrides);
     project.updated_at = override.updated_at;
     await saveCatalog(catalogRoot, catalog);
+
+    if (project.project_path) {
+      const fsSync = require("node:fs");
+      const hooksManifestPath = path.join(project.project_path, ".skills-platform", "hooks", "manifest.json");
+      if (fsSync.existsSync(hooksManifestPath)) {
+        try {
+          const { updateHooksBySkillStatus, compileProviderConfigs } = require("./hooks-manager");
+          const skillIdentities = [registrySkill?.skill_name, lineageId, registrySkillId].filter(Boolean);
+          let anyChanged = false;
+          for (const sId of skillIdentities) {
+            const res = updateHooksBySkillStatus({
+              projectPath: project.project_path,
+              skillId: sId,
+              enabled: desiredState === "enabled",
+              sync: false,
+            });
+            if (res.changed > 0) anyChanged = true;
+          }
+          if (anyChanged) {
+            compileProviderConfigs({ projectPath: project.project_path });
+          }
+        } catch {}
+      }
+    }
+
     return override;
   });
 }
@@ -779,7 +804,7 @@ async function setProjectSkillOverride({
 async function clearProjectSkillOverride({ catalogRoot, registryRoot, projectId, lineageId }) {
   projectId = requireIdentifier(projectId, "Project id");
   lineageId = requireIdentifier(lineageId, "Skill lineage id");
-  await getSkillLineage(registryRoot, lineageId);
+  const lineage = await getSkillLineage(registryRoot, lineageId);
 
   return withCatalogMutationLock(catalogRoot, async () => {
     const catalog = await loadCatalog(catalogRoot);
@@ -792,6 +817,31 @@ async function clearProjectSkillOverride({ catalogRoot, registryRoot, projectId,
     const [removed] = project.skill_overrides.splice(index, 1);
     project.updated_at = now();
     await saveCatalog(catalogRoot, catalog);
+
+    if (project.project_path && removed?.desired_state === "disabled") {
+      const fsSync = require("node:fs");
+      const hooksManifestPath = path.join(project.project_path, ".skills-platform", "hooks", "manifest.json");
+      if (fsSync.existsSync(hooksManifestPath)) {
+        try {
+          const { updateHooksBySkillStatus, compileProviderConfigs } = require("./hooks-manager");
+          const skillIdentities = [lineage?.skill_name, lineageId, removed.registry_skill_id].filter(Boolean);
+          let anyChanged = false;
+          for (const sId of skillIdentities) {
+            const res = updateHooksBySkillStatus({
+              projectPath: project.project_path,
+              skillId: sId,
+              enabled: true,
+              sync: false,
+            });
+            if (res.changed > 0) anyChanged = true;
+          }
+          if (anyChanged) {
+            compileProviderConfigs({ projectPath: project.project_path });
+          }
+        } catch {}
+      }
+    }
+
     return { cleared: true, project_id: projectId, lineage_id: lineageId, override: removed };
   });
 }

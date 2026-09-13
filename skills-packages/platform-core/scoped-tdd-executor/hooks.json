@@ -1,0 +1,30 @@
+{
+  "hooks": [
+    {
+      "id": "test-storm-guard",
+      "name": "Test Storm Suppression Guard",
+      "event": "on_test_run",
+      "description": "Blocks un-scoped full regression suite execution during inner-loop TDD cycles.",
+      "enabled": true,
+      "matcher": "test|run_command",
+      "handler": {
+        "type": "script",
+        "target": "scripts/test-storm-guard.js",
+        "timeout_ms": 2000
+      },
+      "priority": 50,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "failure_policy": "open",
+      "metadata": {
+        "system": true,
+        "category": "governance",
+        "associated_skill": "scoped-tdd-executor",
+        "companion": true
+      }
+    }
+  ]
+}

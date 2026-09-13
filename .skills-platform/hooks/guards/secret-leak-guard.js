@@ -88,7 +88,11 @@ function collectStringsWithContext(value, collected = [], inheritedCommand = fal
     }
   } else if (typeof value === "object") {
     const isCommandTool = value.toolName === "run_command" ||
-      (typeof value.toolAction === "string" && /command/i.test(value.toolAction));
+      value.tool_name === "run_command" ||
+      (typeof value.toolAction === "string" && /command/i.test(value.toolAction)) ||
+      value.name === "run_command" ||
+      value.toolCall?.name === "run_command" ||
+      value.tool_call?.name === "run_command";
 
     for (const key of Object.keys(value)) {
       const isCmdKey = COMMAND_KEYS.has(key) || (inheritedCommand && key !== "TargetFile");
@@ -187,9 +191,9 @@ function parseCliArgs(argv = process.argv.slice(2)) {
 /**
  * Reads all data from stdin with short timeout.
  */
-function readAllStdin(timeoutMs = 15) {
+function readAllStdin(timeoutMs = 3000) {
   return new Promise((resolve) => {
-    if (process.stdin.isTTY || process.stdin.readableEnded || !process.stdin.readable) {
+    if (process.stdin.isTTY || process.stdin.readableEnded) {
       return resolve("");
     }
     let data = "";
@@ -203,6 +207,7 @@ function readAllStdin(timeoutMs = 15) {
     }
 
     const timer = setTimeout(finish, timeoutMs);
+    if (timer.unref) timer.unref();
     process.stdin.setEncoding("utf8");
     process.stdin.on("data", (chunk) => {
       data += chunk;
@@ -248,33 +253,96 @@ function resolvePayload(cliArgs = {}, env = process.env, stdinData = "") {
 }
 
 /**
+ * Checks if current execution is in Antigravity mode.
+ */
+function isAntigravityMode(payload = {}, env = process.env, cliArgs = {}, rawStdin = "") {
+  if (env.HOOK_RUNTIME === "antigravity" || cliArgs.runtime === "antigravity") {
+    return true;
+  }
+  const p = payload || {};
+  if (
+    p.conversationId ||
+    p.conversation_id ||
+    p.workspacePaths ||
+    p.workspace_paths ||
+    p.transcriptPath ||
+    p.transcript_path ||
+    p.artifactDirectoryPath ||
+    p.artifact_directory_path ||
+    p.toolName ||
+    p.tool_name ||
+    p.modelName ||
+    p.model_name ||
+    p.stepIdx !== undefined ||
+    p.step_idx !== undefined ||
+    p.toolCall ||
+    p.tool_call ||
+    p.permissionOverrides ||
+    p.permission_overrides
+  ) {
+    return true;
+  }
+  if (typeof rawStdin === "string" && rawStdin) {
+    if (/(?:"conversation_id"|"conversationId"|"toolCall"|"tool_call"|"workspacePaths"|"workspace_paths"|"stepIdx"|"step_idx")/.test(rawStdin)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * CLI Main execution
  */
-async function main(argv = process.argv.slice(2)) {
-  const cliArgs = parseCliArgs(argv);
-  const stdinData = await readAllStdin();
-  const payload = resolvePayload(cliArgs, process.env, stdinData);
+function formatGuardStdout(result, payload = {}, env = process.env, cliArgs = {}, rawStdin = "") {
+  let effectivePayload = payload;
+  if (!effectivePayload || Object.keys(effectivePayload).length === 0) {
+    if (env.HOOK_PAYLOAD) {
+      try {
+        effectivePayload = JSON.parse(env.HOOK_PAYLOAD);
+      } catch {}
+    }
+  }
+  const isAntigravity = isAntigravityMode(effectivePayload, env, cliArgs, rawStdin);
+  if (isAntigravity) {
+    const isBlocked = result.allow === false || result.decision === "block" || result.decision === "deny";
+    if (isBlocked) {
+      const reason = [
+        result.reason || "Secret/credential leak detected",
+        result.self_correct_hint ? `Hint: ${result.self_correct_hint}` : null,
+      ].filter(Boolean).join(" ");
+      return { decision: "deny", reason };
+    }
+    return { decision: "allow" };
+  }
+  return result;
+}
 
-  const result = evaluateSecretLeakGuard(payload);
-  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+let currentPayload = {};
+let currentStdin = "";
+let currentCliArgs = {};
+
+async function main(argv = process.argv.slice(2)) {
+  currentCliArgs = parseCliArgs(argv);
+  currentStdin = await readAllStdin();
+  currentPayload = resolvePayload(currentCliArgs, process.env, currentStdin);
+
+  const result = evaluateSecretLeakGuard(currentPayload);
+  const output = formatGuardStdout(result, currentPayload, process.env, currentCliArgs, currentStdin);
+  process.stdout.write(JSON.stringify(output, null, 2) + "\n");
   process.exit(0);
 }
 
 if (require.main === module) {
   main().catch((err) => {
-    process.stdout.write(
-      JSON.stringify(
-        {
-          allow: false,
-          decision: "block",
-          reason: `Secret leak guard internal failure: ${err?.message}`,
-          self_correct_hint: "Verify tool payload format.",
-          violation_type: "secret_leak_error",
-        },
-        null,
-        2
-      ) + "\n"
-    );
+    const errorResult = {
+      allow: false,
+      decision: "deny",
+      reason: `Secret leak guard internal failure: ${err?.message}`,
+      self_correct_hint: "Verify tool payload format.",
+      violation_type: "secret_leak_error",
+    };
+    const output = formatGuardStdout(errorResult, currentPayload, process.env, currentCliArgs, currentStdin);
+    process.stdout.write(JSON.stringify(output, null, 2) + "\n");
     process.exit(0);
   });
 }

@@ -195,23 +195,6 @@ const DEFAULT_HOOKS = [
     failure_policy: "open",
     metadata: { system: true },
   },
-  {
-    id: "test-storm-guard",
-    name: "Test Storm Suppression Guard",
-    event: "on_test_run",
-    description: "Blocks un-scoped full regression suite execution during inner-loop TDD cycles.",
-    enabled: true,
-    matcher: "test",
-    handler: {
-      type: "command",
-      command: "node -e \"console.log('[Guard] Scoped test execution verified.')\"",
-      timeout_ms: 2000,
-    },
-    priority: 50,
-    providers: ["antigravity", "claude", "codex"],
-    failure_policy: "open",
-    metadata: { system: true },
-  },
 ];
 
 class HookManifestError extends Error {
@@ -554,12 +537,54 @@ function saveHookManifest({ projectPath = process.cwd(), manifest }) {
   return validated;
 }
 
-function listHooks({ projectPath = process.cwd(), eventName } = {}) {
+function listHooks({ projectPath = process.cwd(), eventName, skillId } = {}) {
   const manifest = loadHookManifest({ projectPath });
-  const hooks = eventName
-    ? manifest.hooks.filter((hook) => hook.event.toLowerCase() === String(eventName).toLowerCase())
-    : [...manifest.hooks];
+  let hooks = [...manifest.hooks];
+  if (eventName) {
+    hooks = hooks.filter((hook) => hook.event.toLowerCase() === String(eventName).toLowerCase());
+  }
+  if (skillId) {
+    const skillList = Array.isArray(skillId) ? skillId : [skillId];
+    const targetSkills = new Set();
+    for (const raw of skillList) {
+      if (!raw) continue;
+      const trimmed = String(raw).trim();
+      targetSkills.add(trimmed);
+      try {
+        if (trimmed.includes("%")) targetSkills.add(decodeURIComponent(trimmed));
+      } catch {}
+    }
+    hooks = hooks.filter((hook) => {
+      const associated = hook.associated_skill ?? hook.metadata?.associated_skill ?? null;
+      if (!associated) return false;
+      let decodedAssociated = associated;
+      try {
+        if (associated.includes("%")) decodedAssociated = decodeURIComponent(associated);
+      } catch {}
+      return targetSkills.has(associated) || targetSkills.has(decodedAssociated);
+    });
+  }
   return hooks.sort(compareHooks);
+}
+
+function listHooksBySkill({ projectPath = process.cwd(), eventName, skillId } = {}) {
+  const hooks = listHooks({ projectPath, eventName, skillId });
+  const bySkill = {};
+  const unassociated = [];
+  for (const hook of hooks) {
+    const skill = hook.associated_skill ?? hook.metadata?.associated_skill ?? null;
+    if (skill) {
+      if (!bySkill[skill]) bySkill[skill] = [];
+      bySkill[skill].push(hook);
+    } else {
+      unassociated.push(hook);
+    }
+  }
+  return {
+    by_skill: bySkill,
+    unassociated,
+    total_hooks: hooks.length,
+  };
 }
 
 function registerHook({ projectPath = process.cwd(), hook, sync = true }) {
@@ -595,6 +620,459 @@ function updateHookStatus({ projectPath = process.cwd(), hookId, enabled, sync =
   saveHookManifest({ projectPath, manifest });
   if (sync) compileProviderConfigs({ projectPath });
   return hook;
+}
+
+function updateAllHooksStatus({ projectPath = process.cwd(), enabled, sync = true }) {
+  if (typeof enabled !== "boolean") throw new Error("Hook enabled state must be a boolean");
+  const manifest = loadHookManifest({ projectPath });
+  let changedCount = 0;
+  for (const hook of manifest.hooks) {
+    if (hook.enabled !== enabled) {
+      hook.enabled = enabled;
+      changedCount++;
+    }
+  }
+  saveHookManifest({ projectPath, manifest });
+  if (sync) compileProviderConfigs({ projectPath });
+  return {
+    ok: true,
+    total: manifest.hooks.length,
+    changed: changedCount,
+    enabled,
+    hooks: manifest.hooks.map((hook) => ({
+      id: hook.id,
+      name: hook.name,
+      event: hook.event,
+      enabled: hook.enabled,
+      associated_skill: hook.associated_skill ?? hook.metadata?.associated_skill ?? null,
+      failure_policy: hook.failure_policy ?? DEFAULT_FAILURE_POLICY,
+      priority: hookPriority(hook),
+      handler: hook.handler,
+      target: hook.handler?.target || hook.handler?.command,
+    })),
+  };
+}
+
+function updateHooksBySkillStatus({ projectPath = process.cwd(), skillId, enabled, sync = true }) {
+  if (typeof skillId !== "string" || skillId.trim() === "") {
+    throw new Error("Skill id must be a non-empty string");
+  }
+  if (typeof enabled !== "boolean") {
+    throw new Error("Hook enabled state must be a boolean");
+  }
+  const manifest = loadHookManifest({ projectPath });
+  const trimmedSkillId = skillId.trim();
+  let decodedSkillId = trimmedSkillId;
+  try {
+    if (trimmedSkillId.includes("%")) decodedSkillId = decodeURIComponent(trimmedSkillId);
+  } catch {}
+  const targetSkills = new Set([trimmedSkillId, decodedSkillId]);
+  const matchedHooks = manifest.hooks.filter((hook) => {
+    const associated = hook.associated_skill ?? hook.metadata?.associated_skill ?? null;
+    if (!associated) return false;
+    let decodedAssociated = associated;
+    try {
+      if (associated.includes("%")) decodedAssociated = decodeURIComponent(associated);
+    } catch {}
+    return targetSkills.has(associated) || targetSkills.has(decodedAssociated);
+  });
+  let changedCount = 0;
+  for (const hook of matchedHooks) {
+    if (hook.enabled !== enabled) {
+      hook.enabled = enabled;
+      changedCount++;
+    }
+  }
+  saveHookManifest({ projectPath, manifest });
+  if (sync) compileProviderConfigs({ projectPath });
+  return {
+    ok: true,
+    skill: trimmedSkillId,
+    total: matchedHooks.length,
+    changed: changedCount,
+    enabled,
+    hooks: matchedHooks.map((hook) => ({
+      id: hook.id,
+      name: hook.name,
+      event: hook.event,
+      enabled: hook.enabled,
+      associated_skill: hook.associated_skill ?? hook.metadata?.associated_skill ?? null,
+      failure_policy: hook.failure_policy ?? DEFAULT_FAILURE_POLICY,
+      priority: hookPriority(hook),
+      handler: hook.handler,
+      target: hook.handler?.target || hook.handler?.command,
+    })),
+  };
+}
+
+function isSkillInstalledInProject(arg1, arg2) {
+  let projectPath = process.cwd();
+  let skillId = null;
+
+  if (typeof arg1 === "object" && arg1 !== null) {
+    projectPath = arg1.projectPath || arg1.project_path || process.cwd();
+    skillId = arg1.skillId || arg1.skill_id || arg1.skill;
+  } else if (typeof arg1 === "string") {
+    if (typeof arg2 === "string") {
+      if (path.isAbsolute(arg2)) {
+        projectPath = arg2;
+        skillId = arg1;
+      } else if (path.isAbsolute(arg1)) {
+        projectPath = arg1;
+        skillId = arg2;
+      } else {
+        const isDir = (p) => {
+          try { return fs.statSync(path.resolve(p)).isDirectory(); } catch { return false; }
+        };
+        const hasSkillIndicators = (p) => {
+          const r = path.resolve(p);
+          return fs.existsSync(path.join(r, ".agents", "skills")) ||
+            fs.existsSync(path.join(r, ".claude", "skills")) ||
+            fs.existsSync(path.join(r, ".codex", "skills")) ||
+            fs.existsSync(path.join(r, ".skills-platform")) ||
+            fs.existsSync(path.join(r, "package.json")) ||
+            fs.existsSync(path.join(r, "catalog.json"));
+        };
+        if (hasSkillIndicators(arg2)) {
+          projectPath = arg2;
+          skillId = arg1;
+        } else if (hasSkillIndicators(arg1)) {
+          projectPath = arg1;
+          skillId = arg2;
+        } else if (isDir(arg2) && !isDir(arg1)) {
+          projectPath = arg2;
+          skillId = arg1;
+        } else if (isDir(arg1) && !isDir(arg2)) {
+          projectPath = arg1;
+          skillId = arg2;
+        } else {
+          projectPath = arg1;
+          skillId = arg2;
+        }
+      }
+    } else {
+      skillId = arg1;
+    }
+  }
+
+  if (!skillId || typeof skillId !== "string") return false;
+  const targetSkill = skillId.trim();
+  if (!targetSkill) return false;
+  let decodedSkill = targetSkill;
+  try {
+    if (targetSkill.includes("%")) decodedSkill = decodeURIComponent(targetSkill);
+  } catch {}
+  const resolvedProjectPath = path.resolve(projectPath);
+  const skillVariants = [...new Set([targetSkill, decodedSkill])];
+
+  const candidateSubdirs = [];
+  for (const sId of skillVariants) {
+    candidateSubdirs.push(
+      path.join(resolvedProjectPath, ".agents", "skills", sId),
+      path.join(resolvedProjectPath, ".claude", "skills", sId),
+      path.join(resolvedProjectPath, ".codex", "skills", sId),
+      path.join(resolvedProjectPath, ".gemini", "config", "skills", sId),
+      path.join(resolvedProjectPath, "skills", sId),
+      path.join(resolvedProjectPath, "skills-packages", sId),
+      path.join(resolvedProjectPath, "skills-instances", sId),
+      path.join(resolvedProjectPath, ".agents", "skills", `${sId}.skills-platform-link-ownership.json`),
+      path.join(resolvedProjectPath, ".claude", "skills", `${sId}.skills-platform-link-ownership.json`),
+      path.join(resolvedProjectPath, ".codex", "skills", `${sId}.skills-platform-link-ownership.json`),
+      path.join(resolvedProjectPath, ".gemini", "config", "skills", `${sId}.skills-platform-link-ownership.json`),
+      path.join(resolvedProjectPath, "skills", `${sId}.skills-platform-link-ownership.json`)
+    );
+  }
+
+  for (const candidate of candidateSubdirs) {
+    if (fs.existsSync(candidate)) return true;
+  }
+
+  for (const parentDir of ["skills-packages", "skills", "skills-instances"]) {
+    const fullParent = path.join(resolvedProjectPath, parentDir);
+    if (fs.existsSync(fullParent)) {
+      try {
+        const entries = fs.readdirSync(fullParent);
+        for (const entry of entries) {
+          for (const sId of skillVariants) {
+            const nestedCandidate = path.join(fullParent, entry, sId);
+            if (fs.existsSync(nestedCandidate)) return true;
+          }
+        }
+      } catch {}
+    }
+  }
+
+  const selfSkillPath = path.join(resolvedProjectPath, "SKILL.md");
+  if (fs.existsSync(selfSkillPath)) {
+    const baseName = path.basename(resolvedProjectPath);
+    if (skillVariants.includes(baseName)) return true;
+    try {
+      const content = fs.readFileSync(selfSkillPath, "utf8");
+      const match = content.match(/^---\n([\s\S]*?)\n---/);
+      if (match) {
+        const fm = require("yaml").parse(match[1]);
+        if (fm?.name && skillVariants.includes(fm.name)) return true;
+      }
+    } catch {}
+  }
+
+  const searchCatalogPaths = [
+    path.join(resolvedProjectPath, ".skills-platform", "catalog.json"),
+    path.join(resolvedProjectPath, "catalog.json"),
+  ];
+  for (const catalogPath of searchCatalogPaths) {
+    if (fs.existsSync(catalogPath)) {
+      try {
+        const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
+        if (Array.isArray(catalog.projects)) {
+          for (const proj of catalog.projects) {
+            const matchesProject = !proj.project_path || path.resolve(proj.project_path) === resolvedProjectPath;
+            if (matchesProject && proj.delivery_root) {
+              for (const sId of skillVariants) {
+                const deliveryCandidate = path.join(proj.delivery_root, sId);
+                const sidecarCandidate = `${deliveryCandidate}.skills-platform-link-ownership.json`;
+                if (fs.existsSync(deliveryCandidate) || fs.existsSync(sidecarCandidate)) {
+                  const override = proj.skill_overrides?.find((o) =>
+                    skillVariants.includes(o.lineage_id) ||
+                    skillVariants.includes(o.registry_skill_id) ||
+                    skillVariants.includes(o.skill_name)
+                  );
+                  if (override?.desired_state === "disabled") {
+                    return false;
+                  }
+                  return true;
+                }
+              }
+            }
+          }
+        }
+        if (Array.isArray(catalog.skills)) {
+          for (const sId of skillVariants) {
+            const registeredSkill = catalog.skills.find((s) => s.id === sId || s.name === sId || s.skill_name === sId);
+            if (registeredSkill && registeredSkill.canonical_path && fs.existsSync(registeredSkill.canonical_path)) {
+              return true;
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  return false;
+}
+
+function discoverCompanionHooks({ skillPath, skillName, projectPath = process.cwd(), deliveryPath = null } = {}) {
+  if (!skillPath || !fs.existsSync(skillPath)) return [];
+  const name = skillName || path.basename(skillPath);
+  const resolvedProjectPath = path.resolve(projectPath);
+  let effectiveDeliveryPath = deliveryPath ? path.resolve(deliveryPath) : path.resolve(skillPath);
+
+  if (!deliveryPath) {
+    const possibleDeliveryRoots = [
+      path.join(resolvedProjectPath, ".agents", "skills", name),
+      path.join(resolvedProjectPath, ".claude", "skills", name),
+      path.join(resolvedProjectPath, ".codex", "skills", name),
+      path.join(resolvedProjectPath, ".gemini", "config", "skills", name),
+      path.join(resolvedProjectPath, "skills", name),
+    ];
+    for (const candidate of possibleDeliveryRoots) {
+      if (fs.existsSync(candidate)) {
+        effectiveDeliveryPath = candidate;
+        break;
+      }
+    }
+  }
+
+  let rawHooks = null;
+
+  const hooksJsonPath = path.join(skillPath, "hooks.json");
+  if (fs.existsSync(hooksJsonPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(hooksJsonPath, "utf8"));
+      rawHooks = parsed?.hooks ?? parsed?.companion_hooks ?? parsed;
+    } catch {}
+  }
+
+  if (!rawHooks || (Array.isArray(rawHooks) && rawHooks.length === 0)) {
+    for (const yamlName of ["hooks.yaml", "hooks.yml"]) {
+      const yamlPath = path.join(skillPath, yamlName);
+      if (fs.existsSync(yamlPath)) {
+        try {
+          const parsed = require("yaml").parse(fs.readFileSync(yamlPath, "utf8"));
+          rawHooks = parsed?.hooks ?? parsed?.companion_hooks ?? parsed;
+          if (rawHooks && (!Array.isArray(rawHooks) || rawHooks.length > 0)) break;
+        } catch {}
+      }
+    }
+  }
+
+  if (!rawHooks || (Array.isArray(rawHooks) && rawHooks.length === 0)) {
+    const pkgPath = path.join(skillPath, "package.json");
+    if (fs.existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+        rawHooks = pkg.hooks ?? pkg.companion_hooks ?? pkg.skills_platform?.hooks ?? pkg.skills_platform?.companion_hooks;
+      } catch {}
+    }
+  }
+
+  if (!rawHooks || (Array.isArray(rawHooks) && rawHooks.length === 0)) {
+    const skillMdPath = path.join(skillPath, "SKILL.md");
+    if (fs.existsSync(skillMdPath)) {
+      try {
+        const content = fs.readFileSync(skillMdPath, "utf8");
+        const match = content.match(/^---\n([\s\S]*?)\n---/);
+        if (match) {
+          const frontmatter = require("yaml").parse(match[1]);
+          rawHooks = frontmatter?.hooks ?? frontmatter?.companion_hooks ?? frontmatter?.metadata?.hooks ?? frontmatter?.metadata?.companion_hooks;
+        }
+      } catch {}
+    }
+  }
+
+  if (!rawHooks || (Array.isArray(rawHooks) && rawHooks.length === 0)) {
+    const scriptsHooksJson = path.join(skillPath, "scripts", "hooks.json");
+    if (fs.existsSync(scriptsHooksJson)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(scriptsHooksJson, "utf8"));
+        rawHooks = parsed?.hooks ?? parsed?.companion_hooks ?? parsed;
+      } catch {}
+    }
+  }
+
+  if (!rawHooks || (Array.isArray(rawHooks) && rawHooks.length === 0)) {
+    const scriptsDir = path.join(skillPath, "scripts");
+    if (fs.existsSync(scriptsDir) && fs.statSync(scriptsDir).isDirectory()) {
+      try {
+        const files = fs.readdirSync(scriptsDir);
+        const autoHooks = [];
+        for (const file of files) {
+          const ext = path.extname(file);
+          if (![".js", ".mjs", ".cjs"].includes(ext)) continue;
+          const base = path.basename(file, ext);
+          let event = "pre_tool_use";
+          if (STANDARD_HOOK_EVENTS.has ? STANDARD_HOOK_EVENTS.has(base) : STANDARD_HOOK_EVENTS.includes(base)) {
+            event = base;
+          } else if (file.includes("guard") || file.includes("blocker")) {
+            event = "pre_tool_use";
+          } else if (file.includes("telemetry") || file.includes("collector")) {
+            event = "post_tool_use";
+          }
+          autoHooks.push({
+            id: `${name}-${base}`,
+            name: `${name} ${base}`,
+            event,
+            handler: {
+              type: "script",
+              target: path.join("scripts", file),
+            },
+          });
+        }
+        if (autoHooks.length > 0) rawHooks = autoHooks;
+      } catch {}
+    }
+  }
+
+  if (!Array.isArray(rawHooks)) {
+    if (rawHooks && typeof rawHooks === "object") {
+      const converted = [];
+      for (const [key, val] of Object.entries(rawHooks)) {
+        if (!val) continue;
+        if (typeof val === "string") {
+          const isStandard = STANDARD_HOOK_EVENTS.has ? STANDARD_HOOK_EVENTS.has(key) : STANDARD_HOOK_EVENTS.includes(key);
+          converted.push({
+            id: `${name}-${key}`,
+            event: isStandard ? key : "pre_tool_use",
+            handler: { type: "script", target: val },
+          });
+        } else if (typeof val === "object") {
+          const isStandard = STANDARD_HOOK_EVENTS.has ? STANDARD_HOOK_EVENTS.has(key) : STANDARD_HOOK_EVENTS.includes(key);
+          converted.push({
+            id: val.id || `${name}-${key}`,
+            event: val.event || (isStandard ? key : "pre_tool_use"),
+            ...val,
+          });
+        }
+      }
+      rawHooks = converted;
+    } else {
+      rawHooks = [];
+    }
+  }
+
+  const normalizedHooks = [];
+  const seenIds = new Set();
+  for (let i = 0; i < rawHooks.length; i++) {
+    const raw = rawHooks[i];
+    if (!raw || typeof raw !== "object") continue;
+    let handler = raw.handler;
+    if (typeof handler === "string") {
+      handler = { type: "script", target: handler };
+    } else if (!handler && (raw.target || raw.script || raw.command || raw.url)) {
+      if (raw.target || raw.script) {
+        handler = { type: "script", target: raw.target || raw.script, timeout_ms: raw.timeout_ms };
+      } else if (raw.command) {
+        handler = { type: "command", command: raw.command, timeout_ms: raw.timeout_ms };
+      } else if (raw.url) {
+        handler = { type: "webhook", url: raw.url, timeout_ms: raw.timeout_ms };
+      }
+    }
+    if (!handler || typeof handler !== "object") {
+      handler = { type: "command", command: "node -v" };
+    }
+
+    if (handler.type === "script" && handler.target) {
+      const cleanTarget = path.isAbsolute(handler.target)
+        ? path.relative(skillPath, handler.target)
+        : handler.target.replace(/^\.?\//, "");
+      const targetInDelivery = path.join(effectiveDeliveryPath, cleanTarget);
+      const relTarget = path.relative(resolvedProjectPath, targetInDelivery).replaceAll("\\", "/");
+      handler = {
+        ...handler,
+        target: relTarget,
+      };
+
+      if (process.platform !== "win32") {
+        try {
+          const scriptFullPath = path.isAbsolute(handler.target) ? handler.target : path.join(skillPath, cleanTarget);
+          if (fs.existsSync(scriptFullPath)) {
+            const st = fs.statSync(scriptFullPath);
+            if ((st.mode & 0o111) === 0) {
+              fs.chmodSync(scriptFullPath, st.mode | 0o111);
+            }
+          }
+        } catch {}
+      }
+    }
+
+    let hookId = raw.id || `${name}-${raw.event || "hook"}`;
+    if (seenIds.has(hookId)) {
+      hookId = `${hookId}-${i + 1}`;
+    }
+    seenIds.add(hookId);
+
+    const hookDef = createHookDefinition({
+      id: hookId,
+      name: raw.name || raw.id || `${name} companion hook`,
+      event: raw.event || "pre_tool_use",
+      description: raw.description ?? `Companion hook for skill ${name}`,
+      enabled: raw.enabled !== false,
+      matcher: raw.matcher ?? null,
+      priority: raw.priority ?? 100,
+      providers: raw.providers,
+      failure_policy: raw.failure_policy ?? "open",
+      associated_skill: name,
+      handler,
+      metadata: {
+        ...(raw.metadata || {}),
+        associated_skill: name,
+        companion: true,
+      },
+    });
+    normalizedHooks.push(hookDef);
+  }
+
+  return normalizedHooks;
 }
 
 function providersForHook(hook) {
@@ -682,15 +1160,15 @@ function buildProviderConfigs(manifest, projectPath, { codexCapabilities } = {})
           command,
           timeout: Math.ceil((hook.handler.timeout_ms ?? 5000) / 1000),
         };
-        if (hook.event === "pre_tool_use") {
+        if (hook.event === "pre_tool_use" || hook.event === "on_test_run") {
           antigravityConfig[hook.id] = { PreToolUse: [{ matcher: hook.matcher || ".*", hooks: [hookSpec] }] };
         } else if (hook.event === "post_tool_use") {
           antigravityConfig[hook.id] = { PostToolUse: [{ matcher: hook.matcher || ".*", hooks: [hookSpec] }] };
-        } else if (hook.event === "pre_invocation") {
+        } else if (hook.event === "pre_invocation" || hook.event === "user_prompt_submit") {
           antigravityConfig[hook.id] = { PreInvocation: [hookSpec] };
         } else if (hook.event === "post_invocation") {
           antigravityConfig[hook.id] = { PostInvocation: [hookSpec] };
-        } else if (hook.event === "session_stop") {
+        } else if (hook.event === "session_stop" || hook.event === "stop") {
           antigravityConfig[hook.id] = { Stop: [hookSpec] };
         } else {
           antigravityConfig[hook.id] = {
@@ -1656,14 +2134,22 @@ function getHookDiagnostics({ projectPath = process.cwd(), codexCapabilities } =
     }
 
     const issues = [];
+    const associatedSkill = hook.associated_skill ?? hook.metadata?.associated_skill ?? null;
+    let orphan = false;
+    if (associatedSkill) {
+      const skillInstalled = isSkillInstalledInProject(resolvedProjectPath, associatedSkill);
+      if (!skillInstalled) {
+        orphan = true;
+        issues.push(`Associated skill '${associatedSkill}' is not installed or does not exist`);
+      }
+    }
     if (hook.enabled && !handler.supported) issues.push(handler.error);
     if (hook.enabled && handler.exists === false) issues.push(handler.error);
     if (hook.enabled) {
       for (const provider of requestedProviders) {
+        if (!SUPPORTED_CONFIG_PROVIDERS.has(provider)) continue;
         if (!providerStates[provider].synced) {
           issues.push(`Provider '${provider}' is ${providerStates[provider].status}`);
-        } else if (!providerStates[provider].runtimeReady) {
-          issues.push(`Provider '${provider}' runtime is not verified`);
         }
       }
     }
@@ -1681,26 +2167,34 @@ function getHookDiagnostics({ projectPath = process.cwd(), codexCapabilities } =
       priority: hookPriority(hook),
       desiredEnabled: hook.enabled,
       failurePolicy: hook.failure_policy ?? DEFAULT_FAILURE_POLICY,
+      associated_skill: associatedSkill,
+      orphan,
       handler,
       providers: providerStates,
-      runtimeReady,
+      runtimeReady: runtimeReady && !orphan,
       issues: issues.filter(Boolean),
     };
   });
 
   const providerValues = Object.values(providers);
+  const supportedProviders = providerValues.filter((provider) =>
+    SUPPORTED_CONFIG_PROVIDERS.has(provider.provider)
+  );
   const issues = [
-    ...providerValues.filter((provider) => provider.status !== "synced" && provider.expectedHookIds.length > 0)
+    ...supportedProviders.filter((provider) => provider.status !== "synced" && provider.expectedHookIds.length > 0)
       .map((provider) => `Provider '${provider.provider}' is ${provider.status}`),
     ...hooks.flatMap((hook) => hook.issues.map((issue) => `Hook '${hook.id}': ${issue}`)),
   ];
   const desiredEnabled = hooks.filter((hook) => hook.desiredEnabled).length;
+  const orphanCount = hooks.filter((hook) => hook.orphan).length;
   const summary = {
     configuredProviders: providerValues.filter((provider) => provider.configured).length,
     syncedProviders: providerValues.filter((provider) => provider.synced).length,
     driftedProviders: providerValues.filter((provider) => provider.drift).length,
     unsupportedProviders: providerValues.filter((provider) => provider.unsupported).length,
     missingHandlers: hooks.filter((hook) => hook.desiredEnabled && hook.handler.exists === false).length,
+    orphanHooks: orphanCount,
+    orphan_count: orphanCount,
     runtimeReadyHooks: hooks.filter((hook) => hook.runtimeReady).length,
   };
   return {
@@ -1722,6 +2216,150 @@ function getHookDiagnostics({ projectPath = process.cwd(), codexCapabilities } =
 }
 
 const analyzeHookDiagnostics = getHookDiagnostics;
+
+function auditHooks({ projectPath = process.cwd() } = {}) {
+  const resolvedProjectPath = path.resolve(projectPath);
+  let manifest;
+  let diagnostics = { issues: [], providers: { antigravity: { status: "unknown" }, codex: { status: "unknown" } } };
+  try {
+    manifest = loadHookManifest({ projectPath: resolvedProjectPath });
+    diagnostics = getHookDiagnostics({ projectPath: resolvedProjectPath });
+  } catch (err) {
+    const errorIssues = err.issues
+      ? err.issues.map((i) => (typeof i === "string" ? i : `${i.field}: ${i.message}`))
+      : [err.message];
+    return {
+      audited_at: new Date().toISOString(),
+      project_path: resolvedProjectPath,
+      healthy: false,
+      total_hooks: 0,
+      enabled_count: 0,
+      disabled_count: 0,
+      orphan_count: 0,
+      hooks: [],
+      provider_sync: {
+        antigravity: "unknown",
+        codex: "unknown",
+      },
+      issues: errorIssues,
+    };
+  }
+
+  const auditIssues = [];
+  const hookResults = [];
+
+  for (const hook of manifest.hooks) {
+    const hookIssues = [];
+    const scriptPath = hook.handler?.target ? resolveScriptTarget(resolvedProjectPath, hook.handler.target) : null;
+    let scriptExists = null;
+
+    const associatedSkill = hook.associated_skill ?? hook.metadata?.associated_skill ?? null;
+    let skillInstalled = true;
+    if (associatedSkill) {
+      skillInstalled = isSkillInstalledInProject(resolvedProjectPath, associatedSkill);
+      if (!skillInstalled) {
+        hookIssues.push(`Orphan hook: associated skill '${associatedSkill}' is not installed or does not exist`);
+      }
+    }
+
+    if (hook.handler?.type === "script") {
+      if (!scriptPath) {
+        hookIssues.push("Script target path is missing");
+      } else if (!fs.existsSync(scriptPath)) {
+        hookIssues.push(`Script file does not exist: ${hook.handler.target}`);
+        scriptExists = false;
+      } else {
+        try {
+          fs.accessSync(scriptPath, fs.constants.R_OK);
+          scriptExists = true;
+        } catch {
+          hookIssues.push(`Script file is not readable (permission denied): ${hook.handler.target}`);
+          scriptExists = false;
+        }
+      }
+    } else if (hook.handler?.type === "command") {
+      if (!hook.handler?.command || typeof hook.handler.command !== "string") {
+        hookIssues.push("Command handler requires non-empty command string");
+      }
+    } else if (hook.handler?.type === "webhook") {
+      if (!hook.handler?.url || typeof hook.handler.url !== "string") {
+        hookIssues.push("Webhook handler requires non-empty url string");
+      } else {
+        try {
+          new URL(hook.handler.url);
+        } catch {
+          hookIssues.push(`Webhook handler URL is invalid: ${hook.handler.url}`);
+        }
+      }
+    }
+
+    const isValidEvent = STANDARD_HOOK_EVENTS.has
+      ? STANDARD_HOOK_EVENTS.has(hook.event)
+      : STANDARD_HOOK_EVENTS.includes(hook.event);
+    if (!isValidEvent) {
+      hookIssues.push(`Invalid event: ${hook.event}`);
+    }
+
+    if (hook.failure_policy && !["open", "closed"].includes(hook.failure_policy)) {
+      hookIssues.push(`Invalid failure policy: ${hook.failure_policy}`);
+    }
+
+    let protojsonCompliant = true;
+    if (hook.handler?.type === "script" && scriptExists && /\.[cm]?js$/.test(hook.handler.target || "")) {
+      try {
+        const content = fs.readFileSync(scriptPath, "utf8");
+        if (content.includes("formatGuardStdout") || content.includes("HOOK_RUNTIME") || content.includes("conversationId")) {
+          protojsonCompliant = true;
+        } else if (content.includes("allow:") && !content.includes("decision")) {
+          protojsonCompliant = false;
+          hookIssues.push("Script output may violate Antigravity protojson schema (missing standard decision field)");
+        }
+      } catch {
+        // Ignore read errors
+      }
+    }
+
+    if (hookIssues.length > 0) {
+      auditIssues.push(...hookIssues.map((issue) => `[${hook.id}] ${issue}`));
+    }
+
+    hookResults.push({
+      id: hook.id,
+      name: hook.name,
+      event: hook.event,
+      enabled: hook.enabled,
+      failure_policy: hook.failure_policy ?? DEFAULT_FAILURE_POLICY,
+      priority: hookPriority(hook),
+      associated_skill: associatedSkill,
+      orphan: !skillInstalled,
+      handler_type: hook.handler?.type,
+      target: hook.handler?.target || hook.handler?.command || hook.handler?.url,
+      handler: hook.handler,
+      exists: scriptExists,
+      protojson_compliant: protojsonCompliant,
+      healthy: hookIssues.length === 0,
+      issues: hookIssues,
+    });
+  }
+
+  const allIssues = [...new Set([...auditIssues, ...diagnostics.issues])];
+
+  return {
+    audited_at: new Date().toISOString(),
+    project_path: resolvedProjectPath,
+    healthy: allIssues.length === 0,
+    total_hooks: manifest.hooks.length,
+    enabled_count: manifest.hooks.filter((h) => h.enabled).length,
+    disabled_count: manifest.hooks.filter((h) => !h.enabled).length,
+    orphan_count: hookResults.filter((h) => h.orphan).length,
+    hooks: hookResults,
+    provider_sync: {
+      antigravity: diagnostics.providers.antigravity.status,
+      codex: diagnostics.providers.codex.status,
+    },
+    issues: allIssues,
+  };
+}
 
 function failurePolicyFor(hook) {
   return hook.failure_policy ?? DEFAULT_FAILURE_POLICY;
@@ -2059,9 +2697,15 @@ module.exports = {
   loadHookManifest,
   saveHookManifest,
   listHooks,
+  listHooksBySkill,
   registerHook,
   removeHook,
   updateHookStatus,
+  updateAllHooksStatus,
+  updateHooksBySkillStatus,
+  isSkillInstalledInProject,
+  discoverCompanionHooks,
+  auditHooks,
   compileProviderConfigs,
   buildProviderConfigs,
   detectCodexCapabilities,
