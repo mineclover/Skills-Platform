@@ -556,7 +556,17 @@ async function resolveLifecycleRecipe(phaseOrRecipePath, projectPath = process.c
     path.resolve(projectPath, phaseOrRecipePath),
     path.resolve(projectPath, `${phaseKey}-recipe.json`),
     path.resolve(__dirname, "../../..", `${phaseKey}-recipe.json`),
+    path.resolve(__dirname, "../../..", "recipes/tier2-procedure-loops", `${phaseKey}-recipe.json`),
+    path.resolve(__dirname, "../../..", "recipes/tier1-platform-core", `${phaseKey}-recipe.json`),
+    path.resolve(__dirname, "../../..", "recipes/tier3-mlc-architecture", `${phaseKey}-recipe.json`),
+    path.resolve(__dirname, "../../..", "recipes/tier4-ecosystem", `${phaseKey}-recipe.json`),
+    path.resolve(__dirname, "../../..", "recipes", `${phaseKey}-recipe.json`),
     path.resolve(__dirname, "../../..", phaseOrRecipePath),
+    path.resolve(__dirname, "../../..", "recipes/tier2-procedure-loops", phaseOrRecipePath),
+    path.resolve(__dirname, "../../..", "recipes/tier1-platform-core", phaseOrRecipePath),
+    path.resolve(__dirname, "../../..", "recipes/tier3-mlc-architecture", phaseOrRecipePath),
+    path.resolve(__dirname, "../../..", "recipes/tier4-ecosystem", phaseOrRecipePath),
+    path.resolve(__dirname, "../../..", "recipes", phaseOrRecipePath),
   ];
 
   for (const candidate of candidates) {

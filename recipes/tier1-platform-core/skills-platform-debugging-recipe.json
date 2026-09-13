@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "recipe_id": "skills-platform-debugging",
+  "name": "Skills Platform Debugging Recommendation",
+  "description": "Optional debugging preset; project recommendation role and priority are assigned separately.",
+  "created_at": "2026-09-07T22:55:38.425Z",
+  "created_by": "local",
+  "sources": [
+    {
+      "source_id": "source_local_4a65ffa53f80d846",
+      "type": "local",
+      "locator": "./skills-packages/community-codex/diagnosing-bugs",
+      "ref": "HEAD",
+      "resolved_commit": "3098440499d65036a30ae5ebec6fac90f3d53833472e582e32be50f90b459755"
+    }
+  ],
+  "skills": [
+    {
+      "name": "diagnosing-bugs",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_id": "source_local_4a65ffa53f80d846",
+      "source_relative_path": ".",
+      "content_digest": "3098440499d65036a30ae5ebec6fac90f3d53833472e582e32be50f90b459755",
+      "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow."
+    }
+  ],
+  "presets": [
+    {
+      "id": "skills-platform-debugging-codex",
+      "name": "Skills Platform · Debugging (Optional)",
+      "version": 2,
+      "owner": "Skills Platform",
+      "lifecycle": "reviewed",
+      "description": null,
+      "purpose": "재현 가능한 버그·성능 회귀 작업에 한해 별도로 선택하는 진단 스킬셋.",
+      "work_scope_tags": [
+        "debugging"
+      ],
+      "skills": [
+        {
+          "skill_name": "diagnosing-bugs",
+          "source_relative_path": ".",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": []
+}

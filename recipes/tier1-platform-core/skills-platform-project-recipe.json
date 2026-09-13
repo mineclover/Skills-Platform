@@ -1,0 +1,300 @@
+{
+  "schema_version": 1,
+  "recipe_id": "skills-platform-project",
+  "name": "Skills Platform Codex Project Configuration",
+  "description": "Automated skill installation recipe generated at 2026-09-08T01:05:31.948Z",
+  "created_at": "2026-09-08T01:05:31.948Z",
+  "created_by": "local",
+  "sources": [
+    {
+      "source_id": "source_local_05a23d0ba2577995",
+      "type": "local",
+      "locator": "./skills-packages/platform-core/skill-authoring-standard",
+      "ref": "HEAD",
+      "resolved_commit": "8156c4f25c4fe37c15056414f251d147c0468abcb3555a6abe765923c89f69e4"
+    },
+    {
+      "source_id": "source_local_ef4f86b90b4258ae",
+      "type": "local",
+      "locator": "./skills-packages/community-codex/writing-great-skills",
+      "ref": "HEAD",
+      "resolved_commit": "65fe32b948c832390e19dba6991ac8f24f40184f5dc555cb68db26d4cf46c3c6"
+    },
+    {
+      "source_id": "source_local_286f992105ff8e54",
+      "type": "local",
+      "locator": "./skills-packages/platform-core/skills-platform-guide",
+      "ref": "HEAD",
+      "resolved_commit": "be1d1bea85f3dda8833095b2eba0805d93ed4670fbd91078ae6e78b96db982d5"
+    },
+    {
+      "source_id": "source_local_4a65ffa53f80d846",
+      "type": "local",
+      "locator": "./skills-packages/community-codex/diagnosing-bugs",
+      "ref": "HEAD",
+      "resolved_commit": "3098440499d65036a30ae5ebec6fac90f3d53833472e582e32be50f90b459755"
+    }
+  ],
+  "skills": [
+    {
+      "name": "diagnosing-bugs",
+      "artifact_type": "skill",
+      "invocation_mode": "hybrid",
+      "source_id": "source_local_4a65ffa53f80d846",
+      "source_relative_path": ".",
+      "content_digest": "3098440499d65036a30ae5ebec6fac90f3d53833472e582e32be50f90b459755",
+      "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow.",
+      "profile": {
+        "artifact_type": "skill",
+        "invocation_mode": "hybrid",
+        "title": "diagnosing-bugs",
+        "summary": "재현 가능한 버그와 성능 회귀의 진단·최소화·검증을 위한 선택형 스킬.",
+        "purpose": "재현 가능한 버그·성능 회귀의 원인 진단",
+        "use_when": [
+          "증상을 재현할 환경과 검증 명령을 만들 수 있는 디버깅"
+        ],
+        "avoid_when": [
+          "단순 사용 설명 또는 재현 접근이 없는 추정 진단"
+        ],
+        "tags": [
+          "collection:community-codex",
+          "skills-platform:debugging"
+        ],
+        "domains": [],
+        "work_scope_tags": [
+          "debugging"
+        ],
+        "owner": null,
+        "maintainers": [],
+        "visibility": "private",
+        "provider_constraints": [
+          "codex"
+        ],
+        "runtime_requirements": [],
+        "risk_level": "medium",
+        "review_state": "reviewed"
+      }
+    },
+    {
+      "name": "skill-authoring-standard",
+      "artifact_type": "skill",
+      "invocation_mode": "hybrid",
+      "source_id": "source_local_05a23d0ba2577995",
+      "source_relative_path": ".",
+      "content_digest": "8156c4f25c4fe37c15056414f251d147c0468abcb3555a6abe765923c89f69e4",
+      "description": "Route skill authoring, review, and static validation through the official conventions for Codex or Google Antigravity. Use when creating or revising a skill, checking SKILL.md metadata and progressive disclosure, or explaining provider-specific discovery and package structure.",
+      "profile": {
+        "artifact_type": "skill",
+        "invocation_mode": "hybrid",
+        "title": "skill-authoring-standard",
+        "summary": "Route skill authoring and review through separate Codex and Antigravity provider rulesets.",
+        "purpose": "호스트별 스킬 작성 규칙과 정적 검증",
+        "use_when": [
+          "Codex 또는 Antigravity 스킬 작성·변경·검토"
+        ],
+        "avoid_when": [
+          "스킬 패키지와 무관한 일반 작업"
+        ],
+        "tags": [
+          "authoring",
+          "collection:platform-core",
+          "governance",
+          "skills-platform:base"
+        ],
+        "domains": [],
+        "work_scope_tags": [
+          "curation",
+          "governance"
+        ],
+        "owner": "Skills Platform",
+        "maintainers": [],
+        "visibility": "private",
+        "provider_constraints": [
+          "antigravity",
+          "codex"
+        ],
+        "runtime_requirements": [],
+        "risk_level": "low",
+        "review_state": "reviewed"
+      }
+    },
+    {
+      "name": "skills-platform-guide",
+      "artifact_type": "skill",
+      "invocation_mode": "hybrid",
+      "source_id": "source_local_286f992105ff8e54",
+      "source_relative_path": ".",
+      "content_digest": "be1d1bea85f3dda8833095b2eba0805d93ed4670fbd91078ae6e78b96db982d5",
+      "description": "Skills Platform의 목적과 사용 흐름을 안내하고 스킬 탐색, 설치, 사용 확인, 업데이트, 제거를 지원한다. 플랫폼 온보딩, 추천 스킬셋과 검토 정책, Vercel Skills CLI 설치와 Catalog 관리 방식 선택, 설치된 스킬의 경로·중복·인식 문제를 다룰 때 사용한다.",
+      "profile": {
+        "artifact_type": "skill",
+        "invocation_mode": "hybrid",
+        "title": "skills-platform-guide",
+        "summary": "Guide platform onboarding, direct or Catalog-managed installation, verification, and maintenance.",
+        "purpose": "플랫폼 사용·설치 경로 선택·결과 확인",
+        "use_when": [
+          "플랫폼 온보딩, 스킬 설치 및 추천 세트 선택"
+        ],
+        "avoid_when": [
+          "일반 코드 구현 자체"
+        ],
+        "tags": [
+          "collection:platform-core",
+          "skills-platform:base"
+        ],
+        "domains": [],
+        "work_scope_tags": [
+          "curation",
+          "governance"
+        ],
+        "owner": null,
+        "maintainers": [],
+        "visibility": "private",
+        "provider_constraints": [
+          "antigravity",
+          "codex"
+        ],
+        "runtime_requirements": [],
+        "risk_level": "unknown",
+        "review_state": "reviewed"
+      }
+    },
+    {
+      "name": "writing-great-skills",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_id": "source_local_ef4f86b90b4258ae",
+      "source_relative_path": ".",
+      "content_digest": "65fe32b948c832390e19dba6991ac8f24f40184f5dc555cb68db26d4cf46c3c6",
+      "description": "Review and refine Codex skill instructions for predictable discovery and execution. Use when auditing description scope, progressive disclosure, completion criteria, duplication, or prompt steering; use skill-authoring-standard for provider package contracts.",
+      "profile": {
+        "artifact_type": "skill",
+        "invocation_mode": "user_invoked",
+        "title": "writing-great-skills",
+        "summary": "Review Codex skill instructions for predictable discovery, execution, and pruning.",
+        "purpose": "Codex 스킬 지침의 범위·구조·중복 리뷰",
+        "use_when": [
+          "명시적으로 스킬 지침 품질을 검토할 때"
+        ],
+        "avoid_when": [
+          "Antigravity 규격 판단 또는 일반 코드 리뷰"
+        ],
+        "tags": [
+          "authoring",
+          "codex",
+          "collection:community-codex",
+          "skills-platform:base"
+        ],
+        "domains": [],
+        "work_scope_tags": [
+          "curation",
+          "governance"
+        ],
+        "owner": "Skills Platform",
+        "maintainers": [],
+        "visibility": "private",
+        "provider_constraints": [
+          "codex"
+        ],
+        "runtime_requirements": [],
+        "risk_level": "low",
+        "review_state": "reviewed"
+      }
+    }
+  ],
+  "presets": [
+    {
+      "id": "skills-platform-authoring-codex",
+      "name": "Skills Platform Authoring · Codex",
+      "version": 5,
+      "owner": "Skills Platform",
+      "lifecycle": "reviewed",
+      "description": "Project-local Codex platform usage guide, authoring router, and explicit review reference.",
+      "purpose": "Use and maintain project skills consistently, and author against Codex conventions without shadowing the bundled system skill-creator.",
+      "work_scope_tags": [
+        "curation",
+        "governance"
+      ],
+      "skills": [
+        {
+          "skill_name": "skills-platform-guide",
+          "source_relative_path": ".",
+          "artifact_type": "skill",
+          "source_id": "source_local_286f992105ff8e54",
+          "content_digest": "be1d1bea85f3dda8833095b2eba0805d93ed4670fbd91078ae6e78b96db982d5",
+          "required": true
+        },
+        {
+          "skill_name": "skill-authoring-standard",
+          "source_relative_path": ".",
+          "artifact_type": "skill",
+          "source_id": "source_local_05a23d0ba2577995",
+          "content_digest": "8156c4f25c4fe37c15056414f251d147c0468abcb3555a6abe765923c89f69e4",
+          "required": true
+        },
+        {
+          "skill_name": "writing-great-skills",
+          "source_relative_path": ".",
+          "artifact_type": "skill",
+          "source_id": "source_local_ef4f86b90b4258ae",
+          "content_digest": "65fe32b948c832390e19dba6991ac8f24f40184f5dc555cb68db26d4cf46c3c6",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "skills-platform-debugging-codex",
+      "name": "Skills Platform · Debugging (Optional)",
+      "version": 2,
+      "owner": "Skills Platform",
+      "lifecycle": "reviewed",
+      "description": null,
+      "purpose": "재현 가능한 버그·성능 회귀 작업에 한해 별도로 선택하는 진단 스킬셋.",
+      "work_scope_tags": [
+        "debugging"
+      ],
+      "skills": [
+        {
+          "skill_name": "diagnosing-bugs",
+          "source_relative_path": ".",
+          "artifact_type": "skill",
+          "source_id": "source_local_4a65ffa53f80d846",
+          "content_digest": "3098440499d65036a30ae5ebec6fac90f3d53833472e582e32be50f90b459755",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "project_id": "skills-platform-codex",
+      "project_name": "Skills Platform · Codex",
+      "provider_id": "codex",
+      "scope": "project",
+      "default_preset_id": "skills-platform-authoring-codex",
+      "default_preset_version": 5,
+      "review_policy": "require_approved",
+      "delivery_root_relative": ".agents/skills",
+      "preset_assignments": [
+        {
+          "preset_id": "skills-platform-authoring-codex",
+          "template_version": 5,
+          "role": "default",
+          "priority": 0,
+          "work_scope_tags": [],
+          "enabled": true
+        },
+        {
+          "preset_id": "skills-platform-debugging-codex",
+          "template_version": 2,
+          "role": "recommended",
+          "priority": 10,
+          "work_scope_tags": [
+            "debugging"
+          ],
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

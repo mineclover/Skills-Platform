@@ -1,0 +1,390 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-09-13T12:40:25.188Z",
+  "description": "Skills Platform Catalog Discovery Index organizing 16 modular recipes across 4 discovery facets as optional reference suites and composable templates.",
+  "total_recipes": 16,
+  "total_tiers": 4,
+  "tiers": [
+    {
+      "id": "tier1-platform-core",
+      "tier_number": 1,
+      "name": "Platform Core",
+      "description": "Discovery Facet 1: Foundational authoring guidelines, optional debugging recommendations, and project baseline configurations.",
+      "directory": "recipes/tier1-platform-core",
+      "recipe_count": 3,
+      "recipes": [
+        {
+          "file": "skills-platform-authoring-recipe.json",
+          "relative_path": "recipes/tier1-platform-core/skills-platform-authoring-recipe.json",
+          "root_symlink": "skills-platform-authoring-recipe.json",
+          "recipe_id": "skills-platform-authoring",
+          "name": "Skills Platform Usage and Authoring Packages",
+          "description": "Project-managed onboarding, installation guidance, and provider-specific skill-authoring packages.",
+          "presets": [
+            {
+              "id": "skills-platform-authoring-codex",
+              "name": "Skills Platform Authoring · Codex",
+              "work_scope_tags": [
+                "curation",
+                "governance"
+              ]
+            },
+            {
+              "id": "skills-platform-authoring-antigravity",
+              "name": "Skills Platform Authoring · Antigravity",
+              "work_scope_tags": [
+                "curation",
+                "governance"
+              ]
+            }
+          ],
+          "skills_count": 4,
+          "has_hooks": false
+        },
+        {
+          "file": "skills-platform-debugging-recipe.json",
+          "relative_path": "recipes/tier1-platform-core/skills-platform-debugging-recipe.json",
+          "root_symlink": "skills-platform-debugging-recipe.json",
+          "recipe_id": "skills-platform-debugging",
+          "name": "Skills Platform Debugging Recommendation",
+          "description": "Optional debugging preset; project recommendation role and priority are assigned separately.",
+          "presets": [
+            {
+              "id": "skills-platform-debugging-codex",
+              "name": "Skills Platform · Debugging (Optional)",
+              "work_scope_tags": [
+                "debugging"
+              ]
+            }
+          ],
+          "skills_count": 1,
+          "has_hooks": false
+        },
+        {
+          "file": "skills-platform-project-recipe.json",
+          "relative_path": "recipes/tier1-platform-core/skills-platform-project-recipe.json",
+          "root_symlink": "skills-platform-project-recipe.json",
+          "recipe_id": "skills-platform-project",
+          "name": "Skills Platform Codex Project Configuration",
+          "description": "Automated skill installation recipe generated at 2026-09-08T01:05:31.948Z",
+          "presets": [
+            {
+              "id": "skills-platform-authoring-codex",
+              "name": "Skills Platform Authoring · Codex",
+              "work_scope_tags": [
+                "curation",
+                "governance"
+              ]
+            },
+            {
+              "id": "skills-platform-debugging-codex",
+              "name": "Skills Platform · Debugging (Optional)",
+              "work_scope_tags": [
+                "debugging"
+              ]
+            }
+          ],
+          "skills_count": 4,
+          "has_hooks": false
+        }
+      ]
+    },
+    {
+      "id": "tier2-procedure-loops",
+      "tier_number": 2,
+      "name": "Procedure Loops",
+      "description": "Discovery Facet 2: Optional reference lifecycle loop recipes for outer-loop planning, inner-loop TDD execution, and release gate governance; composable with custom team workflows.",
+      "directory": "recipes/tier2-procedure-loops",
+      "recipe_count": 3,
+      "recipes": [
+        {
+          "file": "task-planning-recipe.json",
+          "relative_path": "recipes/tier2-procedure-loops/task-planning-recipe.json",
+          "root_symlink": "task-planning-recipe.json",
+          "recipe_id": "mlc-task-planning",
+          "name": "Task Planning & PRD Decomposition Recipe",
+          "description": "Optional reference suite for outer-loop planning, extracting PRDs, analyzing system dependencies, and decomposing work into atomic TODO queues; usable standalone or as an opt-in 'plan' work_scope_overlay.",
+          "presets": [
+            {
+              "id": "task-planning-suite",
+              "name": "Task Planning Suite",
+              "work_scope_tags": [
+                "horizontal",
+                "plan"
+              ]
+            }
+          ],
+          "skills_count": 2,
+          "has_hooks": true
+        },
+        {
+          "file": "scoped-inner-loop-recipe.json",
+          "relative_path": "recipes/tier2-procedure-loops/scoped-inner-loop-recipe.json",
+          "root_symlink": "scoped-inner-loop-recipe.json",
+          "recipe_id": "mlc-scoped-inner-loop",
+          "name": "Scoped Vertical TDD & Inner Loop Recipe",
+          "description": "Optional reference execution recipe for resolving isolated single TODO tasks with pinpoint test execution and zero full-suite scans; designed for loose coupling and 'vertical'/'execute' overlays.",
+          "presets": [
+            {
+              "id": "scoped-inner-loop-suite",
+              "name": "Scoped Inner Loop Suite",
+              "work_scope_tags": [
+                "execute",
+                "vertical"
+              ]
+            }
+          ],
+          "skills_count": 3,
+          "has_hooks": true
+        },
+        {
+          "file": "release-governance-recipe.json",
+          "relative_path": "recipes/tier2-procedure-loops/release-governance-recipe.json",
+          "root_symlink": "release-governance-recipe.json",
+          "recipe_id": "mlc-release-governance",
+          "name": "Global Verification & Release Governance Recipe",
+          "description": "Optional reference release recipe for running full regression test verification, updating project baselines, and stabilizing maintenance cases upon task convergence.",
+          "presets": [
+            {
+              "id": "release-governance-suite",
+              "name": "Release Governance Suite",
+              "work_scope_tags": [
+                "gate",
+                "governance"
+              ]
+            }
+          ],
+          "skills_count": 3,
+          "has_hooks": true
+        }
+      ]
+    },
+    {
+      "id": "tier3-mlc-architecture",
+      "tier_number": 3,
+      "name": "MLC Architecture",
+      "description": "Discovery Facet 3: Modular Lifecycle Context (MLC) reference architecture presets, Bounded Baseline Condenser, and domain overlays (ADR-0005) available as composable building blocks.",
+      "directory": "recipes/tier3-mlc-architecture",
+      "recipe_count": 7,
+      "recipes": [
+        {
+          "file": "condensation-recipe.json",
+          "relative_path": "recipes/tier3-mlc-architecture/condensation-recipe.json",
+          "root_symlink": "condensation-recipe.json",
+          "recipe_id": "mlc-condensation-core",
+          "name": "Recipe for condensation-core",
+          "description": "Optional reference compiler for 80k baseline compilation and reference pack building; usable standalone or as an opt-in 'curation' overlay.",
+          "presets": [
+            {
+              "id": "condensation-core",
+              "name": "Condensation Core (3-Skill Ultra-light)",
+              "work_scope_tags": [
+                "curation",
+                "planning",
+                "review"
+              ]
+            }
+          ],
+          "skills_count": 3,
+          "has_hooks": false
+        },
+        {
+          "file": "baseline-curation-recipe.json",
+          "relative_path": "recipes/tier3-mlc-architecture/baseline-curation-recipe.json",
+          "root_symlink": "baseline-curation-recipe.json",
+          "recipe_id": "mlc-baseline-curation-core",
+          "name": "Recipe for baseline-curation-core",
+          "description": "Optional reference domain suite combining baseline compiler with 8 architectural reducers for deep code curation.",
+          "presets": [
+            {
+              "id": "baseline-curation-core",
+              "name": "Baseline Curation Core (11-Skill Full Domain)",
+              "work_scope_tags": [
+                "architecture",
+                "curation",
+                "migration"
+              ]
+            }
+          ],
+          "skills_count": 11,
+          "has_hooks": false
+        },
+        {
+          "file": "mlc-recursive-context-recipe.json",
+          "relative_path": "recipes/tier3-mlc-architecture/mlc-recursive-context-recipe.json",
+          "root_symlink": "mlc-recursive-context-recipe.json",
+          "recipe_id": "mlc-recursive-context",
+          "name": "Recipe for mlc-recursive-context",
+          "description": "Optional reference context engine featuring 4 base registries and 9 H/V exploration skills for deep analysis workflows.",
+          "presets": [
+            {
+              "id": "mlc-recursive-context",
+              "name": "MLC Recursive Context & Exploration (13-Skill)",
+              "work_scope_tags": [
+                "context",
+                "explore",
+                "planning"
+              ]
+            }
+          ],
+          "skills_count": 13,
+          "has_hooks": false
+        },
+        {
+          "file": "mlc-specialist-domains-recipe.json",
+          "relative_path": "recipes/tier3-mlc-architecture/mlc-specialist-domains-recipe.json",
+          "root_symlink": "mlc-specialist-domains-recipe.json",
+          "recipe_id": "mlc-specialist-domains",
+          "name": "Recipe for mlc-specialist-domains",
+          "description": "Optional specialist domain overlays for AI Agent Systems, Browser DevTools, UI Editor, 3D Graphics, and Knowledge Publishing.",
+          "presets": [
+            {
+              "id": "mlc-specialist-domains",
+              "name": "MLC Specialist Domain Overlays (5-Skill)",
+              "work_scope_tags": [
+                "domain",
+                "specialist"
+              ]
+            }
+          ],
+          "skills_count": 5,
+          "has_hooks": false
+        },
+        {
+          "file": "mlc-toolchain-recipe.json",
+          "relative_path": "recipes/tier3-mlc-architecture/mlc-toolchain-recipe.json",
+          "root_symlink": "mlc-toolchain-recipe.json",
+          "recipe_id": "mlc-toolchain-plane",
+          "name": "Recipe for mlc-toolchain-plane",
+          "description": "Optional reference toolchain suite for Method Registry, Tool Registry, Toolchain Planner, and Invocation Guard governance.",
+          "presets": [
+            {
+              "id": "mlc-toolchain-plane",
+              "name": "MLC Toolchain & Capability Plane (6-Skill)",
+              "work_scope_tags": [
+                "governance",
+                "toolchain"
+              ]
+            }
+          ],
+          "skills_count": 6,
+          "has_hooks": false
+        },
+        {
+          "file": "mlc-governance-recipe.json",
+          "relative_path": "recipes/tier3-mlc-architecture/mlc-governance-recipe.json",
+          "root_symlink": "mlc-governance-recipe.json",
+          "recipe_id": "mlc-lifecycle-governance",
+          "name": "Recipe for mlc-lifecycle-governance",
+          "description": "Optional reference suite modeling a 10-state Case machine, Signal Intake, Validation Gate, Release Stabilization, and Closure Learning.",
+          "presets": [
+            {
+              "id": "mlc-lifecycle-governance",
+              "name": "MLC Lifecycle & Governance Plane (8-Skill)",
+              "work_scope_tags": [
+                "governance",
+                "lifecycle",
+                "review"
+              ]
+            }
+          ],
+          "skills_count": 8,
+          "has_hooks": false
+        },
+        {
+          "file": "mlc-full-suite-recipe.json",
+          "relative_path": "recipes/tier3-mlc-architecture/mlc-full-suite-recipe.json",
+          "root_symlink": "mlc-full-suite-recipe.json",
+          "recipe_id": "mlc-baseline-full-suite",
+          "name": "Recipe for baseline-full-suite",
+          "description": "Comprehensive reference bundle combining context condensation, specialist overlays, and lifecycle governance as an opt-in master suite.",
+          "presets": [
+            {
+              "id": "baseline-full-suite",
+              "name": "Bounded Baseline Condenser Full Suite (43-Skill)",
+              "work_scope_tags": [
+                "curation",
+                "full"
+              ]
+            }
+          ],
+          "skills_count": 43,
+          "has_hooks": false
+        }
+      ]
+    },
+    {
+      "id": "tier4-ecosystem",
+      "tier_number": 4,
+      "name": "Ecosystem",
+      "description": "Discovery Facet 4: Multi-provider and community agent ecosystem suites (Paperthin reflexes, Antigravity Native, Codex/Community) for diverse project workflows.",
+      "directory": "recipes/tier4-ecosystem",
+      "recipe_count": 3,
+      "recipes": [
+        {
+          "file": "paperthin-reflexes-recipe.json",
+          "relative_path": "recipes/tier4-ecosystem/paperthin-reflexes-recipe.json",
+          "root_symlink": "paperthin-reflexes-recipe.json",
+          "recipe_id": "mlc-paperthin-reflexes",
+          "name": "Paperthin Reflexes & Core Coding Baseline",
+          "description": "28개 코딩 반사신경 스킬과 5대 보안 가드 훅이 결합된 일상 개발/TDD 참고용 레퍼런스 스위트 (완전 선택적 채택)",
+          "presets": [
+            {
+              "id": "paperthin-reflexes",
+              "name": "Paperthin Reflexes Baseline",
+              "work_scope_tags": [
+                "coding",
+                "reflexes",
+                "tdd"
+              ]
+            }
+          ],
+          "skills_count": 28,
+          "has_hooks": true
+        },
+        {
+          "file": "agy-lifecycle-recipe.json",
+          "relative_path": "recipes/tier4-ecosystem/agy-lifecycle-recipe.json",
+          "root_symlink": "agy-lifecycle-recipe.json",
+          "recipe_id": "mlc-agy-lifecycle",
+          "name": "Antigravity Native Lifecycle & Worktree Pipeline Recipe",
+          "description": "Antigravity 환경을 위한 절차적 책임 워크스페이스, Git 순차 병합 및 5대 보안 가드 훅 워크플로우 레퍼런스 레시피",
+          "presets": [
+            {
+              "id": "agy-lifecycle",
+              "name": "Antigravity Lifecycle Preset",
+              "work_scope_tags": [
+                "antigravity",
+                "lifecycle",
+                "worktree"
+              ]
+            }
+          ],
+          "skills_count": 4,
+          "has_hooks": true
+        },
+        {
+          "file": "community-dev-recipe.json",
+          "relative_path": "recipes/tier4-ecosystem/community-dev-recipe.json",
+          "root_symlink": "community-dev-recipe.json",
+          "recipe_id": "mlc-community-dev-suite",
+          "name": "Community & Codex Full-Stack Development Suite",
+          "description": "TDD, Code Review, Bug Diagnosis, Spec Synthesis, and Conflict Resolution skills imported from Codex & Community for autonomous team workflows.",
+          "presets": [
+            {
+              "id": "community-dev-preset",
+              "name": "Community Development Preset",
+              "work_scope_tags": [
+                "community",
+                "development",
+                "fullstack"
+              ]
+            }
+          ],
+          "skills_count": 6,
+          "has_hooks": false
+        }
+      ]
+    }
+  ]
+}

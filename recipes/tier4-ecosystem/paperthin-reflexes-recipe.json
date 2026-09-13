@@ -1,0 +1,625 @@
+{
+  "schema_version": 1,
+  "recipe_id": "mlc-paperthin-reflexes",
+  "name": "Paperthin Reflexes & Core Coding Baseline",
+  "version": "1.0.0",
+  "description": "28개 코딩 반사신경 스킬과 5대 보안 가드 훅이 결합된 일상 개발/TDD 참고용 레퍼런스 스위트 (완전 선택적 채택)",
+  "created_at": "2026-08-29T00:00:00.000Z",
+  "sources": [
+    {
+      "source_id": "src:paperthin",
+      "type": "local",
+      "locator": "./skills-packages/paperthin",
+      "description": "Paperthin 28 reflex skills package"
+    }
+  ],
+  "skills": [
+    {
+      "skill_id": "skill:aim",
+      "name": "aim",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "aim",
+      "content_digest": "6bb7762b410a1b0e843e0a9043d989652f08577271187190a577e832f7ac3969",
+      "invocation_mode": "hybrid",
+      "description": "When data lands with a thin ask — files, a repo, a paste, a chat scrollback — read it and propose what the user is trying to do with it, as a proposal to confirm rather than a question to answer. Use the moment material arrives without a fully-formed ask, or when the ask reads thinner than the data suggests."
+    },
+    {
+      "skill_id": "skill:autobahn",
+      "name": "autobahn",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "autobahn",
+      "content_digest": "0bf2f1386124fd0ec8d02c8665d266c47111266dfc4279b4320cb67dd71c1e77",
+      "invocation_mode": "hybrid",
+      "description": "Carve guardrail-adjacent items out of scope with safe alternatives before risk-adjacent work starts, then run the safe remainder at full strength in a fresh subagent that only ever sees the carved prompt, never the risky input. Use when a task includes stealth, scraping, privacy, IP, policy, licensing, security, or other safety-adjacent material that could be silently dropped, over-elaborated, or needlessly diluted. Fires on the impulse, not only the topic: the moment you notice yourself about to hedge, soften, silently skip, or brace for a refusal, carve before you execute."
+    },
+    {
+      "skill_id": "skill:catchup",
+      "name": "catchup",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "catchup",
+      "content_digest": "bb7dd33f6caf6b81a785dcfddbd3afbea013fcf9347554f1d4aecd1d9ce0e396",
+      "invocation_mode": "hybrid",
+      "description": "Rebuild the human's lost context on a project from live state, in plain language: what needs them, what changed, what new words mean. Use when the human returns after a gap, says they can't follow the project anymore, asks what happened or what a term means, or before deciding what to do next when their mental model is stale. Read-only; it briefs, it does not act."
+    },
+    {
+      "skill_id": "skill:debloat",
+      "name": "debloat",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "debloat",
+      "content_digest": "00b32ac4ecea4e4470782c07748024708675aab443f0e23cb4041f73fa89d202",
+      "invocation_mode": "hybrid",
+      "description": "Compress an artifact that has accreted into bloat — padding, over-qualification, fused sentences, walls of enumeration, adjacent restatement — down to its load-bearing density, meaning preserved. Use when prose is correct and current but has grown verbose or patched-over and you want it tight without a full rewrite."
+    },
+    {
+      "skill_id": "skill:dedash",
+      "name": "dedash",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "dedash",
+      "content_digest": "7e65511ca4f8afa2306d59859f412aafa0499658719c68d0f3d14148d41af42a",
+      "invocation_mode": "hybrid",
+      "description": "Remove em-dashes and the dashes standing in for them from a user-owned scope, reading each occurrence in context and choosing the punctuation or wording that fits."
+    },
+    {
+      "skill_id": "skill:detool",
+      "name": "detool",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "detool",
+      "content_digest": "eab0f08957ac7f946de0862d050efe34befd331bd5393deff6985a8b27494645",
+      "invocation_mode": "hybrid",
+      "description": "Make durable artifacts portable by replacing incidental stack, vendor, model, CLI, path, quota, or harness nouns with the mechanism they mean, while keeping provenance, runbooks, and tool-subject claims concrete."
+    },
+    {
+      "skill_id": "skill:factchk",
+      "name": "factchk",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "factchk",
+      "content_digest": "9ca8b91885934e1aa101a9c38fec382410951dcc00fbf76220efc9d0f89e573c",
+      "invocation_mode": "hybrid",
+      "description": "Verify reality-grounded claims against external sources in both directions before they ship — could the 'absurd' be real, could the 'obvious' be false or long-established? Use whenever an artifact, or the sentence you are about to write, asserts something as plausible, realistic, absurd, novel, or impossible from intuition rather than a checked source; before relying on a factual claim in prose, a design rationale, a research claim, or a plan. Fires on metacognitive doubt — when you can't actually know, verify instead of trusting the feeling. Scans read-only, then fixes the clear errors or flags the judgment calls; leaves deliberate fiction alone."
+    },
+    {
+      "skill_id": "skill:feynman",
+      "name": "feynman",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "feynman",
+      "content_digest": "90a6025f5314305203f52cd01507d4308ddd74ab38ad7c042e2b5772b0236560",
+      "invocation_mode": "hybrid",
+      "description": "Press a decision you just made until you can explain it to a skeptic in your own words, or surface the gap where you can't. The Feynman test aimed at a choice: understanding is cheapest to fake the moment after you decide, so a fresh critic presses for what you can't actually explain. Use right after picking an option, especially one an agent laid out without arguing for."
+    },
+    {
+      "skill_id": "skill:hate",
+      "name": "hate",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "hate",
+      "content_digest": "2d404fe89478bb520d72ef0da5674dfd1e00ff3e7dde43a5d6aeeb77d8b4ccbd",
+      "invocation_mode": "hybrid",
+      "description": "Attack a plan, design, or argument like you want it to fail before you commit real effort — return the single load-bearing objection and the cheapest experiment that would prove it matters, not a checklist. User-invoked on purpose: a hate-it reflex always in the agent's reach would bias it toward demolition. Weighs many failure axes but owns the synthesis to one root."
+    },
+    {
+      "skill_id": "skill:macrothink",
+      "name": "macrothink",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "macrothink",
+      "content_digest": "3eb27c1d74420f1723b800a20c02cf05ac81c526555befd13b3b3f87d5488426",
+      "invocation_mode": "hybrid",
+      "description": "User-invoked read-only pass for checking whether the current direction is tunnel-visioned: strip the session's bait, fan out 2 to 5 same-model fresh reads, and report divergence first without treating convergence as proof."
+    },
+    {
+      "skill_id": "skill:mandela",
+      "name": "mandela",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "mandela",
+      "content_digest": "f02a13cb7619014c35ac494b61c0592e633a5df48b7a649ef9f86f62ae8e6f0d",
+      "invocation_mode": "hybrid",
+      "description": "Audit any eval, metric, experiment, or benchmark for leakage — does external ground-truth enter independently, or are the model, scorer, and designer just confirming a result no outside truth ever produced? Use before trusting any 'how we'll know it worked' — an A/B, a holdout, a score, a validation — and whenever a result feels too clean or self-confirming. Walks an 8-pattern leakage taxonomy and returns only the patterns that fire, each with an independence fix. Read-only."
+    },
+    {
+      "skill_id": "skill:modelchk",
+      "name": "modelchk",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "modelchk",
+      "content_digest": "23bd19f25be8d3323c24aaf1b9966df4a06d31885032969d0a3b66bdbe46fa68",
+      "invocation_mode": "hybrid",
+      "description": "Size a task's run before spending it: the cheapest sufficient capability tier (fast, standard, frontier) and the reasoning effort within it, on a neutral scale that binds to whatever levels the model exposes. Use when work seems over- or under-powered, costly, ambiguous, or high-risk, or asks which model class and how much thinking is enough."
+    },
+    {
+      "skill_id": "skill:nba",
+      "name": "nba",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "nba",
+      "content_digest": "e41b874d68588fe5ef47dd4e5a17ffd7449524e8a4cbf158da51afd8c1a00029",
+      "invocation_mode": "hybrid",
+      "description": "Read the live cycle state and return the single highest-leverage next best action, not a menu. Use when a project is between phases, the author asks what to do next, too many valid threads are open, or the work needs re-entry into frame, build, drive, re0-memo, hate, re0-work, or ship."
+    },
+    {
+      "skill_id": "skill:prism",
+      "name": "prism",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "prism",
+      "content_digest": "3c7daf86487c28956a492d64f8b69f1bd2575a088fa23ce2ac7585dee18bf9f3",
+      "invocation_mode": "hybrid",
+      "description": "Split one artifact — a claim, plan, or file — across 2 to 5 independent lenses, one per genuinely distinct failure mode (correctness, security, readability, cost, adversarial-user), and return their convergence: where they agree, where they disagree, and the single next question that resolves the disagreement. Use when one reviewer isn't enough because the failure modes are heterogeneous, or a claim looks strong to its author and needs cross-lens pressure before it ships."
+    },
+    {
+      "skill_id": "skill:re0",
+      "name": "re0",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "re0",
+      "content_digest": "4ef9ab0222f819f0b0e172887321b3217406407c838df4fd5f42f03ecf6a7486",
+      "invocation_mode": "hybrid",
+      "description": "Refresh an existing artifact into the current best v0. Use when the user asks to clean up, sync up, dedupe, de-noise, smooth, rewrite, or update an artifact after iteration; when nearby artifacts may have drifted; or when changes in one place should be reflected across related artifacts while keeping the result minimal."
+    },
+    {
+      "skill_id": "skill:re0-git",
+      "name": "re0-git",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "re0-git",
+      "content_digest": "2e6e885953c37b917d34310444995e6232b7db698a8c916b611210b53e591d8f",
+      "invocation_mode": "hybrid",
+      "description": "Rewrite a finished commit's message into a clean, handoff-ready form in your own log style, so `git log` alone tells the story. User-invoked: run it after a commit."
+    },
+    {
+      "skill_id": "skill:re0-loop",
+      "name": "re0-loop",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "re0-loop",
+      "content_digest": "a7158b09c1220a5998d320fd1777a457c1a86c96b6b0063d5224659dbdd24a3e",
+      "invocation_mode": "hybrid",
+      "description": "Run repeated build -> QA -> re0-memo -> re0-work cycles while preserving learning and letting code die. Use for long agentic projects where progress must be measured by quality-cleared templates, reusable modules, and eliminated anti-patterns rather than hours spent or features accumulated."
+    },
+    {
+      "skill_id": "skill:re0-memo",
+      "name": "re0-memo",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "re0-memo",
+      "content_digest": "8fd585b721ed581a54cb2f589626fb44dc9cf7c9dcaf7ac2f49b45b6c4785e0a",
+      "invocation_mode": "hybrid",
+      "description": "Turn a finished, failed, or disappointing work cycle into portable lessons, anti-patterns, quality gates, and next-cycle vocabulary. Use after a build, QA pass, demo, user complaint, or abandoned attempt when the useful output is what the next pass must learn rather than the code itself."
+    },
+    {
+      "skill_id": "skill:re0-merge",
+      "name": "re0-merge",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "re0-merge",
+      "content_digest": "eb3195f5113fe73bc7398fb8171e56657c7a19cf7df882a3a1c06e6e1a38dfed",
+      "invocation_mode": "hybrid",
+      "description": "Review and land an external contribution the way this suite does: gate it against the thesis, land it with the author's credit intact, complete a new skill rather than merging it raw, then approve, credit, and explain before closing. Use when reviewing a pull request, as any collaborator or maintainer, not only the author."
+    },
+    {
+      "skill_id": "skill:re0-plan",
+      "name": "re0-plan",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "re0-plan",
+      "content_digest": "d680362a884408bdc8b43f72fdf1a1b0180b5ac7686849acbf8f2c6c6e5e571c",
+      "invocation_mode": "hybrid",
+      "description": "Open a paperthin iteration's casebook before re0-loop's first turn — seeded with real content the moment the folder exists, never an empty directory. User-invoked, paperthin-only: assumes the full skill package installed. Run when opening a new build cycle in this repo."
+    },
+    {
+      "skill_id": "skill:re0-release",
+      "name": "re0-release",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "re0-release",
+      "content_digest": "969584faeb5d63b80d1a0331e0b34ed4863c22a83ef1d3573640aab84548f375",
+      "invocation_mode": "hybrid",
+      "description": "Walk a pending change through this repo's shipping and releasing checklist end to end, then tag and publish once confirmed. User-invoked: run it when you've decided to ship."
+    },
+    {
+      "skill_id": "skill:re0-upgrade",
+      "name": "re0-upgrade",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "re0-upgrade",
+      "content_digest": "cb14b3ceb0ead24506ee69e23c2930bd45b91d18746173461113684d3e1647a8",
+      "invocation_mode": "hybrid",
+      "description": "Bring your installed paperthin skills up to the full current catalog in one step: retire what's been renamed, add every skill you don't have yet, and refresh the rest, all shown and confirmed before anything changes."
+    },
+    {
+      "skill_id": "skill:re0-work",
+      "name": "re0-work",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "re0-work",
+      "content_digest": "16594eaa0c45ac862eaee5c34526600b47c561ba9065345d2698cec337bf20ea",
+      "invocation_mode": "hybrid",
+      "description": "Restart a project or artifact from v0 while preserving only proven lessons, contracts, gates, vocabulary, real-surface tests, and negative corpus. Use when the foundation is wrong, accumulated code is misleading progress, or a new pass should learn from the old one without inheriting its accidental architecture."
+    },
+    {
+      "skill_id": "skill:readchk",
+      "name": "readchk",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "readchk",
+      "content_digest": "65ae0c888e28e7cca7bed6d2102657eb791df7500ad1a13be92a376be071f00b",
+      "invocation_mode": "hybrid",
+      "description": "Verify the model's understanding of a user's instruction before spending non-trivial work. Use when a request is long, bundled, high-stakes, hard to undo, or has ambiguous scope or referents such as this, that, it, the other one, whatever is cleaner, or whichever order makes sense. Restate internally, cross-check against available context, proceed silently when resolved, and surface only a genuine surviving fork."
+    },
+    {
+      "skill_id": "skill:reorder",
+      "name": "reorder",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "reorder",
+      "content_digest": "87367b02bf0b9b868c4932a877f00cf9c61f279d72ab5fabd08e6ffea9601038",
+      "invocation_mode": "hybrid",
+      "description": "Realign a listing whose order has gone arbitrary — a list, table, catalog, sections, an enum — into a logical sequence under one stated principle. Move items only: nothing is reworded, added, or removed. Use when the order no longer helps a reader follow the set."
+    },
+    {
+      "skill_id": "skill:shower",
+      "name": "shower",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "shower",
+      "content_digest": "642d9d0627d697ec44b2ac08a15ff500506d78a591ed322e71b29dd1fcd0e08d",
+      "invocation_mode": "hybrid",
+      "description": "Cold-read the artifact you're focused on from a fresh, zero-context sub-session to confirm it stands on its own — a shower-thought reset for accumulated session bias. Use when a long session has worn away your fresh eyes and you can no longer tell whether the artifact in focus is clear to someone with no prior context; before a handoff, publish, or merge; or when you want a clean-room comprehension smoke test. Spawns a separate context-free reviewer; it diagnoses, it does not fix."
+    },
+    {
+      "skill_id": "skill:sip",
+      "name": "sip",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "sip",
+      "content_digest": "a675d6bedfa065b45e481bee466863fa2cb820e447d7c9f648e4196b10ae7a97",
+      "invocation_mode": "hybrid",
+      "description": "After you create or change an artifact or skill, taste-test it with our own skills instead of trusting your in-session judgment — recursive self-improvement, made automatic. Use right after writing or editing anything, before calling it done, committing, or handing it off."
+    },
+    {
+      "skill_id": "skill:ssotize",
+      "name": "ssotize",
+      "version": "1.0.0",
+      "source_id": "src:paperthin",
+      "source_relative_path": "ssotize",
+      "content_digest": "adf4f36b1aebfd34719d02818b23a51600d44d2052a7a0b3434b643a3511f431",
+      "invocation_mode": "hybrid",
+      "description": "Audit and consolidate a fact that's scattered across places into one canonical source, after approval, and replace the rest with references. Use when asked to find duplication, check consistency, locate the source of truth, deduplicate, consolidate, unify, or establish SSOT across artifacts or platforms. Starts read-only, reports the map and plan, then mutates only after explicit approval."
+    }
+  ],
+  "presets": [
+    {
+      "id": "paperthin-reflexes",
+      "name": "Paperthin Reflexes Baseline",
+      "version": 1,
+      "description": "Reference coding reflex suite with 28 core reflex skills from Paperthin",
+      "skills": [
+        {
+          "skill_id": "skill:aim",
+          "skill_name": "aim",
+          "version": "1.0.0",
+          "source_relative_path": "aim",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:autobahn",
+          "skill_name": "autobahn",
+          "version": "1.0.0",
+          "source_relative_path": "autobahn",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:catchup",
+          "skill_name": "catchup",
+          "version": "1.0.0",
+          "source_relative_path": "catchup",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:debloat",
+          "skill_name": "debloat",
+          "version": "1.0.0",
+          "source_relative_path": "debloat",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:dedash",
+          "skill_name": "dedash",
+          "version": "1.0.0",
+          "source_relative_path": "dedash",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:detool",
+          "skill_name": "detool",
+          "version": "1.0.0",
+          "source_relative_path": "detool",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:factchk",
+          "skill_name": "factchk",
+          "version": "1.0.0",
+          "source_relative_path": "factchk",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:feynman",
+          "skill_name": "feynman",
+          "version": "1.0.0",
+          "source_relative_path": "feynman",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:hate",
+          "skill_name": "hate",
+          "version": "1.0.0",
+          "source_relative_path": "hate",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:macrothink",
+          "skill_name": "macrothink",
+          "version": "1.0.0",
+          "source_relative_path": "macrothink",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:mandela",
+          "skill_name": "mandela",
+          "version": "1.0.0",
+          "source_relative_path": "mandela",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:modelchk",
+          "skill_name": "modelchk",
+          "version": "1.0.0",
+          "source_relative_path": "modelchk",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:nba",
+          "skill_name": "nba",
+          "version": "1.0.0",
+          "source_relative_path": "nba",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:prism",
+          "skill_name": "prism",
+          "version": "1.0.0",
+          "source_relative_path": "prism",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:re0",
+          "skill_name": "re0",
+          "version": "1.0.0",
+          "source_relative_path": "re0",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:re0-git",
+          "skill_name": "re0-git",
+          "version": "1.0.0",
+          "source_relative_path": "re0-git",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:re0-loop",
+          "skill_name": "re0-loop",
+          "version": "1.0.0",
+          "source_relative_path": "re0-loop",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:re0-memo",
+          "skill_name": "re0-memo",
+          "version": "1.0.0",
+          "source_relative_path": "re0-memo",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:re0-merge",
+          "skill_name": "re0-merge",
+          "version": "1.0.0",
+          "source_relative_path": "re0-merge",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:re0-plan",
+          "skill_name": "re0-plan",
+          "version": "1.0.0",
+          "source_relative_path": "re0-plan",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:re0-release",
+          "skill_name": "re0-release",
+          "version": "1.0.0",
+          "source_relative_path": "re0-release",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:re0-upgrade",
+          "skill_name": "re0-upgrade",
+          "version": "1.0.0",
+          "source_relative_path": "re0-upgrade",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:re0-work",
+          "skill_name": "re0-work",
+          "version": "1.0.0",
+          "source_relative_path": "re0-work",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:readchk",
+          "skill_name": "readchk",
+          "version": "1.0.0",
+          "source_relative_path": "readchk",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:reorder",
+          "skill_name": "reorder",
+          "version": "1.0.0",
+          "source_relative_path": "reorder",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:shower",
+          "skill_name": "shower",
+          "version": "1.0.0",
+          "source_relative_path": "shower",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:sip",
+          "skill_name": "sip",
+          "version": "1.0.0",
+          "source_relative_path": "sip",
+          "artifact_type": "skill",
+          "required": true
+        },
+        {
+          "skill_id": "skill:ssotize",
+          "skill_name": "ssotize",
+          "version": "1.0.0",
+          "source_relative_path": "ssotize",
+          "artifact_type": "skill",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "hooks": [
+    {
+      "id": "secret-leak-guard",
+      "name": "Secret Leak Guard",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "run_command|write_to_file|replace_file_content|send_message|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/secret-leak-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 5,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "destructive-command-blocker",
+      "name": "Destructive Command Blocker",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "run_command",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/destructive-command-blocker.js",
+        "timeout_ms": 5000
+      },
+      "priority": 10,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "context-budget-guard",
+      "name": "Context Budget Guard",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content|run_command|view_file",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/context-budget-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 15,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    },
+    {
+      "id": "scope-boundary-enforcer",
+      "name": "Scope Boundary Enforcer",
+      "event": "post_tool_use",
+      "enabled": true,
+      "matcher": "write_to_file|replace_file_content",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/scope-boundary-enforcer.js",
+        "timeout_ms": 5000
+      },
+      "priority": 20,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "associated_skill": "vertical-spec-documenter"
+    },
+    {
+      "id": "subagent-recursion-limiter",
+      "name": "Subagent Recursion Limiter",
+      "event": "pre_tool_use",
+      "enabled": true,
+      "matcher": "invoke_subagent|send_message",
+      "handler": {
+        "type": "script",
+        "target": ".skills-platform/hooks/guards/subagent-recursion-limiter.js",
+        "timeout_ms": 5000
+      },
+      "priority": 25,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ]
+    }
+  ]
+}
