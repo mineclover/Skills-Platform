@@ -252,6 +252,30 @@
       "content_digest": "e1131227f04ef4162e9a4b1180f33512fe252c0df26a6ccd96d8835351b6bfdd",
       "fetched_at": "2026-09-13T03:28:11.022Z",
       "review_state": "imported"
+    },
+    {
+      "id": "revision_664626fc7c540a8b22c8d9ea",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "resolved_revision": "6f706e30b5ec55e87598bf3b59164c9d9d96222f",
+      "content_digest": "d2fd02352d33a4d1e8df6875863aab620c8155a5877a8d4882bb5faa9b2ae7df",
+      "fetched_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_a46993c9f257a7e1f93c5ee0",
+      "source_id": "source_local_e98f324f1cc91585",
+      "resolved_revision": "dde9f5252584b897efa0deb144ba6aaa14f11c9d4e0fd4a5b046ddf6128045b4",
+      "content_digest": "dde9f5252584b897efa0deb144ba6aaa14f11c9d4e0fd4a5b046ddf6128045b4",
+      "fetched_at": "2026-09-13T03:46:56.567Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "revision_dfd35cf7987fdab76a499f65",
+      "source_id": "source_local_ac4bbce16f32422a",
+      "resolved_revision": "de4dec953225d8071215735a08fe17e99fbcaeee02218a7fe04085afaf4b792e",
+      "content_digest": "de4dec953225d8071215735a08fe17e99fbcaeee02218a7fe04085afaf4b792e",
+      "fetched_at": "2026-09-13T03:46:56.951Z",
+      "review_state": "imported"
     }
   ],
   "lineages": [
@@ -300,7 +324,7 @@
       "source_relative_path": "skills/breadth/re0-upgrade",
       "skill_name": "re0-upgrade",
       "created_at": "2026-08-26T22:43:51.739Z",
-      "invocation_mode": "model_invoked"
+      "invocation_mode": "unspecified"
     },
     {
       "id": "lineage_021dfa6016d6599dc824",
@@ -2758,6 +2782,866 @@
       "canonical_path": "revisions/revision_5e8094b57bb31730d7bf9c8a/artifacts/skill-authoring-standard-e1131227f0",
       "canonical_relative_path": "revisions/revision_5e8094b57bb31730d7bf9c8a/artifacts/skill-authoring-standard-e1131227f0",
       "imported_at": "2026-09-13T03:28:11.022Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_8892c4d03c31daade923",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "paperthin",
+      "artifact_type": "plugin",
+      "invocation_mode": "model_invoked",
+      "source_relative_path": ".claude-plugin",
+      "artifact_key": "source_local_d7bcc470ac71e912:.claude-plugin",
+      "lineage_id": "lineage_94d2bdb05c7cb8c7fd11",
+      "description": "Low-level agentic design patterns. Turning old engineering wisdom into reflexes your agent reaches for on its own—on any agent.",
+      "manifest": null,
+      "provider_compatibility": null,
+      "authoring_ruleset_fingerprint": null,
+      "content_digest": "42362fb50d23f9dc790b1eafa70c565cd15ebc416105def284db36f24d8916fd",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/paperthin-42362fb50d",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/paperthin-42362fb50d",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_0e2adfa24656117c8aa7",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "re0-upgrade",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/breadth/re0-upgrade",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/breadth/re0-upgrade",
+      "lineage_id": "lineage_3f81dfcb91902b8088b8",
+      "description": "Bring your installed paperthin skills up to the full current catalog in one step: retire what's been renamed, add every skill you don't have yet, and refresh the rest, all shown and confirmed before anything changes.",
+      "manifest": {
+        "declared_name": "re0-upgrade",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "a18d20e3d91d47e47580ff22276d061f8602e2de8aeac7c872c5c993e9289008",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-upgrade-a18d20e3d9",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-upgrade-a18d20e3d9",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_f952f79ef808a46656b9",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "ssotize",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/breadth/ssotize",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/breadth/ssotize",
+      "lineage_id": "lineage_021dfa6016d6599dc824",
+      "description": "Audit and consolidate a fact that's scattered across places into one canonical source, after approval, and replace the rest with references. Use when asked to find duplication, check consistency, locate the source of truth, deduplicate, consolidate, unify, or establish SSOT across artifacts or platforms. Starts read-only, reports the map and plan, then mutates only after explicit approval.",
+      "manifest": {
+        "declared_name": "ssotize",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "adf4f36b1aebfd34719d02818b23a51600d44d2052a7a0b3434b643a3511f431",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/ssotize-adf4f36b1a",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/ssotize-adf4f36b1a",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_0418f9b2fb9c648d2f50",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "catchup",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/coil/catchup",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/coil/catchup",
+      "lineage_id": "lineage_01cd8fd6852431573fb4",
+      "description": "Rebuild the human's lost context on a project from live state, in plain language: what needs them, what changed, what new words mean. Use when the human returns after a gap, says they can't follow the project anymore, asks what happened or what a term means, or before deciding what to do next when their mental model is stale. Read-only; it briefs, it does not act.",
+      "manifest": {
+        "declared_name": "catchup",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "bb7dd33f6caf6b81a785dcfddbd3afbea013fcf9347554f1d4aecd1d9ce0e396",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/catchup-bb7dd33f6c",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/catchup-bb7dd33f6c",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_06f534c706cefa644871",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "nba",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/coil/nba",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/coil/nba",
+      "lineage_id": "lineage_f0459f9eb5db8f174ed5",
+      "description": "Read the live cycle state and return the single highest-leverage next best action, not a menu. Use when a project is between phases, the author asks what to do next, too many valid threads are open, or the work needs re-entry into frame, build, drive, re0-memo, hate, re0-work, or ship.",
+      "manifest": {
+        "declared_name": "nba",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "e41b874d68588fe5ef47dd4e5a17ffd7449524e8a4cbf158da51afd8c1a00029",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/nba-e41b874d68",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/nba-e41b874d68",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_ebb95fdeffbc8403d478",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "re0-loop",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/coil/re0-loop",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/coil/re0-loop",
+      "lineage_id": "lineage_3f2b0c675817fdcbaf5a",
+      "description": "Run repeated build -> QA -> re0-memo -> re0-work cycles while preserving learning and letting code die. Use for long agentic projects where progress must be measured by quality-cleared templates, reusable modules, and eliminated anti-patterns rather than hours spent or features accumulated.",
+      "manifest": {
+        "declared_name": "re0-loop",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "a7158b09c1220a5998d320fd1777a457c1a86c96b6b0063d5224659dbdd24a3e",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-loop-a7158b09c1",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-loop-a7158b09c1",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_22bfb59a231b03c78d98",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "re0-memo",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/coil/re0-memo",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/coil/re0-memo",
+      "lineage_id": "lineage_d6b6e5e8a670ae8a3176",
+      "description": "Turn a finished, failed, or disappointing work cycle into portable lessons, anti-patterns, quality gates, and next-cycle vocabulary. Use after a build, QA pass, demo, user complaint, or abandoned attempt when the useful output is what the next pass must learn rather than the code itself.",
+      "manifest": {
+        "declared_name": "re0-memo",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "8fd585b721ed581a54cb2f589626fb44dc9cf7c9dcaf7ac2f49b45b6c4785e0a",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-memo-8fd585b721",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-memo-8fd585b721",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_ae02310b7b991bb5586c",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "re0-plan",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/coil/re0-plan",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/coil/re0-plan",
+      "lineage_id": "lineage_d73e5fe4c73d1ef3f97b",
+      "description": "Open a paperthin iteration's casebook before re0-loop's first turn — seeded with real content the moment the folder exists, never an empty directory. User-invoked, paperthin-only: assumes the full skill package installed. Run when opening a new build cycle in this repo.",
+      "manifest": {
+        "declared_name": "re0-plan",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "c9ddfc2afbc0af203fd10ed292c47cc73310967015ba9377e0ce6c925bb4faba",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-plan-c9ddfc2afb",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-plan-c9ddfc2afb",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_5310158b6ebe16a4ead0",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "re0-work",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/coil/re0-work",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/coil/re0-work",
+      "lineage_id": "lineage_d15bc8e21a5e4e5ec465",
+      "description": "Restart a project or artifact from v0 while preserving only proven lessons, contracts, gates, vocabulary, real-surface tests, and negative corpus. Use when the foundation is wrong, accumulated code is misleading progress, or a new pass should learn from the old one without inheriting its accidental architecture.",
+      "manifest": {
+        "declared_name": "re0-work",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "16594eaa0c45ac862eaee5c34526600b47c561ba9065345d2698cec337bf20ea",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-work-16594eaa0c",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-work-16594eaa0c",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_e4757cf4648a1b527e5e",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "aim",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/aim",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/aim",
+      "lineage_id": "lineage_64ee29f35b1ffd891c66",
+      "description": "When data lands with a thin ask — files, a repo, a paste, a chat scrollback — read it and propose what the user is trying to do with it, as a proposal to confirm rather than a question to answer. Use the moment material arrives without a fully-formed ask, or when the ask reads thinner than the data suggests.",
+      "manifest": {
+        "declared_name": "aim",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "6bb7762b410a1b0e843e0a9043d989652f08577271187190a577e832f7ac3969",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/aim-6bb7762b41",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/aim-6bb7762b41",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_e2ee7f4869edc3802a32",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "autobahn",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/autobahn",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/autobahn",
+      "lineage_id": "lineage_ab8ef1997ac5c9da3fdf",
+      "description": "Carve guardrail-adjacent items out of scope with safe alternatives before risk-adjacent work starts, then run the safe remainder at full strength in a fresh subagent that only ever sees the carved prompt, never the risky input. Use when a task includes stealth, scraping, privacy, IP, policy, licensing, security, or other safety-adjacent material that could be silently dropped, over-elaborated, or needlessly diluted. Fires on the impulse, not only the topic: the moment you notice yourself about to hedge, soften, silently skip, or brace for a refusal, carve before you execute.",
+      "manifest": {
+        "declared_name": "autobahn",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "0bf2f1386124fd0ec8d02c8665d266c47111266dfc4279b4320cb67dd71c1e77",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/autobahn-0bf2f13861",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/autobahn-0bf2f13861",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_3c8f2cffe4d24525a91c",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "debloat",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/debloat",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/debloat",
+      "lineage_id": "lineage_bb3851db271060506d28",
+      "description": "Compress an artifact that has accreted into bloat — padding, over-qualification, fused sentences, walls of enumeration, adjacent restatement — down to its load-bearing density, meaning preserved. Use when prose is correct and current but has grown verbose or patched-over and you want it tight without a full rewrite.",
+      "manifest": {
+        "declared_name": "debloat",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "00b32ac4ecea4e4470782c07748024708675aab443f0e23cb4041f73fa89d202",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/debloat-00b32ac4ec",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/debloat-00b32ac4ec",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_b5bd6e21929b303ce2e9",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "dedash",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/dedash",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/dedash",
+      "lineage_id": "lineage_232ff435ff78f51bad43",
+      "description": "Remove em-dashes and the dashes standing in for them from a user-owned scope, reading each occurrence in context and choosing the punctuation or wording that fits.",
+      "manifest": {
+        "declared_name": "dedash",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "7e65511ca4f8afa2306d59859f412aafa0499658719c68d0f3d14148d41af42a",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/dedash-7e65511ca4",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/dedash-7e65511ca4",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_0c284d04e0ccd3c0427a",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "detool",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/detool",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/detool",
+      "lineage_id": "lineage_02416ea9aca82af7576e",
+      "description": "Make durable artifacts portable by replacing incidental stack, vendor, model, CLI, path, quota, or harness nouns with the mechanism they mean, while keeping provenance, runbooks, and tool-subject claims concrete.",
+      "manifest": {
+        "declared_name": "detool",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "eab0f08957ac7f946de0862d050efe34befd331bd5393deff6985a8b27494645",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/detool-eab0f08957",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/detool-eab0f08957",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_f67ad532c0b0a1178cf3",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "factchk",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/factchk",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/factchk",
+      "lineage_id": "lineage_6b7bd2853c70c44ad727",
+      "description": "Verify reality-grounded claims against external sources in both directions before they ship — could the 'absurd' be real, could the 'obvious' be false or long-established? Use whenever an artifact, or the sentence you are about to write, asserts something as plausible, realistic, absurd, novel, or impossible from intuition rather than a checked source; before relying on a factual claim in prose, a design rationale, a research claim, or a plan. Fires on metacognitive doubt — when you can't actually know, verify instead of trusting the feeling. Scans read-only, then fixes the clear errors or flags the judgment calls; leaves deliberate fiction alone.",
+      "manifest": {
+        "declared_name": "factchk",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "9ca8b91885934e1aa101a9c38fec382410951dcc00fbf76220efc9d0f89e573c",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/factchk-9ca8b91885",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/factchk-9ca8b91885",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_ce3c8af17ea09249ed88",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "feynman",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/depth/feynman",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/feynman",
+      "lineage_id": "lineage_e2f875851c0df93c2ba9",
+      "description": "Press a decision you just made until you can explain it to a skeptic in your own words, or surface the gap where you can't. The Feynman test aimed at a choice: understanding is cheapest to fake the moment after you decide, so a fresh critic presses for what you can't actually explain. Use right after picking an option, especially one an agent laid out without arguing for.",
+      "manifest": {
+        "declared_name": "feynman",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "90a6025f5314305203f52cd01507d4308ddd74ab38ad7c042e2b5772b0236560",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/feynman-90a6025f53",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/feynman-90a6025f53",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_c7571fcc875de44b2e8a",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "hate",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/depth/hate",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/hate",
+      "lineage_id": "lineage_ea180f1e004065405be2",
+      "description": "Attack a plan, design, or argument like you want it to fail before you commit real effort — return the single load-bearing objection and the cheapest experiment that would prove it matters, not a checklist. User-invoked on purpose: a hate-it reflex always in the agent's reach would bias it toward demolition. Weighs many failure axes but owns the synthesis to one root.",
+      "manifest": {
+        "declared_name": "hate",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "2d404fe89478bb520d72ef0da5674dfd1e00ff3e7dde43a5d6aeeb77d8b4ccbd",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/hate-2d404fe894",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/hate-2d404fe894",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_cc58d61458372adaf878",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "macrothink",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/depth/macrothink",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/macrothink",
+      "lineage_id": "lineage_2e3e5a15d229080ea48e",
+      "description": "User-invoked read-only pass for checking whether the current direction is tunnel-visioned: strip the session's bait, fan out 2 to 5 same-model fresh reads, and report divergence first without treating convergence as proof.",
+      "manifest": {
+        "declared_name": "macrothink",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "3eb27c1d74420f1723b800a20c02cf05ac81c526555befd13b3b3f87d5488426",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/macrothink-3eb27c1d74",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/macrothink-3eb27c1d74",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_f0a4ea3be339cb2e94bc",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "mandela",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/mandela",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/mandela",
+      "lineage_id": "lineage_b93836f609772ec074ec",
+      "description": "Audit any eval, metric, experiment, or benchmark for leakage — does external ground-truth enter independently, or are the model, scorer, and designer just confirming a result no outside truth ever produced? Use before trusting any 'how we'll know it worked' — an A/B, a holdout, a score, a validation — and whenever a result feels too clean or self-confirming. Walks an 8-pattern leakage taxonomy and returns only the patterns that fire, each with an independence fix. Read-only.",
+      "manifest": {
+        "declared_name": "mandela",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "f02a13cb7619014c35ac494b61c0592e633a5df48b7a649ef9f86f62ae8e6f0d",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/mandela-f02a13cb76",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/mandela-f02a13cb76",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_a6796d3a941ea87c4615",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "modelchk",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/modelchk",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/modelchk",
+      "lineage_id": "lineage_255ad74b881bcc24ff7f",
+      "description": "Size a task's run before spending it: the cheapest sufficient capability tier (fast, standard, frontier) and the reasoning effort within it, on a neutral scale that binds to whatever levels the model exposes. Use when work seems over- or under-powered, costly, ambiguous, or high-risk, or asks which model class and how much thinking is enough.",
+      "manifest": {
+        "declared_name": "modelchk",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "23bd19f25be8d3323c24aaf1b9966df4a06d31885032969d0a3b66bdbe46fa68",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/modelchk-23bd19f25b",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/modelchk-23bd19f25b",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_fd2f88304cf64f33959e",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "re0-git",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/depth/re0-git",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/re0-git",
+      "lineage_id": "lineage_e5106e6f07e12ae515ee",
+      "description": "Rewrite a finished commit's message into a clean, handoff-ready form in your own log style, so `git log` alone tells the story. User-invoked: run it after a commit.",
+      "manifest": {
+        "declared_name": "re0-git",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "2e6e885953c37b917d34310444995e6232b7db698a8c916b611210b53e591d8f",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-git-2e6e885953",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-git-2e6e885953",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_f354a5e107eabb28069f",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "re0-merge",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/depth/re0-merge",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/re0-merge",
+      "lineage_id": "lineage_1d203a55ef49d7130781",
+      "description": "Review and land an external contribution the way this suite does: gate it against the thesis, land it with the author's credit intact, complete a new skill rather than merging it raw, then approve, credit, and explain before closing. Use when reviewing a pull request, as any collaborator or maintainer, not only the author.",
+      "manifest": {
+        "declared_name": "re0-merge",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "eb3195f5113fe73bc7398fb8171e56657c7a19cf7df882a3a1c06e6e1a38dfed",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-merge-eb3195f511",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-merge-eb3195f511",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_e5808cd3836393d4be7f",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "re0-release",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/depth/re0-release",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/re0-release",
+      "lineage_id": "lineage_2464b40beb627e315706",
+      "description": "Walk a pending change through this repo's shipping and releasing checklist end to end, then tag and publish once confirmed. User-invoked: run it when you've decided to ship.",
+      "manifest": {
+        "declared_name": "re0-release",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "cc6079a6c31fd0a0f42480bbaa479f277e7d50ad387d66877730755c537cbd3b",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-release-cc6079a6c3",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-release-cc6079a6c3",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_4f0f9b4c30b7d42e2e41",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "re0",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/re0",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/re0",
+      "lineage_id": "lineage_b1f11781c5d949bee4e9",
+      "description": "Refresh an existing artifact into the current best v0. Use when the user asks to clean up, sync up, dedupe, de-noise, smooth, rewrite, or update an artifact after iteration; when nearby artifacts may have drifted; or when changes in one place should be reflected across related artifacts while keeping the result minimal.",
+      "manifest": {
+        "declared_name": "re0",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "4ef9ab0222f819f0b0e172887321b3217406407c838df4fd5f42f03ecf6a7486",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-4ef9ab0222",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/re0-4ef9ab0222",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_4d9d4d0762287f1aa6eb",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "readchk",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/readchk",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/readchk",
+      "lineage_id": "lineage_7c132929d52d5bac907e",
+      "description": "Verify the model's understanding of a user's instruction before spending non-trivial work. Use when a request is long, bundled, high-stakes, hard to undo, or has ambiguous scope or referents such as this, that, it, the other one, whatever is cleaner, or whichever order makes sense. Restate internally, cross-check against available context, proceed silently when resolved, and surface only a genuine surviving fork.",
+      "manifest": {
+        "declared_name": "readchk",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "65ae0c888e28e7cca7bed6d2102657eb791df7500ad1a13be92a376be071f00b",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/readchk-65ae0c888e",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/readchk-65ae0c888e",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_15a2e8771297842f6a2f",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "reorder",
+      "artifact_type": "skill",
+      "invocation_mode": "model_invoked",
+      "source_relative_path": "skills/depth/reorder",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/reorder",
+      "lineage_id": "lineage_4b2f1a1b14b238b1e06e",
+      "description": "Realign a listing whose order has gone arbitrary — a list, table, catalog, sections, an enum — into a logical sequence under one stated principle. Move items only: nothing is reworded, added, or removed. Use when the order no longer helps a reader follow the set.",
+      "manifest": {
+        "declared_name": "reorder",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "87367b02bf0b9b868c4932a877f00cf9c61f279d72ab5fabd08e6ffea9601038",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/reorder-87367b02bf",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/reorder-87367b02bf",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_aa9bf97e3caace1f6de7",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "shower",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": "skills/depth/shower",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/shower",
+      "lineage_id": "lineage_ca0be9aef8dfe77ac1f1",
+      "description": "Cold-read the artifact you're focused on from a fresh, zero-context sub-session to confirm it stands on its own — a shower-thought reset for accumulated session bias. Use when a long session has worn away your fresh eyes and you can no longer tell whether the artifact in focus is clear to someone with no prior context; before a handoff, publish, or merge; or when you want a clean-room comprehension smoke test. Spawns a separate context-free reviewer; it diagnoses, it does not fix.",
+      "manifest": {
+        "declared_name": "shower",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "642d9d0627d697ec44b2ac08a15ff500506d78a591ed322e71b29dd1fcd0e08d",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/shower-642d9d0627",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/shower-642d9d0627",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_22d36eefdc8c857961ce",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "sip",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/depth/sip",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/depth/sip",
+      "lineage_id": "lineage_b99a080e12ca38687c49",
+      "description": "After you create or change an artifact or skill, taste-test it with our own skills instead of trusting your in-session judgment — recursive self-improvement, made automatic. Use right after writing or editing anything, before calling it done, committing, or handing it off.",
+      "manifest": {
+        "declared_name": "sip",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "a675d6bedfa065b45e481bee466863fa2cb820e447d7c9f648e4196b10ae7a97",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/sip-a675d6bedf",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/sip-a675d6bedf",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_ce0176691586fbfdffd7",
+      "source_id": "source_local_d7bcc470ac71e912",
+      "source_revision_id": "revision_664626fc7c540a8b22c8d9ea",
+      "skill_name": "prism",
+      "artifact_type": "skill",
+      "invocation_mode": "user_invoked",
+      "source_relative_path": "skills/mesh/prism",
+      "artifact_key": "source_local_d7bcc470ac71e912:skills/mesh/prism",
+      "lineage_id": "lineage_86650cef939af413e682",
+      "description": "Split one artifact — a claim, plan, or file — across 2 to 5 independent lenses, one per genuinely distinct failure mode (correctness, security, readability, cost, adversarial-user), and return their convergence: where they agree, where they disagree, and the single next question that resolves the disagreement. Use when one reviewer isn't enough because the failure modes are heterogeneous, or a claim looks strong to its author and needs cross-lens pressure before it ships.",
+      "manifest": {
+        "declared_name": "prism",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "3c7daf86487c28956a492d64f8b69f1bd2575a088fa23ce2ac7585dee18bf9f3",
+      "canonical_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/prism-3c7daf8648",
+      "canonical_relative_path": "revisions/revision_664626fc7c540a8b22c8d9ea/artifacts/prism-3c7daf8648",
+      "imported_at": "2026-09-13T03:40:40.761Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_7a766996b2dd8e013788",
+      "source_id": "source_local_e98f324f1cc91585",
+      "source_revision_id": "revision_a46993c9f257a7e1f93c5ee0",
+      "skill_name": "skills-platform-guide",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_e98f324f1cc91585:.",
+      "lineage_id": "lineage_897a6dec49116469cb3e",
+      "description": "Skills Platform의 목적과 사용 흐름을 안내하고 스킬 탐색, 설치, 사용 확인, 업데이트, 제거를 지원한다. 플랫폼 온보딩, 추천 스킬셋과 검토 정책, Vercel Skills CLI 설치와 Catalog 관리 방식 선택, 설치된 스킬의 경로·중복·인식 문제를 다룰 때 사용한다. 시스템 훅과 가드 제어, 컴패니언 훅 연동, Antigravity Protojson 규격 검증도 안내한다.",
+      "manifest": {
+        "declared_name": "skills-platform-guide",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "dde9f5252584b897efa0deb144ba6aaa14f11c9d4e0fd4a5b046ddf6128045b4",
+      "canonical_path": "revisions/revision_a46993c9f257a7e1f93c5ee0/artifacts/skills-platform-guide-dde9f52525",
+      "canonical_relative_path": "revisions/revision_a46993c9f257a7e1f93c5ee0/artifacts/skills-platform-guide-dde9f52525",
+      "imported_at": "2026-09-13T03:46:56.567Z",
+      "review_state": "imported"
+    },
+    {
+      "id": "skill_66dde6e93943e4381575",
+      "source_id": "source_local_ac4bbce16f32422a",
+      "source_revision_id": "revision_dfd35cf7987fdab76a499f65",
+      "skill_name": "skill-authoring-standard",
+      "artifact_type": "skill",
+      "invocation_mode": "unspecified",
+      "source_relative_path": ".",
+      "artifact_key": "source_local_ac4bbce16f32422a:.",
+      "lineage_id": "lineage_9d81a8d1c195c074a056",
+      "description": "Route skill authoring, review, and static validation through the official conventions for Codex or Google Antigravity. Use when creating or revising a skill, checking SKILL.md metadata and progressive disclosure, or explaining provider-specific discovery and package structure.",
+      "manifest": {
+        "declared_name": "skill-authoring-standard",
+        "license": null,
+        "allowed_tools": null,
+        "metadata": null
+      },
+      "provider_compatibility": {
+        "codex": true,
+        "antigravity": true
+      },
+      "authoring_ruleset_fingerprint": "antigravity-official-skills@1.0.0+codex-official-skills@1.0.0",
+      "content_digest": "de4dec953225d8071215735a08fe17e99fbcaeee02218a7fe04085afaf4b792e",
+      "canonical_path": "revisions/revision_dfd35cf7987fdab76a499f65/artifacts/skill-authoring-standard-de4dec9532",
+      "canonical_relative_path": "revisions/revision_dfd35cf7987fdab76a499f65/artifacts/skill-authoring-standard-de4dec9532",
+      "imported_at": "2026-09-13T03:46:56.951Z",
       "review_state": "imported"
     }
   ]

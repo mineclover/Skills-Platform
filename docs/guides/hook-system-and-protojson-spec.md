@@ -4,8 +4,20 @@
 
 The Skills Platform hook architecture provides deterministic, multi-agent lifecycle interception and safety governance across Google Antigravity, OpenAI Codex, and Anthropic Claude Code.
 
+### 1.0 Conceptual Taxonomy: Skill vs Hook vs Guard vs Companion Hook
+
+It is essential to distinguish between the four architectural concepts operating across the platform:
+
+| Concept | Layer | Form & Location | Role & Enforcement Boundary |
+| :--- | :--- | :--- | :--- |
+| **Skill (스킬)** | Cognition / Prompt | `SKILL.md` (`.agents/skills/`) | **Soft Guidance (Prompt Level)**: Natural language instructions, decision trees, and workflows that guide the LLM's reasoning. The agent reads and voluntarily follows them. Cannot mechanically prevent mistakes or hallucinations. |
+| **Hook (훅)** | Runtime / Pipeline | `.agents/hooks.json`, `.codex/hooks.json` | **Hard Interceptor (Runtime Level)**: Platform lifecycle triggers executed by the agent runtime (IDE/CLI) right before (`PreToolUse`) or after (`PostToolUse`) tool calls. The agent has no control over its execution. |
+| **Guard (가드)** | Execution / Policy | `.skills-platform/hooks/guards/*.js` | **Hard Enforcement (Execution Level)**: Deterministic scripts executed by hooks that inspect tool arguments and enforce invariants, emitting `{ decision: "allow" \| "deny" }`. Denials abort tool calls instantly. |
+| **Companion Hook (컴패니언 훅)** | Packaging / Co-lifecycle | `<skill-package>/hooks.json` | **Skill-Bound Guard**: A guard bundled directly inside a skill package to mechanically enforce rules declared in the skill's `SKILL.md` (e.g. `test-storm-guard` bound to `scoped-tdd-executor`). Auto-mounts on skill link and unmounts on skill unlink. |
+
+> **Cross-Platform Scope**: Hooks and guards are **not** exclusive to Google Antigravity. They operate across both Google Antigravity (`.agents/hooks.json`) and OpenAI Codex (`.codex/hooks.json`). The specific focus on Antigravity's Protojson specification arises because Antigravity uses an uncompromising C++ Protobuf parser that immediately crashes on undeclared JSON keys, requiring strict output conformity across all guards.
+
 ```
-                    ┌────────────────────────────────────────────────────────┐
                     │               Skills Platform Hook Engine              │
                     └───────────────────────────┬────────────────────────────┘
                                                 │
