@@ -1,17 +1,17 @@
 # Skills Platform Architecture
 
-## 1. Product Boundary & Maintenance Control Plane (MLC)
+## 1. Product Boundary & Open Composability Substrate
 
-Skills Platform is the **registry, activation catalog, and Maintenance Control Plane (MLC)** for AI agent customizations. It manages the continuous closed control loop across:
+Skills Platform is the **registry, activation catalog, and open composability substrate** for AI agent customizations. It supports diverse community workflows while providing the **Modular Lifecycle Context (MLC)** as a comprehensive reference maintenance control plane architecture. When utilizing closed-loop maintenance, it manages the lifecycle across:
 
 ```text
 Prior Context -> Behavior (Skills) -> Evidence -> Context Patch Proposal -> Validated Baseline
 ```
 
-The platform strictly separates the **Target System** (applications, codebases, microservices) from the **Maintenance Control Plane** (Skills Platform).
+The platform strictly separates the **Target System** (applications, codebases, microservices) from the **Maintenance Control Plane & Skill Delivery Substrate** (Skills Platform).
 
 ```text
-Maintenance Control Plane (Skills Platform)
+Reference Maintenance Control Plane Architecture (MLC Implementation)
 ├── Registry Layer     : Element, Topic, Responsibility, Convention, Method, Tool Capability
 ├── Context Layer      : Horizontal Context (Exploration) vs Vertical Context (Single Resolution)
 ├── Behavior Layer     : Horizontal Exploration vs Vertical Resolution vs Validation

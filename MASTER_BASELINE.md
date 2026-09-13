@@ -1,16 +1,18 @@
 # MASTER_BASELINE.md
 
-> **Status**: Frozen Canonical Implementation Baseline  
-> **Core Architecture**: 시스템 유지보수 라이프사이클과 툴 정의 체계 (Maintenance Lifecycle & Tool Governance System)  
+> **Status**: Verified Canonical Baseline & Reference Maintenance Architecture  
+> **Core Philosophy**: 개방형 조합 기저 (Open Composability Substrate) & 시스템 유지보수 레퍼런스 아키텍처 (MLC)  
 > **Audience**: Implementation agents, maintainers, code reviewers, and multi-agent control planes  
-> **Authority**: High normative force — preserves user architectural directives, closed-loop maintenance principles (MLC-01 ~ MLC-14), ADR 0001-0005, and multi-provider delivery specifications.
+> **Authority**: High normative force for verified system invariants (contracts, schemas, security guards, tests). Preserves MLC reference architecture while establishing open composability for diverse community presets.
 
 ---
 
 ## 1. 핵심 철학과 3대 원칙 (Core Philosophy & Invariants)
 
+Skills Platform은 단일 공식이나 획일적 아키텍처를 강제하지 않으며, 커뮤니티의 다양한 개발 철학과 자율적 조합을 1급 시민으로 존중합니다. 동시에, 엄격한 품질과 결정론적 유지가 요구되는 시스템을 위해 다음과 같은 **'지속적인 폐쇄 제어 루프(Continuous Closed-Loop Reference Control Plane)'** 아키텍처를 선택적 레퍼런스 모델로 제공합니다.
+
 유지보수를 단순한 “문제 발생 -> 수정” 과정으로 보지 않는다.  
-유지보수는 다음 네 종류의 자산을 순환시키는 **지속적인 폐쇄 제어 루프 (Continuous Closed-Loop Control Plane)**이다.
+유지보수는 다음 네 종류의 자산을 순환시키는 **지속적인 폐쇄 제어 루프 (Continuous Closed-Loop Control Plane)** 모델을 레퍼런스로 채택할 수 있다.
 
 ```text
 사전 컨텍스트 (Prior Context)
@@ -27,13 +29,13 @@
 
 ---
 
-## 2. 유지보수 시스템 상위 계층 구조 (Maintenance Control Plane)
+## 2. 레퍼런스 유지보수 제어 아키텍처 계층 구조 (Reference Control Plane Architecture)
 
 ```text
 Target System
 실제로 운영·개발·배포되는 제품, 서비스, 모듈, 계약 (Apps, Contracts, Adapters)
 
-Maintenance Control Plane (Skills Platform)
+Reference Maintenance Control Plane (MLC Implementation)
 ├── Registry Layer
 │   ├── Element Registry (독립 시스템 요소 식별자)
 │   ├── Topic Registry (작업 단위 고유 ID 및 라이프사이클)
@@ -77,18 +79,20 @@ Maintenance Control Plane (Skills Platform)
 
 ---
 
-## 3. 모듈화된 프리셋 및 작업 스코프 인벤토리 (Modular Presets)
+## 3. 모듈화된 프리셋 및 작업 스코프 인벤토리 (Modular Presets & Reference Suites)
+
+아래 프리셋들은 프로젝트가 목적에 맞게 독립적으로 채택하거나 `--work-scope`를 통해 동적으로 오버레이할 수 있는 **'선택적 레퍼런스 템플릿(Optional Reference Templates)'**입니다. `recommended` 및 `work_scope_overlay` 역할은 자동 강제가 아니며 사용자/팀의 선택에 완전히 위임됩니다. 독자적인 프리셋과 레시피를 생성·배포하는 방법은 [recipes/README.md](./recipes/README.md) 및 [docs/guides/community-recipes-and-presets.md](./docs/guides/community-recipes-and-presets.md)를 참조하십시오.
 
 | Preset ID | Category | Skills Count | Dynamic Work Scope | Primary Purpose |
 |---|---|:---:|---|---|
-| **`paperthin-reflexes`** | Core Coding Baseline | 28 | (Default) | 일상 코딩, 리팩토링, TDD, 모델 반사신경 |
+| **`paperthin-reflexes`** | Reference Coding Reflexes | 28 | `scope: coding` | 일상 코딩, 리팩토링, TDD용 28개 반사신경 레퍼런스 스위트 (선택적 채택) |
 | **`condensation-core`** | Context Compiler | 3 | `scope: curation` | 80k 단일 정본 구현 기준선 컴파일 |
 | **`baseline-curation-core`** | Deep Architecture | 11 | `scope: architecture` | 8대 도메인 전수 정제 및 아키텍처 축약 |
 | **`mlc-recursive-context`** | H/V Context Engine | 13 | `scope: explore` | 4대 레지스트리 및 9대 H/V 재귀 탐색 |
 | **`mlc-specialist-domains`** | Specialist Overlays | 5 | `scope: specialist` | AI Agent, DevTools, UI Editor 등 전문 도메인 |
 | **`mlc-toolchain-plane`** | Tool & Capability Layer | 6 | `scope: toolchain` | Method 레지스트리, 툴체인 계획, 호출 가드 |
 | **`mlc-lifecycle-governance`** | Lifecycle & Governance | 8 | `scope: governance` | 10단계 케이스 머신, 신호 수집, 책임 게이트 |
-| **`baseline-full-suite`** | Full Master Suite | 43 | (All) | 43종 전체 MLC 제어 평면 일괄 사용 |
+| **`baseline-full-suite`** | Reference Master Suite | 43 | `scope: full` | 43종 전체 MLC 레퍼런스 컴포넌트 번들 (필요 시 일괄 채택) |
 | **`builtin-pristine`** | Clean Slate Baseline | 0 | (Pristine) | 0개 스킬 상태로 안전한 완전 초기화 |
 
 > 📖 **루프 유형별 매트릭스 거버넌스 사양서**: [docs/guides/loop-types-and-skill-presets-matrix.md](./docs/guides/loop-types-and-skill-presets-matrix.md)  
@@ -111,7 +115,9 @@ Maintenance Control Plane (Skills Platform)
 
 ---
 
-## 5. 3단계 자율 라이프사이클 루프 러너 (Autonomous Lifecycle Loop)
+## 5. 3단계 자율 라이프사이클 루프 러너 (Autonomous Lifecycle Loop Reference)
+
+3단계 자율 라이프사이클 루프(Plan ➔ Inner Loop TDD ➔ Release Gate)는 복합 작업 시 에이전트의 컨텍스트 오염과 테스트 스톰을 방지하기 위해 제공되는 **선택적 레퍼런스 절차 루프(Reference Procedure Loop)**입니다. 개별 프로젝트는 필요에 따라 이 루프를 사용하거나, 더 가벼운 독자적인 실행 방식을 자유롭게 선택할 수 있습니다.
 
 `skills-platform loop run --prd <path> --project <path> --provider <provider>`
 
@@ -130,7 +136,7 @@ Maintenance Control Plane (Skills Platform)
 
 ---
 *참조 결정 기록: ADR 0001 ~ ADR 0007 (Telemetry Hook Engine & Lifecycle Loop Architecture).*
-*시스템 유지보수 라이프사이클과 툴 정의 체계 (MLC) 정본 기준선 — Skills Platform Control Plane.*
+*시스템 유지보수 라이프사이클과 툴 정의 체계 (MLC) 레퍼런스 기준선 — Skills Platform Open Composability Substrate.*
 ---
 
 ## 7. 프로덕션 보안 가드 훅 & 쇼트서킷 엔진 (Production Guard Hook Engine)

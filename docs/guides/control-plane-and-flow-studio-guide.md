@@ -40,7 +40,7 @@ skills-platform hook sync
 
 ## 2. 🔄 3단계 자율 라이프사이클 루프 운용법
 
-Skills Platform은 작업의 크기에 상관없이 **3단계 상태 머신**을 통해 에이전트의 컨텍스트 오염과 무분별한 테스트 스톰을 기계적으로 차단합니다.
+Skills Platform은 대규모 또는 복합 작업 시 에이전트의 컨텍스트 오염과 무분별한 테스트 스톰을 방지할 수 있도록 **선택적 3단계 상태 머신(Reference 3-Phase Lifecycle Loop)**을 제공합니다. 프로젝트는 작업 성격에 따라 이 절차 루프를 채택하거나 독립적인 경량 워크플로우를 자유롭게 운용할 수 있습니다.
 
 ```text
 [ 📑 PRD.md ] ──➔ [ Phase 1: Plan ] ──➔ [ Phase 2: Scoped Inner Loop ] ──➔ [ Phase 3: Release Gate ]
