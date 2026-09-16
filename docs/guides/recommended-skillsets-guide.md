@@ -17,6 +17,60 @@ Skills Platform의 추천은 **프로젝트에 필요한 최소 기본셋을 먼
 
 Catalog에 저장한 family·출처 태그는 탐색을 돕는 분류입니다. `review_state`는 실제 검토한 수준을 유지하고, 태그 정리만으로 `reviewed`나 `healthy`로 승격하지 않습니다. 과거 전체 목록이나 추천 표를 현재 설치 목록으로 사용하지 않습니다.
 
+---
+
+## 1.1 다축 택소노미(Multi-Axis Taxonomy)와 페르소나 지식 라우팅
+
+Skills Platform은 복잡한 스킬 체계를 5개 핵심 개체와 3차원 직교(Orthogonal) 축으로 엄밀히 구분하여 관리합니다.
+
+```
+[차원 A: 배포/패키징 축]      [차원 B: 런타임 제어/합성 축]       [차원 C: 인지적 페르소나/지식 축]
+   (Packaging/Delivery)          (Runtime Configuration)            (Cognitive Persona & Routing)
+         │                               │                                     │
+    Recipe / Tarball             Catalog / Presets                       7 Expert Personas
+(독립 이식·공유 매니페스트)     (버전 템플릿·스코프 오버레이)               (전문가별 지식 2계층 분리)
+         │                               │                                     │
+         └───────────────┬───────────────┘                                     │
+                         ▼                                                     ▼
+                Effective Skillset                                      Subagent Routing
+               (런타임 최종 활성 집합)                                (invoke_subagent로 위임)
+```
+
+### 5대 핵심 개체 정의
+1. **원자적 스킬 (Atomic Skill)**: 최소 단위의 실행 가능한 지식 패키지(`SKILL.md`, `scripts/`, `references/`). 특정 런북이나 도구 인터페이스를 완결성 있게 격리합니다.
+2. **프리셋 (Preset)**: `catalog.json`의 `presets[]`에 등록된 버전 관리 구성 템플릿. 역할(`default`, `recommended`, `work_scope_overlay`)과 `priority`를 갖습니다.
+3. **스킬셋 (Skillset)**: 특정 프로젝트와 작업 범위에서 합성된 **런타임 최종 활성 상태(`EffectiveSkillSet`)**. 기본 프리셋에 작업 범위(`work_scope_overlay`)가 결합된 런타임 인스턴스입니다.
+4. **레시피 (Recipe)**: 외부 공유 및 머신 간 독립 이식을 위한 단일 파일 패키징 매니페스트(`*-recipe.json`, `recipes/index.json`).
+5. **페르소나 (Persona)**: 인지적 역할 아키타입(Cognitive Archetype). 작업을 전문 영역별로 분할하고, 스킬을 **직무 고유 지식**과 **범용 공유 지식**으로 구조화하여 서브에이전트 위임의 기준이 됩니다.
+6. **작업 스코프 (Work Scope)**: 프로젝트의 현재 상황적 맥락을 나타내는 태그(`--work-scope <tag>`).
+
+### 3차원 직교 매트릭스
+| 차원 | 핵심 질문 | 대표 개체 | 주요 메커니즘 |
+| --- | --- | --- | --- |
+| **차원 A: 배포/패키징 축** | 어디서 가져와 어떻게 배포할 것인가? | Recipe, Package Tarball, Registry Revisions, Adapters | 레시피 export/import, tarball 검증, adapter 파일 복사/심볼릭 링크 |
+| **차원 B: 런타임 제어/합성 축** | 현재 프로젝트/작업에 어떤 스킬을 활성화할 것인가? | Catalog, Presets, Work Scope Overlays, Priority | `project resolve --work-scope`, dynamic overlay, lineage 충돌 해결 |
+| **차원 C: 인지적 페르소나/지식 축** | 누가 어떤 깊이의 지식으로 이 작업을 수행할 것인가? | 7 Expert Personas, Specialized vs Cross-Functional Knowledge | `invoke_subagent` (Role 위임), 2계층 지식 라우팅, 컨텍스트 격리 |
+
+### 7대 전문가 페르소나와 2계층 지식 구조
+- 🔒 **직무 고유 지식 (Specialized Knowledge)**: 특정 전문 분야의 독보적 도메인 지식, 전용 프로토콜, 폐쇄적 런북 (해당 전문가 서브에이전트 호출 시에만 컨텍스트에 주입).
+- 🌐 **범용 공유 지식 (Cross-Functional Knowledge)**: 모든 작업에서 공통 기반으로 참조하는 안전 규격, 프로세스 위생, 단위 테스트 격리 원칙 (`deterministic-test-runner`, `chrome-instance-hygiene`, `skill-authoring-standard` 등).
+
+| 페르소나 | 주요 특화 도메인 | 🔒 직무 고유 지식 (Specialized) | 🌐 범용 공유 지식 (General) |
+| --- | --- | --- | --- |
+| **디버깅 전문가** | 런타임 결함 격리 & libuv 진단 | `deterministic-test-runner`, `lch-failure-recovery` | `scoped-tdd-executor`, `skill-authoring-standard` |
+| **크롬 자동화 전문가** | 브라우저 자동화 & 프로세스 위생 | `chrome-instance-hygiene`, `chrome-extensions` | `modern-web-guidance`, `deterministic-test-runner` |
+| **포토샵 작업 전문가** | PSD 제작, Generator TCP & Action Manager | `photoshop-toolchain-workflow` | `svg-authoring`, `scoped-tdd-executor` |
+| **웹 프로그래밍 전문가** | 모던 프론트엔드 & TypeScript AST | `modern-web-guidance`, `lch-contract-compiler` | `deterministic-test-runner`, `generative_ui` |
+| **디자인 전문가** | 수학적 SVG 엔지니어링 & 시각 시스템 | `svg-authoring`, `generative_ui` | `modern-web-guidance`, `scene-content-authoring` |
+| **스토리텔러** | 씬 아키텍처 & 인터랙티브 서사 | `scene-content-authoring`, `openwiki-grounding`, `openwiki-cli` | `svg-authoring`, `generative_ui` |
+| **QA 전문가** | 결정론적 테스트 & 가드 거버넌스 | `deterministic-test-runner`, `scoped-tdd-executor`, `lch-independent-auditor` | `chrome-instance-hygiene`, `skill-authoring-standard` |
+
+### 전문가 라우팅 어드바이저와 비-붕괴 원칙 (Persona ≠ Preset)
+- **비-붕괴 원칙**: 페르소나는 **행위자(Actor)**이고 프리셋은 **구성 템플릿(Config)**입니다. 하나의 페르소나가 상황에 따라 여러 프리셋과 스코프를 유연하게 활용하므로 1:1로 결합하거나 단일 프리셋으로 축소하지 않습니다.
+- **서브에이전트 위임**: 복합 작업 발생 시 메인 에이전트가 단일 컨텍스트를 과적(Overload)하지 않고, `invoke_subagent`에 `Role: "Chrome Automation Specialist"` 등의 전문가 직무를 명시하여 분할 위임합니다.
+
+---
+
 ## 2. Skills Platform Codex 프로젝트의 최소 기본셋
 
 기본 프리셋 ID는 `skills-platform-authoring-codex`입니다. 이름은 기존 호환성을 위해 유지하며, 현재 선언은 운영 안내까지 포함합니다. 아래 순서는 사용 흐름입니다.

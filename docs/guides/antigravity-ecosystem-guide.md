@@ -255,3 +255,31 @@ cat ~/.gemini/config/config.json
 # 5. Execute live Antigravity ecosystem test suite
 node --test apps/skills-catalog/test/antigravity-ecosystem.test.js
 ```
+
+---
+
+## 7. Multi-Agent Persona Orchestration & Two-Tier Knowledge Routing
+
+In Antigravity 2.0, complex engineering tasks are broken down and delegated across specialized subagents acting as **Cognitive Personas**. This architectural pattern preserves context tokens and prevents prompt interference.
+
+### 7.1 The 3 Orthogonal Dimensions
+The Skills Platform taxonomy defines 3 orthogonal dimensions that operate simultaneously:
+1. **Dimension A: Packaging & Delivery (배포/패키징 축)**: Recipes (`*-recipe.json`), Packages, Tarballs, Registry Revisions, and Adapters.
+2. **Dimension B: Runtime Resolution & Configuration (런타임 제어/합성 축)**: Catalog, Presets, Work Scope Overlays (`--work-scope`), and Priority resolution producing the `EffectiveSkillSet`.
+3. **Dimension C: Cognitive Role & Knowledge Routing (인지적 페르소나/지식 축)**: 7 Expert Personas, Specialized vs. Cross-Functional Knowledge partitioning, and subagent delegation (`invoke_subagent` with `Role`).
+
+### 7.2 The 7 Expert Personas
+1. **Debugging Specialist (`debugging-specialist`)**: 비동기 레이스 컨디션, 메모리/이벤트루프 핸들 누수, 런타임 이상 징후 정밀 추적 (`deterministic-test-runner`, `lch-failure-recovery`).
+2. **Chrome Automation Specialist (`chrome-automation-specialist`)**: CDP 프로토콜 제어, 헤드리스 프로세스 수명주기 격리, 브라우저 자동화 위생 (`chrome-instance-hygiene`, `chrome-extensions`).
+3. **Photoshop Specialist (`photoshop-workflow-specialist`)**: Generator TCP 49494 소켓 통신, 선언적 Action Manager JSX, TypeSpec 스키마 정합성 (`photoshop-toolchain-workflow`).
+4. **Web Frontend Specialist (`web-programming-specialist`)**: 현대적 웹 표준(CSS/JS API), React 19/TypeScript AST, 무손실 계약 컴파일 (`modern-web-guidance`, `lch-contract-compiler`).
+5. **Design & Visual Specialist (`design-specialist`)**: 수학적 정밀도의 벡터 그래픽(SVG), 인터랙티브 UI 디자인 시스템, 시각 계층 설계 (`svg-authoring`, `generative_ui`).
+6. **Interactive Storyteller (`storyteller-specialist`)**: 인터랙티브 서사 구조화, 순수 데이터 딕셔너리 매핑(view(state)), 3-lane 스케줄링 (`scene-content-authoring`, `openwiki-grounding`, `openwiki-cli`).
+7. **Deterministic QA Specialist (`qa-deterministic-specialist`)**: 결정론적 프로세스 테어다운, 1:1 핀포인트 TDD 거버넌스, 테스트 스톰 원천 차단 (`deterministic-test-runner`, `scoped-tdd-executor`, `lch-independent-auditor`).
+
+### 7.3 Two-Tier Knowledge Separation
+- 🔒 **Specialized Knowledge (직무 고유 지식)**: Domain-heavy protocols, deep DSLs, and specialized procedures kept within persona subagents.
+- 🌐 **Cross-Functional Knowledge (범용 공유 지식)**: Common safety guards (`deterministic-test-runner`, `chrome-instance-hygiene`, `skill-authoring-standard`) available to all agents.
+
+### 7.4 Non-Collapsing Invariant (Persona ≠ Preset)
+A Persona is an **Actor** (orchestration identity), whereas a Preset is a **Static Configuration** (skill membership & priorities). A single persona utilizes different presets and scopes depending on the task lifecycle phase (e.g. Chrome Specialist uses `debugging` during diagnosis and `qa` during regression verification).

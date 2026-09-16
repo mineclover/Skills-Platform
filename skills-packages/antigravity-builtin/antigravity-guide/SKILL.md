@@ -1,6 +1,6 @@
 ---
 name: antigravity-guide
-description: Provides a comprehensive guide, quick reference, and sitemap for Google Antigravity (AGY), including the Antigravity CLI (agy), Antigravity 2.0, Antigravity IDE, Python SDK, slash commands, keybindings, and customizations (skills, rules, MCP, sidecars). Activate this skill when the user asks questions about how to use, configure, or customize Antigravity, AGY, the agy CLI, the Antigravity IDE, or Antigravity 2.0.
+description: Provides a comprehensive guide, quick reference, and sitemap for Google Antigravity (AGY), including the Antigravity CLI (agy), Antigravity 2.0, Antigravity IDE, Python SDK, slash commands, keybindings, multi-agent subagent orchestration (7 Expert Personas & 2-tier knowledge), and customizations (skills, rules, MCP, sidecars). Activate this skill when the user asks questions about how to use, configure, or customize Antigravity, AGY, the agy CLI, the Antigravity IDE, or Antigravity 2.0.
 ---
 
 # Google Antigravity (AGY) Guide & Sitemap
@@ -26,6 +26,10 @@ subdocumentation in the `references/` directory of this skill:
         (https://github.com/google-antigravity/antigravity-sdk-python) for
         programmatic agent leasing, orchestration APIs, and custom tool
         exposing.
+-   **Multi-Agent Personas & Subagent Routing**: [references/personas-and-subagents.md](references/personas-and-subagents.md)
+    -   Covers subagent lifecycle orchestration (`invoke_subagent`), the 7 Expert
+        Personas, two-tier knowledge architecture (Specialized vs Cross-Functional),
+        and Skills Platform control plane integration.
 
 --------------------------------------------------------------------------------
 
