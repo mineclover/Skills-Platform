@@ -7,6 +7,7 @@ import {
   Settings,
   Shield,
   Sparkles,
+  Users,
   Workflow,
 } from "lucide-react";
 
@@ -18,6 +19,11 @@ export interface NavItemDef {
 }
 
 export const navigation: NavItemDef[] = [
+  {
+    label: "Personas",
+    icon: Users,
+    tooltip: "7 Expert Personas, Specialized vs General Knowledge & Skill Routing",
+  },
   {
     label: "Skills",
     icon: Database,

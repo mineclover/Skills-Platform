@@ -18,6 +18,7 @@ import { SkillWorkspace } from "./components/SkillWorkspace";
 import { TemplateWorkspace } from "./components/TemplateWorkspace";
 import { HookWorkspace } from "./components/HookWorkspace";
 import { FlowStudioCanvas } from "./components/flow/FlowStudioCanvas";
+import { PersonaWorkspace } from "./components/PersonaWorkspace";
 import {
   calculateProjectStatus,
   ProjectStatusPill,
@@ -1065,7 +1066,9 @@ export function CatalogApp() {
     <main className="app-shell">
       <SideNavigation activePage={activePage} onNavigate={setActivePage} />
       <div className="workspace">
-        {activePage === "Skills" ? (
+        {activePage === "Personas" ? (
+          <PersonaWorkspace />
+        ) : activePage === "Skills" ? (
           <>
             <SkillWorkspace
               skills={catalogSkills}
