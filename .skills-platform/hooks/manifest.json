@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-09-13T03:28:01.011Z",
+  "updated_at": "2026-09-14T23:45:55.481Z",
   "hooks": [
     {
       "id": "secret-leak-guard",
@@ -172,6 +172,30 @@
       "associated_skill": null,
       "metadata": {
         "system": true
+      }
+    },
+    {
+      "id": "deterministic-test-guard",
+      "name": "Deterministic Test Execution Guard",
+      "event": "on_test_run",
+      "description": null,
+      "enabled": true,
+      "matcher": null,
+      "handler": {
+        "type": "script",
+        "target": "skills-packages/platform-core/deterministic-test-runner/scripts/test-execution-guard.js",
+        "timeout_ms": 5000
+      },
+      "priority": 100,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "failure_policy": "open",
+      "associated_skill": "deterministic-test-runner",
+      "metadata": {
+        "associated_skill": "deterministic-test-runner"
       }
     }
   ]

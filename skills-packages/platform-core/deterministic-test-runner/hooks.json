@@ -1,0 +1,30 @@
+{
+  "hooks": [
+    {
+      "id": "deterministic-test-guard",
+      "name": "Deterministic Test Execution Guard",
+      "event": "on_test_run",
+      "description": "Ensures test runner commands include deterministic exit signals, force-exit flags, or preload teardown hooks to prevent dangling background processes.",
+      "enabled": true,
+      "matcher": "test|run_command",
+      "handler": {
+        "type": "script",
+        "target": "scripts/test-execution-guard.js",
+        "timeout_ms": 2000
+      },
+      "priority": 40,
+      "providers": [
+        "antigravity",
+        "claude",
+        "codex"
+      ],
+      "failure_policy": "open",
+      "metadata": {
+        "system": true,
+        "category": "safety",
+        "associated_skill": "deterministic-test-runner",
+        "companion": true
+      }
+    }
+  ]
+}
